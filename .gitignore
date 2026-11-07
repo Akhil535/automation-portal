@@ -19,6 +19,9 @@ config.json
 .env
 .env.*
 
+# an accidental second copy of the repository inside this folder
+automation-portal/
+
 # Office lock files and temporary files
 ~$*
 *.tmp

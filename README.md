@@ -4,14 +4,14 @@
 
 Needs Node.js 20 or newer (https://nodejs.org) and Microsoft Word (for the PDF files).
 
-1.  and open the folder.
-2. Double-click **setup.bat** – it creates  from  and installs the packages.
+1. `git clone https://github.com/Akhil535/automation-portal.git` and open the folder.
+2. Double-click **setup.bat** – it creates `config.json` from `config.example.json` and installs the packages.
 3. Double-click **start-portal.bat** – the portal opens at http://localhost:8080.
 4. On first start, create the administrator (only possible on that PC itself) and set up two-factor sign-in.
 5. Optional: **install-startup.bat** starts it automatically when Windows starts.
 
 Facility data, master templates, passwords and keys are not in the repository – each PC keeps its own
-(, , ).
+(`facilities/`, `data/`, `config.json`).
 
 
 A small web portal that checks the Department of Health – Abu Dhabi circulars every night. When it finds
