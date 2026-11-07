@@ -1,0 +1,1115 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compliance Portal – Policies · LEGAL REGISTER · DoH</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- ============================== Top bar ============================== -->
+<!-- ============================== Side menu ============================== -->
+<div class="mobilebar">
+  <button type="button" class="sb-burger" id="sb-burger" aria-label="Open the menu"><svg viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg></button>
+  <b id="mb-title">Compliance Portal</b>
+</div>
+<div class="sb-scrim" id="sb-scrim"></div>
+<aside class="sidebar" id="sidebar">
+  <div class="sb-app">
+    <span class="sb-app-mark"><svg viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5zm-1.2 14.2-3.5-3.5 1.4-1.4 2.1 2.1 4.9-4.9 1.4 1.4z"/></svg></span>
+    <span class="sb-app-name"><b>Compliance Portal</b><small>ADHICS · LEGAL REGISTER · DoH</small></span>
+  </div>
+
+  <!-- facility switcher: the facility you are working on -->
+  <div class="fs" id="fs">
+    <button type="button" class="fs-btn" id="fs-btn" aria-haspopup="listbox" aria-expanded="false" data-hc="tip" data-tip="Switch to another facility">
+      <span class="fs-logo"><img id="fac-logo" alt="" hidden><span id="logo-fallback" class="logo-fallback">LR</span></span>
+      <span class="fs-text"><small>Working on</small><b id="side-fac-name">–</b><em id="side-fac-code"></em></span>
+      <svg class="fs-chev" viewBox="0 0 24 24"><path d="M7 10l5-5 5 5zm0 4 5 5 5-5z"/></svg>
+    </button>
+    <div class="fs-pop" id="fs-pop" hidden>
+      <input type="search" id="fs-search" placeholder="Find a facility…" autocomplete="off">
+      <div class="fs-list" id="fs-list" role="listbox"></div>
+      <div class="fs-actions" data-admin>
+        <button type="button" class="fs-add" id="fs-new">＋ New facility <small>policy pack first</small></button>
+        <button type="button" class="fs-add sub" id="btn-add-facility">＋ Add with an existing Excel register</button>
+      </div>
+    </div>
+    <select id="facility-select" hidden></select>
+  </div>
+  <div class="sb-label">Your work</div>
+  <nav id="tabs" class="sb-nav" aria-label="Main menu">
+      <button data-tab="overview" class="active"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Dashboard</button>
+      <button data-tab="policies"><svg class="ico" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>Prepare policies<span class="sb-step">1</span></button>
+      <button data-tab="hr"><svg class="ico" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 11l2 2 4-4M9 17h6"/></svg>HR &amp; checklist<span class="sb-step">2</span></button>
+      <button data-tab="thirdparty"><svg class="ico" viewBox="0 0 24 24"><path d="M11 17l2 2a1.4 1.4 0 0 0 2-2"/><path d="M14 14l2.5 2.5a1.4 1.4 0 0 0 2-2L15 11l-1-1-3 3a1.4 1.4 0 0 1-2-2l3.3-3.3a3 3 0 0 1 3.4-.6L18 8l3-1v8l-2 1"/><path d="M3 7l3-1 4 1M3 7v8l5 4a1.4 1.4 0 0 0 2-2"/></svg>3rd-party documents</button>
+      <button data-tab="master"><svg class="ico" viewBox="0 0 24 24"><path d="M12 3v18M5 7h14M5 7l-3 7a3.5 3.5 0 0 0 6 0zM19 7l-3 7a3.5 3.5 0 0 0 6 0zM8 21h8"/></svg>LEGAL REGISTER<span class="sb-step">3</span></button>
+      <button data-tab="circulars"><svg class="ico" viewBox="0 0 24 24"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>DoH updates<span class="sb-step sb-live" title="Always on – checked every week">↻</span></button>
+      <button data-tab="exports"><svg class="ico" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Downloads</button>
+      <button data-tab="settings"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Facility settings</button>
+      <div class="sb-label sb-admin-label" data-admin>Administration</div>
+      <button data-tab="admin" data-adm="masters" data-admin><svg class="ico" viewBox="0 0 24 24"><path d="M8 3h9l4 4v11a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M3 7v12a2 2 0 0 0 2 2h10M12 11h5M12 15h5"/></svg>Policy templates</button>
+      <button data-tab="admin" data-adm="facilities" data-admin><svg class="ico" viewBox="0 0 24 24"><path d="M4 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M16 9h2a2 2 0 0 1 2 2v10M2 21h20M8 7h4M8 11h4M8 15h4"/></svg>Facilities</button>
+      <button data-tab="admin" data-adm="users" data-admin><svg class="ico" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M16 3.1a4 4 0 0 1 0 7.8M22 21a7 7 0 0 0-4-6.3"/></svg>Users &amp; access<span class="sb-badge" id="sb-pending" hidden></span></button>
+      <button data-tab="admin" data-adm="schedule" data-admin><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M12 14v3l2 1"/></svg>Schedule &amp; email</button>
+      <button data-tab="admin" data-adm="logs" data-admin><svg class="ico" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>Activity log</button>
+    </nav>
+  <div class="sb-foot">
+    <div class="theme-switch" role="group" aria-label="Colour theme">
+        <button type="button" data-theme-set="light" title="Light mode"><svg viewBox="0 0 24 24"><path d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zM11 1h2v3h-2zm0 19h2v3h-2zM1 11h3v2H1zm19 0h3v2h-3zM4.2 2.8l2.1 2.1-1.4 1.4-2.1-2.1zm14.9 14.9 2.1 2.1-1.4 1.4-2.1-2.1zM2.8 19.8l2.1-2.1 1.4 1.4-2.1 2.1zM17.7 4.9l2.1-2.1 1.4 1.4-2.1 2.1z"/></svg>Light</button>
+        <button type="button" data-theme-set="dark" title="Dark mode"><svg viewBox="0 0 24 24"><path d="M21 14.5A9 9 0 0 1 9.5 3a9 9 0 1 0 11.5 11.5z"/></svg>Dark</button>
+      </div>
+    <details class="menu user-menu">
+        <summary><span class="avatar" id="me-avatar">?</span><span class="who"><b id="me-name">–</b><small id="me-role"></small></span></summary>
+        <div class="menu-pop up">
+          <button type="button" id="menu-account">My account</button>
+          <button type="button" id="btn-logout" class="danger-txt">Sign out</button>
+        </div>
+      </details>
+  </div>
+</aside>
+
+<main class="page">
+  <!-- the process, start to finish: done ✓ · do this now · later; plus the one next step -->
+  <nav class="flow" id="flow" aria-label="Your progress">
+    <ol class="flow-steps">
+      <li data-f="0" class="done"><span class="fl-dot"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><span class="fl-txt"><b>Start</b><small>Facility set up</small></span></li>
+      <li data-f="1"><button type="button" data-goto="policies"><span class="fl-dot">1</span><span class="fl-txt"><b>Prepare policies</b><small id="fl-s1">–</small></span></button></li>
+      <li data-f="2"><button type="button" data-goto="hr"><span class="fl-dot">2</span><span class="fl-txt"><b>HR documents</b><small id="fl-s2">–</small></span></button></li>
+      <li data-f="3"><button type="button" data-goto="master"><span class="fl-dot">3</span><span class="fl-txt"><b>LEGAL REGISTER</b><small id="fl-s3">–</small></span></button></li>
+      <li data-f="4"><span class="fl-dot"><svg viewBox="0 0 24 24"><path d="M5 21V4h11l-1.5 4L16 12H7v9z"/></svg></span><span class="fl-txt"><b>Finished</b><small id="fl-s4">Everything up to date</small></span></li>
+    </ol>
+    <div class="flow-next" id="flow-next">
+      <span class="fn-badge" id="fn-badge">Next step</span>
+      <div class="fn-body"><b id="fn-title">–</b><small id="fn-sub"></small></div>
+      <button type="button" class="btn primary" id="fn-go">Go →</button>
+    </div>
+  </nav>
+  <!-- shown while an administrator works on the master template -->
+  <div class="tpl-banner" id="tpl-banner" hidden>
+    <span class="tpl-star">★</span>
+    <div><b>Master template – <span id="tpl-name"></span></b><small>Every new facility copies its register and policies from this template. It is hidden from the facility list and not monitored.</small></div>
+    <button type="button" class="btn small" id="tpl-leave">Back to my facilities</button>
+  </div>
+
+  <!-- no facility yet -->
+  <section id="nofac" class="tab">
+    <div class="nofac">
+      <div class="nofac-art"><svg viewBox="0 0 24 24"><path d="M3 21V7l9-4 9 4v14h-7v-6h-4v6zm6-11h2V8H9zm4 0h2V8h-2zm-4 4h2v-2H9zm4 0h2v-2h-2z"/></svg></div>
+      <h1 id="nofac-title">Create your first facility</h1>
+      <p class="muted" id="nofac-text">Facilities you add appear here. Start with the policy pack: the 33 ADHICS policies are prepared for the new facility from the master template, then its LEGAL REGISTER is created.</p>
+      <ol class="nofac-steps"><li><i>1</i>Facility details &amp; policy pack</li><li><i>2</i>HR &amp; onboarding documents</li><li><i>3</i>LEGAL REGISTER</li></ol>
+      <div class="btn-row center" data-admin>
+        <button type="button" class="btn primary big" id="nofac-new">＋ New facility</button>
+        <button type="button" class="btn" id="nofac-excel">Add with an existing Excel register</button>
+      </div>
+    </div>
+  </section>
+  <!-- ============================== Home ============================== -->
+  <section id="overview" class="tab active">
+    <header class="hx-head">
+      <div class="hx-hello">
+        <p class="hx-date" id="hx-date"></p>
+        <h1 id="home-hello">Dashboard</h1>
+        <p class="muted" id="home-sub">Here is where your facility stands. Follow the steps above from Start to Finished – the highlighted step is the one to do now.</p>
+      </div>
+      <div class="hx-actions">
+        <button class="btn" id="qa-upload" data-write data-hc="tip" data-tip="Licences, certificates, contracts or photos of them – the dates are read for you"><svg viewBox="0 0 24 24"><path d="M11 16V7.8l-3.3 3.3-1.4-1.4L12 4l5.7 5.7-1.4 1.4L13 7.8V16zm-6 4v-6h2v4h10v-4h2v6z"/></svg>Upload documents</button>
+        <a class="btn" id="qa-excel" href="/api/register/download" data-hc="tip" data-tip="The master Excel register with all current dates"><svg viewBox="0 0 24 24"><path d="M11 4h2v8.2l3.3-3.3 1.4 1.4L12 16l-5.7-5.7 1.4-1.4 3.3 3.3zM5 18h14v2H5z"/></svg>Excel<span class="new-dot" id="qa-new" hidden>updated</span></a>
+        <button class="btn" id="qa-pdf" data-hc="tip" data-tip="A one-page compliance summary to print or share"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6zm8 1.5V8h4.5M8 12h8v1.5H8zm0 4h8v1.5H8z"/></svg><span id="qa-pdf-label">PDF report</span></button>
+        <button class="btn" id="qa-entry" data-write data-hc="tip" data-tip="Add a licence, certificate or contract to the register"><svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>Entry</button>
+      </div>
+    </header>
+    <div id="alerts"></div>
+
+    <!-- How it works: an animated isometric scene of the process, with this facility's real progress -->
+    <section class="card iso-card" id="iso-card" aria-label="How it works">
+      <header class="iso-top">
+        <div><span class="pw-kicker">How it works</span><h2>Policies → HR documents → LEGAL REGISTER</h2></div>
+        <div class="iso-ctrl">
+          <button type="button" class="btn small" id="iso-play" aria-label="Pause">❚❚ Pause</button>
+          <button type="button" class="btn small" id="iso-hide" aria-label="Hide the animation">Hide</button>
+        </div>
+      </header>
+      <div class="iso-stage" id="iso-stage" role="img" aria-label="Animated picture: documents travel from Policies to the LEGAL REGISTER to DoH updates and to the finish flag"></div>
+      <div class="iso-caption">
+        <div class="iso-dots" id="iso-dots" role="tablist" aria-label="Steps">
+          <button type="button" data-k="0" role="tab">1</button><button type="button" data-k="1" role="tab">2</button><button type="button" data-k="2" role="tab">3</button><button type="button" data-k="3" role="tab">✓</button>
+        </div>
+        <div class="iso-text"><b id="iso-title">–</b><span id="iso-sub"></span></div>
+        <button type="button" class="btn primary small" id="iso-go">Open this step →</button>
+      </div>
+      <div class="iso-bar"><i id="iso-bar"></i></div>
+    </section>
+    <div class="iso-show" id="iso-show" hidden><button type="button" class="link-btn" id="iso-unhide">▶ Show "How it works"</button></div>
+
+    <!-- The journey: 1 Policies -> 2 HR documents -> 3 LEGAL REGISTER (final); DoH monitoring runs all the time -->
+    <ol class="jr-track" id="jr-track">
+      <li data-jr="1"><button type="button" data-goto="policies"><i>1</i><span><b>Policies</b><small id="jr-s1">–</small></span></button></li>
+      <li data-jr="2"><button type="button" data-goto="hr"><i>2</i><span><b>HR documents</b><small id="jr-s2">–</small></span></button></li>
+      <li data-jr="3"><button type="button" data-goto="master"><i>3</i><span><b>LEGAL REGISTER</b><small id="jr-s3">–</small></span></button></li>
+    </ol>
+
+    <div class="jr-grid">
+      <!-- Step 1: Policies -->
+      <article class="card jr-card" id="jr-c1">
+        <header class="jr-head"><span class="jr-num">1</span><div><span class="hx-eyebrow">Step 1</span><h2>Policy documents</h2></div><span class="jr-state" id="jr-st1"></span></header>
+        <div id="hx-policies" class="hx-pol-body"><p class="muted small">Loading…</p></div>
+        <div class="btn-row">
+          <button class="btn primary small" id="hx-pol-open">Open Policies →</button>
+          <a class="btn small" id="jr-zip" href="#" hidden>⬇ Word + PDF (.zip)</a>
+        </div>
+      </article>
+
+      <!-- Step 2: HR & onboarding documents -->
+      <article class="card jr-card" id="jr-c2">
+        <header class="jr-head"><span class="jr-num">2</span><div><span class="hx-eyebrow">Step 2</span><h2>HR &amp; onboarding documents</h2></div><span class="jr-state" id="jr-st2"></span></header>
+        <div id="hx-hr" class="hx-pol-body"><p class="muted small">Loading…</p></div>
+        <p class="small muted" id="hx-hr-checklist"></p>
+        <div class="btn-row"><button class="btn primary small" type="button" data-goto="hr" id="hx-hr-open">Open HR &amp; checklist →</button></div>
+      </article>
+
+      <!-- Step 3 (final): LEGAL REGISTER -->
+      <article class="card jr-card" id="jr-c3">
+        <header class="jr-head"><span class="jr-num">3</span><div><span class="hx-eyebrow">Step 3 · final</span><h2>LEGAL REGISTER</h2></div><span class="jr-state" id="jr-st3"></span></header>
+        <div class="hx-strip tone-info" id="hx-health">
+          <div class="hx-ring" id="hx-ring" style="--p:0"><span><b id="hx-pct">–</b><small>%</small></span></div>
+          <div class="hx-verdict"><b id="hx-verdict">Loading…</b><p id="hx-hint"></p></div>
+          <div class="hx-legend" id="hx-legend"></div>
+          <div class="hx-bar" id="hx-bar" aria-label="Entries by status"></div>
+        </div>
+        <h3 class="jr-sub">Next deadlines</h3>
+        <ol class="hx-timeline" id="hx-timeline"><li class="muted">Loading…</li></ol>
+        <div class="btn-row"><button class="btn primary small" id="jr-reg-open">Open LEGAL REGISTER →</button></div>
+      </article>
+
+      <!-- Always on: DoH monitoring keeps the LEGAL REGISTER current -->
+      <article class="card jr-card hx-doh" id="jr-c4">
+        <header class="jr-head"><span class="jr-num">↻</span><div><span class="hx-eyebrow">Always on · updates the register</span><h2 id="doh-title">DoH monitoring</h2></div><span class="sys-dot" id="doh-dot"></span></header>
+        <div class="hx-mini">
+          <div data-hc="tip" data-tip="DoH circulars recorded in the Excel register"><b id="c-records">–</b><span>in register</span><small id="c-records-sub"></small></div>
+          <div data-hc="tip" data-tip="Found in the most recent check"><b id="c-new">–</b><span>new last check</span><small id="c-new-sub"></small></div>
+          <div data-hc="tip" data-tip="Circulars assigned to the IT Department (3rd-party IT service provider)"><b id="c-review">–</b><span>IT items</span></div>
+        </div>
+        <ul class="facts">
+          <li><span>Last check</span><b id="doh-last">–</b></li>
+          <li><span>Next check</span><b id="doh-next">–</b></li>
+          <li><span>E-mail</span><b id="doh-mail">–</b></li>
+        </ul>
+        <div class="btn-row">
+          <button class="btn primary small" id="btn-run" data-write>↻ Check DoH now</button>
+          <button class="btn small" id="btn-check" data-write data-hc="tip" data-tip="Look for new circulars without changing the register">Check only</button>
+          <button class="btn small" id="btn-run-all" data-write data-admin>All facilities</button>
+          <button class="btn small" id="btn-force" hidden>Approve held</button>
+        </div>
+        <span id="run-state" class="muted small"></span>
+      </article>
+    </div>
+
+    <div class="more-toggle"><button type="button" class="btn" id="hx-more-btn" aria-expanded="false">Show more details <span aria-hidden="true">▾</span></button></div>
+    <div class="jr-lower">
+      <article class="card hx-entries">
+        <header class="hx-card-head"><h2>Licences, certificates &amp; contracts</h2><span class="muted small">hover a tile for details · click to update</span></header>
+        <div class="hx-mosaic" id="hx-mosaic"></div>
+      </article>
+      <article class="card hx-activity">
+        <header class="hx-card-head"><h2>Recent activity</h2></header>
+        <ol class="hx-feed" id="hx-activity"><li class="muted">Loading…</li></ol>
+      </article>
+    </div>
+
+    <!-- Facility details and the last check log -->
+    <details class="more-box hx-more">
+      <summary>Facility details &amp; last check log</summary>
+      <div class="hx-more-grid">
+        <div class="fac-band">
+          <div class="band-logo"><img id="band-logo" alt="" hidden><span id="band-logo-fallback" class="logo-fallback">LR</span></div>
+          <span class="band-class" id="band-class" dir="auto"></span>
+          <div class="band-main">
+            <div class="band-kicker">LEGAL REGISTER · DoH Abu Dhabi compliance</div>
+            <h1 id="band-title">LEGAL REGISTER</h1>
+            <dl class="band-doc" id="home-doc"></dl>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Last check result <span class="muted small" id="last-run-fac"></span></h2>
+          <div id="last-run" class="muted">No runs yet.</div>
+          <pre id="live" class="console">Idle.</pre>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="sec-head"><div><h2>All facilities</h2><p class="sec-sub">Register health of every facility in this portal.</p></div>
+          <button id="btn-add-facility-2" data-admin class="btn small">＋ Add facility</button></div>
+        <div class="table-wrap flat">
+          <table id="fac-tbl"><thead><tr><th></th><th>Facility</th><th>Register health</th><th>Register</th><th>Last check</th><th>Last run</th><th class="right">Actions</th></tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============================== Policies (Policy Document Preparation) ============================== -->
+  <section id="policies" class="tab">
+    <header class="pw-head">
+      <div>
+        <span class="pw-kicker">Step 1 of 3</span>
+        <h1>Prepare the policies<span class="h-dim">the ADHICS set, in minutes</span></h1>
+        <p class="muted">Fill in the details, add the logo and signature and create the Word and PDF files. Then Step 2 makes the HR &amp; onboarding documents, and Step 3 – the final step – links everything to the LEGAL REGISTER.</p>
+      </div>
+      <div class="pw-head-side">
+        <span class="pp-badge" id="pp-status">–</span>
+        <button class="btn" id="pp-new" data-admin>＋ New facility</button>
+      </div>
+    </header>
+
+    <div class="pp-for" id="pp-for"></div>
+
+    <ol class="pw-steps" id="pp-steps">
+      <li data-pw="1"><button type="button"><i>1</i><span><b>Details</b><small>dates &amp; names</small></span></button></li>
+      <li data-pw="2"><button type="button"><i>2</i><span><b>Logo &amp; signature</b><small>pictures</small></span></button></li>
+      <li data-pw="3"><button type="button"><i>3</i><span><b>Create policies</b><small>Word + PDF</small></span></button></li>
+      <li data-pw="4"><button type="button"><i>4</i><span><b>LEGAL REGISTER</b><small>link &amp; continue</small></span></button></li>
+    </ol>
+
+    <!-- Step 1: templates -->
+    <div class="panel">
+      <div class="sec-head">
+        <div><h2>1 · Master policy templates</h2>
+          <p class="sec-sub">The standard policies (e.g. the 33 ADHICS policies) as Word files. They are the same for every facility and are never changed – each facility gets its own filled copy. Only an administrator can upload, lock or replace them.</p></div>
+        <div class="btn-row">
+          <label class="btn primary" data-admin id="pp-upload-btn"><input type="file" id="pp-tpl-files" accept=".docx,.doc" multiple hidden>⇪ Upload policies (.docx / .doc)</label>
+          <button class="btn primary" data-admin id="pp-lock" hidden>🔒 Lock as master baseline</button>
+          <button class="btn" data-admin id="pp-unlock" hidden>Unlock to replace…</button>
+        </div>
+      </div>
+      <div class="pp-lockbar" id="pp-lockbar" hidden></div>
+      <div id="pp-tpl-msg"></div>
+      <div class="table-wrap flat">
+        <table class="pp-table"><thead><tr><th>Policy</th><th>Title</th><th>Version</th><th>Master files</th><th>Description of changes (version 2.0)</th><th>Found in template</th><th class="right">Master</th></tr></thead>
+          <tbody id="pp-tpl-body"><tr><td colspan="7" class="muted">Loading…</td></tr></tbody></table>
+      </div>
+    </div>
+
+    <!-- Wizard step 1: details -->
+    <form class="panel pw-pane" data-pane="1" id="pp-form">
+      <div class="pw-title"><span class="pw-num">1</span><div><h2>Policy details</h2><p class="muted small">Entered once – used in every policy.</p></div></div>
+
+      <div class="pw-facts">
+        <div><span>Facility</span><b><input id="pp-fac" readonly tabindex="-1"></b></div>
+        <div><span>Policy ID</span><b><input id="pp-idfmt" readonly tabindex="-1"></b></div>
+        <div><span>Next revision</span><b><input id="pp-due" readonly tabindex="-1"></b></div>
+        <div><span>Classification</span><b><input value="RESTRICTED / داخلي" readonly tabindex="-1"></b></div>
+      </div>
+
+      <div class="pw-grid">
+        <label>Issued on <em>*</em><input type="date" name="issuedOn" required></label>
+        <label>Reviewed on <em>*</em><input type="date" name="reviewedOn" required></label>
+        <label>Prepared by <em>*</em><input name="preparedBy" list="resp-options" required placeholder="Name of the author"></label>
+        <label>Approved by <em>*</em><input name="approvedBy" list="resp-options" required placeholder="Name of the approver"></label>
+      </div>
+
+      <details class="pw-more">
+        <summary>More options <span class="muted small">standard · incident contact</span></summary>
+        <div class="pw-grid three">
+          <label>Standard<input name="standard" placeholder="ADHICS"></label>
+          <label>Contact e-mail<input name="contactEmail" type="email" placeholder="info@facility.ae"><small class="pw-hint" id="pp-email-note">incident contact</small></label>
+          <label>Contact phone<input name="contactPhone" placeholder="05X XXX XXXX"><small class="pw-hint" id="pp-phone-note">incident contact</small></label>
+        </div>
+      </details>
+
+      <div class="pw-nav">
+        <span class="muted small" id="pp-msg"></span>
+        <button class="btn primary big" type="submit" data-write>Save &amp; next →</button>
+      </div>
+    </form>
+
+    <!-- Wizard step 2: pictures -->
+    <div class="panel pw-pane" data-pane="2">
+      <div class="pw-title"><span class="pw-num">2</span><div><h2>Logo, signature &amp; stamp</h2><p class="muted small">A photo, scan, PDF or Word file – the picture is found, cropped and its background removed for you.</p></div></div>
+      <div class="pp-assets pw-assets" id="pp-assets">
+        <div class="pp-asset" data-kind="logo"><div class="pp-pic"><img alt="" hidden><span>No logo</span><button type="button" class="pic-x" data-remove data-write title="Remove" aria-label="Remove this picture">✕</button></div><b>Facility logo</b><small id="pp-logo-note">top of every policy</small>
+          <div class="btn-row"><label class="btn small primary" data-write><input type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg,.pdf,.docx,.doc" hidden>Upload</label></div></div>
+        <div class="pp-asset" data-kind="signature"><div class="pp-pic"><img alt="" hidden><span>No signature</span><button type="button" class="pic-x" data-remove data-write title="Remove" aria-label="Remove this picture">✕</button></div><b>Signature</b><small>of the approver</small>
+          <div class="btn-row"><label class="btn small primary" data-write><input type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg,.pdf,.docx,.doc" hidden>Upload</label></div></div>
+        <div class="pp-asset" data-kind="stamp"><div class="pp-pic"><img alt="" hidden><span>No stamp</span><button type="button" class="pic-x" data-remove data-write title="Remove" aria-label="Remove this picture">✕</button></div><b>Stamp</b><small>facility seal</small>
+          <div class="btn-row"><label class="btn small primary" data-write><input type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg,.pdf,.docx,.doc" hidden>Upload</label></div></div>
+        <div class="pp-asset" data-kind="combined"><div class="pp-pic"><img alt="" hidden><span>Optional</span><button type="button" class="pic-x" data-remove data-write title="Remove" aria-label="Remove this picture">✕</button></div><b>Signature + stamp</b><small>one picture with both</small>
+          <div class="btn-row"><label class="btn small" data-write><input type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg,.pdf,.docx,.doc" hidden>Upload</label></div></div>
+      </div>
+      <div id="pp-asset-msg" class="small muted"></div>
+      <div class="pw-nav">
+        <button type="button" class="btn" data-pw-go="1">← Back</button>
+        <button type="button" class="btn primary big" data-pw-go="3">Next →</button>
+      </div>
+    </div>
+
+    <!-- Wizard step 3: create -->
+    <div class="panel pw-pane" data-pane="3">
+      <div class="pw-title"><span class="pw-num">3</span><div><h2>Create the policies</h2><p class="muted small">Every policy is filled in and saved as Word and PDF.</p></div></div>
+      <div id="pp-need"></div>
+      <div class="pw-create">
+        <button class="btn primary big" id="pp-generate" data-write>⚙ Create all policies</button>
+        <div class="pp-progress" id="pp-progress" hidden><div class="days-bar"><i id="pp-bar" style="width:0%"></i></div><span id="pp-step"></span></div>
+      </div>
+      <div id="pp-problems"></div>
+      <div class="pp-out" id="pp-out" hidden>
+        <div class="pw-download">
+          <div><b id="pp-out-title">Generated files</b><p class="muted small" id="pp-folder"></p></div>
+          <div class="btn-row">
+            <a class="btn primary" id="pp-zip-all" href="#">⬇ Download all (Word + PDF)</a>
+            <a class="btn small" id="pp-zip-word" href="#">Word only</a>
+            <a class="btn small" id="pp-zip-pdf" href="#">PDF only</a>
+          </div>
+        </div>
+        <details class="pw-more">
+          <summary>See each policy</summary>
+          <div class="table-wrap flat"><table class="pp-table"><thead><tr><th>Policy</th><th>Version</th><th>Filled in</th><th class="right">Files</th></tr></thead><tbody id="pp-out-body"></tbody></table></div>
+        </details>
+      </div>
+      <div class="pw-nav">
+        <button type="button" class="btn" data-pw-go="2">← Back</button>
+        <button type="button" class="btn primary big" data-pw-go="4" id="pw-next-3">Next →</button>
+      </div>
+    </div>
+
+    <!-- Wizard step 4: link -->
+    <div class="panel pw-pane pp-link" data-pane="4">
+      <div class="pw-title"><span class="pw-num">4</span><div><h2>Final step: link to the LEGAL REGISTER</h2><p class="muted small">The facility name, approver and author from the policies are written into the LEGAL REGISTER.</p></div></div>
+      <div id="pp-link-msg"></div>
+      <div class="pw-nav">
+        <button type="button" class="btn" data-pw-go="3">← Back</button>
+        <button type="button" class="btn" id="pp-to-hr">Step 2 · HR documents</button>
+        <button class="btn primary big" id="pp-link" data-write>Link &amp; open LEGAL REGISTER →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== Admin console ============================== -->
+  <!-- ============================== HR & onboarding forms + ADHICS checklist ============================== -->
+  <section id="hr" class="tab">
+    <header class="pw-head hr-head">
+      <div class="hr-brand">
+        <img id="hr-logo" alt="" onerror="this.hidden=true">
+        <div>
+          <span class="pw-kicker">HR &amp; checklist</span>
+          <h1 id="hr-fac">–</h1>
+          <p class="muted">Every HR form opens with <b>this facility's name, code and logo</b>. Track each checklist document as Completed, Pending or Not applicable, add remarks and download it as Excel.</p>
+        </div>
+      </div>
+      <div class="pw-head-side">
+        <button type="button" class="btn primary" id="hr-gen" data-write>⚙ Create all HR documents</button>
+        <a class="btn" id="hr-zip" href="#">⬇ HR documents (.zip)</a>
+        <a class="btn" id="hr-xlsx" href="#">⬇ Checklist Excel</a>
+      </div>
+    </header>
+
+    <div class="hr-gen card" id="hr-gen-box" hidden></div>
+    <div class="hr-sum card" id="hr-sum"></div>
+
+    <article class="card hr-forms">
+      <header class="hr-sec-head"><div><h2>HR &amp; onboarding forms</h2><p class="muted small" id="hr-forms-sub">Filled for this facility every time you open them</p></div></header>
+      <div class="hr-form-grid" id="hr-form-grid"></div>
+      <div class="hr-sync" id="hr-sync"></div>
+    </article>
+
+    <article class="card hr-training">
+      <header class="hr-sec-head"><div><h2>Employee training</h2><p class="muted small">Training report and policy acknowledgement – one training date fills every date, or give a document its own dates.</p></div></header>
+      <div class="hr-form-grid" id="hr-train-grid"></div>
+      <div id="hr-train-dates"></div>
+    </article>
+
+    <article class="card hr-check">
+      <header class="hr-sec-head">
+        <div><h2>ADHICS document checklist</h2><p class="muted small">Change a status or remark and it is saved straight away.</p></div>
+        <div class="btn-row"><a class="btn small" id="hr-xlsx-one" href="#">⬇ This section (.xlsx)</a><button type="button" class="btn small" id="hr-reset" data-write>↺ Reset to master list</button></div>
+      </header>
+      <div class="hr-tabs" id="hr-tabs" role="tablist"></div>
+      <div class="hr-filter"><input type="search" id="hr-q" placeholder="Search documents…" aria-label="Search documents"><div class="viewswitch" id="hr-st" role="group" aria-label="Show"><button type="button" data-st="" class="on">All</button><button type="button" data-st="Pending">Pending</button><button type="button" data-st="Completed">Completed</button></div></div>
+      <div class="tbl-wrap"><table class="hr-tbl"><thead><tr><th class="num">S.No</th><th>Document name</th><th>Status</th><th>Remarks</th><th></th></tr></thead><tbody id="hr-rows"></tbody></table></div>
+      <form class="hr-add" id="hr-add" data-write><input name="name" placeholder="Add a document to this section…" maxlength="300" required><button class="btn small primary">＋ Add</button></form>
+    </article>
+
+    <article class="card hr-admin" data-admin>
+      <header class="hr-sec-head"><div><h2>Master HR forms &amp; cross-check</h2><p class="muted small">The forms belong to the master template. They can come from any facility – each one is checked and that facility's name, code and logo are replaced for every facility.</p></div>
+        <div class="btn-row"><label class="btn small primary">⬆ Upload forms<input type="file" id="hr-up" accept=".docx,.doc" multiple hidden></label><label class="btn small">⬆ Checklist workbook (.xlsx)<input type="file" id="hr-up-xlsx" accept=".xlsx" hidden></label></div></header>
+      <div id="hr-cross"></div>
+    </article>
+  </section>
+
+  <!-- ============================== 3rd-party / vendor documents ============================== -->
+  <section id="thirdparty" class="tab">
+    <header class="pw-head hr-head">
+      <div class="hr-brand">
+        <img id="tp-logo" alt="" onerror="this.hidden=true">
+        <div>
+          <span class="pw-kicker">3rd-party documents</span>
+          <h1 id="tp-fac">–</h1>
+          <p class="muted">Documents your vendors and service providers sign – each one with <b>this facility's logo, name, code and Ref. No.</b>, made from the master template like the HR forms.</p>
+        </div>
+      </div>
+      <div class="pw-head-side">
+        <button type="button" class="btn primary" id="tp-gen" data-write>⚙ Create the documents</button>
+        <a class="btn" id="tp-zip" href="#">⬇ Word + PDF (.zip)</a>
+      </div>
+    </header>
+    <article class="card">
+      <header class="hr-sec-head"><div><h2>Vendor &amp; service-provider documents</h2><p class="muted small" id="tp-sub">–</p></div></header>
+      <div class="hr-form-grid" id="tp-grid"></div>
+      <div id="tp-dates"></div>
+    </article>
+  </section>
+
+  <section id="exports" class="tab">
+    <header class="pw-head">
+      <div>
+        <span class="pw-kicker">Export hub</span>
+        <h1>Downloads<span class="h-dim">every file in one place</span></h1>
+        <p class="muted">Every file for <b id="ex-fac">this facility</b> in one place.</p>
+      </div>
+    </header>
+    <div class="ex-grid">
+      <article class="card ex-card">
+        <header><span class="ex-ic">📄</span><div><h2>Policies</h2><p class="muted small" id="ex-pol-sub">–</p></div></header>
+        <a class="btn primary ex-main" id="ex-pol-all" href="#">⬇ Word + PDF (.zip)</a>
+        <div class="btn-row"><a class="btn small" id="ex-pol-word" href="#">Word only</a><a class="btn small" id="ex-pol-pdf" href="#">PDF only</a></div>
+        <button type="button" class="link-btn ex-empty" id="ex-pol-go" hidden>Create the policies first →</button>
+      </article>
+      <article class="card ex-card">
+        <header><span class="ex-ic">📊</span><div><h2>LEGAL REGISTER</h2><p class="muted small" id="ex-reg-sub">The master Excel register with all dates</p></div></header>
+        <a class="btn primary ex-main" id="ex-reg-xlsx" href="#">⬇ Excel register (.xlsx)</a>
+        <div class="btn-row"><button type="button" class="btn small" id="ex-reg-pdf">PDF report…</button><a class="btn small" id="ex-reg-print" href="#" target="_blank">Print view</a></div>
+      </article>
+      <article class="card ex-card">
+        <header><span class="ex-ic">🗂</span><div><h2>HR forms &amp; checklist</h2><p class="muted small" id="ex-hr-sub">With this facility's name, code and logo</p></div></header>
+        <a class="btn primary ex-main" id="ex-hr-xlsx" href="#">⬇ ADHICS checklist (.xlsx)</a>
+        <div class="btn-row"><a class="btn small" id="ex-hr-zip" href="#">HR forms Word + PDF</a><a class="btn small" id="ex-hr-word" href="#">Word only</a></div>
+      </article>
+      <article class="card ex-card">
+        <header><span class="ex-ic">🏛</span><div><h2>DoH circulars</h2><p class="muted small" id="ex-doh-sub">Recorded in the Excel register</p></div></header>
+        <a class="btn primary ex-main" id="ex-doh-xlsx" href="#">⬇ Excel with circulars (.xlsx)</a>
+        <div class="btn-row"><a class="btn small" id="ex-doh-report" href="#" target="_blank" hidden>Last check report</a></div>
+      </article>
+    </div>
+  </section>
+
+  <section id="admin" class="tab">
+    <div class="page-title"><div><span class="adm-kicker">Admin console</span><h1 id="adm-title">Master policies</h1><p class="muted" id="adm-sub"></p></div></div>
+    <div class="adm" id="adm-masters"></div>
+    <div class="adm" id="adm-facilities"></div>
+    <div class="adm" id="adm-users"></div>
+    <div class="adm" id="adm-schedule"></div>
+    <div class="adm" id="adm-logs"></div>
+  </section>
+
+  <!-- ============================== LEGAL REGISTER ============================== -->
+  <section id="master" class="tab">
+    <header class="pw-head">
+      <div>
+        <span class="pw-kicker">Step 2 of 3</span>
+        <h1>Licences, certificates &amp; contracts</h1>
+        <p class="muted">Keep every date current. Upload a document or a photo of it – the dates are read and filled in for you.</p>
+      </div>
+      <div class="pw-head-side">
+        <button class="btn primary" id="btn-docs" data-write>⇪ Upload documents</button>
+        <button class="btn" id="btn-entry-add" data-write>＋ Add entry</button>
+        <details class="menu">
+          <summary class="btn">⋯ More</summary>
+          <div class="menu-pop right">
+            <a id="lnk-download" href="/api/register/download">⬇ Download Excel (.xlsx)</a>
+            <button type="button" id="btn-export-more">⬇ Download PDF report…</button>
+            <a id="lnk-export" href="/api/master/export" target="_blank">🖨 Print view</a>
+            <button type="button" id="btn-import" data-write>Import from policy document…</button>
+          </div>
+        </details>
+      </div>
+    </header>
+
+    <div class="reg-bar">
+      <details class="reg-doc">
+        <summary><span class="reg-doc-k">Document</span><b id="doc-title">LEGAL REGISTER</b><span class="classification" id="doc-class" dir="auto"></span><span class="reg-doc-more">details ▾</span></summary>
+        <dl id="doc-strip"></dl>
+      </details>
+      <div class="viewswitch" id="mview" role="group" aria-label="View"><button type="button" data-mview="cards" data-hc="tip" data-tip="One card per entry – easiest to read">▦ Cards</button><button type="button" data-mview="table" data-hc="tip" data-tip="The register as a table, like the Excel file">☰ Table</button></div>
+    </div>
+    <div class="status-bar" id="status-bar"></div>
+    <div class="filter-note" id="filter-note" hidden></div>
+    <div id="master-alert"></div>
+    <div class="ecards" id="mcards" hidden></div>
+    <div class="table-wrap" id="mtable">
+      <table id="mtbl" class="register">
+        <thead><tr><th>SL</th><th>Name</th><th>Status</th><th>Issued</th><th>Expiry</th><th>Due</th><th>Responsible person</th><th>Compliance</th><th class="right"></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <label class="drop slim" id="page-drop" data-write>
+      <input type="file" id="page-files" accept=".pdf,.docx,.doc,image/*" multiple>
+      <span class="drop-icon">⇪</span>
+      <span><b>Drop documents or photos here</b> — the portal reads them and fills in the right row. You check before anything is saved.</span>
+    </label>
+    <p class="muted small">Rows 10–15 (federal laws) are fixed. Every change is saved to the Excel file after a backup — keep the file closed in Excel.</p>
+  </section>
+
+  <!-- ============================== DoH circulars ============================== -->
+  <section id="circulars" class="tab">
+    <div class="page-title">
+      <div>
+        <span class="pw-kicker">Step 3 of 3</span>
+        <h1>DoH updates</h1>
+        <p class="muted">New circulars from the Department of Health (Abu Dhabi) are added to your register every week. Click one to check or change it.</p>
+      </div>
+      <input id="search" type="search" placeholder="Search number or title…">
+    </div>
+    <div class="chips" id="filters">
+      <button data-f="all" class="active">All</button>
+      <button data-f="it_related">IT Department</button>
+      <button data-f="compliant">Fully compliant</button>
+      <button data-f="recall">Recalls / alerts</button>
+      <button data-f="not_applicable">Not applicable</button>
+      <button data-f="held">Waiting</button>
+    </div>
+    <div class="table-wrap">
+      <table id="tbl"><thead><tr><th>Circular No.</th><th>Circular name</th><th>Date</th><th>Category</th><th>Compliance</th><th>Responsible</th><th>Target</th><th>Frequency</th><th>Row</th><th>Status</th></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+    <section id="settings" class="tab">
+      <div class="page-title"><div><h1>Facility settings</h1><p class="muted">This facility's details, its Excel register, and your own account.</p></div></div>
+      <nav class="chips" id="subtabs">
+        <button data-sub="fac-settings" class="active" data-write>This facility</button>
+        <button data-sub="account-panel">My account</button>
+      </nav>
+
+      <div id="history-panel" class="sub">
+        <div class="table-wrap">
+          <table id="runs"><thead><tr><th>Started</th><th>Trigger</th><th>Mode</th><th>Status</th><th>Checked</th><th>New</th><th>Added</th><th>F–J completed</th><th>IT items</th><th>Errors</th><th>Report</th></tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+      <div id="log-panel" class="sub"><pre id="logbox" class="console tall"></pre></div>
+
+      <div id="fac-settings" class="sub active settings" data-write>
+        <form id="doc-form" class="panel">
+          <h2>A. Document Control <span class="muted fac-name"></span></h2>
+          <div class="row3">
+            <label>Facility title<input name="facilityTitle" required></label>
+            <label>Document Number<span class="affix"><input name="code" required maxlength="20"><span class="suffix" id="num-suffix"></span></span></label>
+            <label>Date of Release <span class="lock">automatic – latest circular</span><input name="releaseDate" type="date" readonly></label>
+          </div>
+          <div class="row3">
+            <label>Document Approver<input name="approver" required></label>
+            <label>Document Author(s)<input name="authors" required></label>
+            <label>Version No. <span class="lock">fixed</span><input id="fx-version" readonly></label>
+          </div>
+          <div class="actions">
+            <button class="btn primary" type="submit">Save document control</button>
+            <label class="check"><input type="checkbox" name="writeWorkbook" checked> Also write to the Excel register</label>
+            <span id="doc-msg" class="muted"></span>
+          </div>
+        </form>
+
+        <form id="profile-form" class="panel">
+          <h2>Centre / branch</h2>
+          <div class="row3">
+            <label>Centre / branch name<input name="name" required></label>
+            <label>Responsible person (new entries)<input name="responsible" list="resp-options" required></label>
+            <label>IT Department <span class="lock">fixed</span><input id="it-dept" readonly></label>
+          </div>
+          <label>Responsible persons offered in the lists (one per line)<textarea name="responsibleOptions" rows="3"></textarea></label>
+          <div class="row3">
+            <label>E-mail recipients (comma-separated; blank = shared default)<input name="emailTo"></label>
+            <label>Track circulars dated from<input type="date" name="scopeStartDate" required></label>
+            <label class="check"><input type="checkbox" name="makeDefault"> Open this facility by default</label>
+          </div>
+          <div class="actions"><button class="btn primary" type="submit">Save centre details</button><span id="profile-msg" class="muted"></span></div>
+        </form>
+
+        <div class="panel">
+          <h2>Facility document</h2>
+          <p class="small">Current document: <b id="pol-current">–</b></p>
+          <p class="muted small">A policy or LEGAL REGISTER document (PDF, Word .docx or .doc). Its details, logo and register dates can be applied to this facility.</p>
+          <button class="btn" type="button" id="btn-import-2" data-write>Import from a document…</button>
+        </div>
+
+        <div class="panel" id="source-box">
+          <h2>Master Excel register</h2>
+          <p class="small">Current workbook: <b id="src-current">–</b></p>
+          <div class="row3">
+            <label>Upload a workbook (.xlsx)<input type="file" id="src-file" accept=".xlsx"></label>
+            <label>…or link a path<input id="src-path" placeholder="\\server\share\LEGAL REGISTER.xlsx"></label>
+            <div class="actions"><button class="btn" type="button" id="btn-src-check">Check workbook</button></div>
+          </div>
+          <div id="src-preview"></div>
+          <div class="actions" id="src-actions" hidden>
+            <label class="check"><input type="checkbox" id="src-import" checked> Take the header details from this workbook</label>
+            <button class="btn primary" type="button" id="btn-src-use">Use this workbook</button>
+          </div>
+        </div>
+
+        <div class="panel danger" data-admin>
+          <h2>Remove facility</h2>
+          <p class="muted small">Removes this facility from the portal. Its folder (register, history, backups, documents) is archived, not erased; a linked register elsewhere is not touched.</p>
+          <button class="btn danger" type="button" id="btn-fac-delete" data-admin>Remove this facility…</button>
+        </div>
+      </div>
+
+      <div id="users-panel" class="sub settings" data-admin>
+        <div class="panel pend-panel" id="pending-panel" hidden>
+          <h2>Access requests <span class="pend-count" id="pending-count"></span></h2>
+          <p class="muted small">People who created an account on the sign-in page. Choose their role and facilities, then approve – they can sign in straight away and set up two-factor authentication. Declining deletes the request.</p>
+          <div class="pend-list" id="pending-list"></div>
+        </div>
+        <div class="panel">
+          <h2>Users</h2>
+          <p class="muted small">Every user signs in with a username, a password (stored as a BCrypt hash) and a 6-digit code from an authenticator app (or an e-mailed code). <b>Admin</b>: everything · <b>Manager</b>: register, documents, monitoring and exports for their facilities · <b>Viewer</b>: read-only and exports. 5 wrong attempts lock an account for 15 minutes.</p>
+          <div class="table-wrap flat"><table id="users-tbl"><thead><tr><th>User</th><th>Role</th><th>Facilities</th><th>2FA</th><th>Last sign-in</th><th class="right">Actions</th></tr></thead><tbody></tbody></table></div>
+        </div>
+        <form id="user-form" class="panel">
+          <h2>Add a user</h2>
+          <div class="row3">
+            <label>Username<input name="username" required minlength="3" autocomplete="off"></label>
+            <label>E-mail (sign-in codes)<input name="email" type="email" autocomplete="off"></label>
+            <label>Role<select name="role"><option value="manager">Manager</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select></label>
+          </div>
+          <div><span class="small muted">Facilities</span><div class="fac-checks" id="user-facs"></div></div>
+          <div class="row3">
+            <label>Temporary password<input name="password" required minlength="10" autocomplete="new-password"></label>
+            <div class="actions"><button type="button" class="btn" id="gen-pw">Generate</button></div>
+          </div>
+          <p class="muted small">Give the user the temporary password securely. At the first sign-in they choose their own password and link their authenticator app.</p>
+          <div class="actions"><button class="btn primary" type="submit">Add user</button><span id="user-msg" class="muted"></span></div>
+        </form>
+      </div>
+
+      <div id="account-panel" class="sub settings">
+        <form id="pw-form" class="panel">
+          <h2>My account</h2>
+          <p class="small" id="me-info"></p>
+          <div class="row3">
+            <label>Current password<input name="current" type="password" required autocomplete="current-password"></label>
+            <label>New password<input name="next" type="password" required minlength="10" autocomplete="new-password"></label>
+            <label>Repeat new password<input name="next2" type="password" required autocomplete="new-password"></label>
+          </div>
+          <div class="actions"><button class="btn primary" type="submit">Change password</button><span id="pw-msg" class="muted"></span></div>
+          <p class="muted small">To move two-factor authentication to a new phone, ask an administrator to reset it; you will scan a new QR code at your next sign-in.</p>
+        </form>
+      </div>
+
+      <form id="settings-form" class="sub settings" data-admin>
+        <p class="muted small">These settings are the same for every facility.</p>
+        <div class="panel"><h2>Monitoring schedule (Asia/Dubai)</h2>
+          <label class="check"><input type="checkbox" name="schedule.enabled"> Scheduled monitoring (one DoH check of recent circulars, applied to every facility)</label>
+          <div class="row3">
+            <label>Check DoH on<select name="runDay"><option value="0">Every Sunday (weekly)</option><option value="1">Every Monday</option><option value="2">Every Tuesday</option><option value="3">Every Wednesday</option><option value="4">Every Thursday</option><option value="5">Every Friday</option><option value="6">Every Saturday</option><option value="*">Every day</option></select></label>
+            <label>at<input type="time" name="nightlyTime"></label>
+            <label>Summary e-mail (same day) at<input type="time" name="summaryTime"></label>
+            <label>Max new circulars per run<input type="number" name="safety.maxNewPerRun"></label>
+          </div>
+          <label class="check"><input type="checkbox" name="schedule.catchUpOnStart"> Catch up on start-up if a scheduled check was missed</label>
+        </div>
+        <div class="panel"><h2>E-mail server</h2>
+          <p class="muted small">Alerts and weekly summaries are sent to the recipients below: one e-mail as soon as new DoH circulars are added to a register, the weekly summary on the sync day, and an alert if a check fails. They also carry the e-mailed sign-in codes. Enter the sending account here – for a Gmail account: server <b>smtp.gmail.com</b>, port <b>587</b>, SSL off, and an <b>app password</b> (Google Account → Security → App passwords) instead of the normal password.</p>
+          <label class="check"><input type="checkbox" name="email.enabled"> E-mail enabled</label>
+          <div class="row3">
+            <label>Send<select name="email.mode"><option value="both">Real-time alerts + daily summary</option><option value="realtime">Real-time alerts only</option><option value="summary">Daily summary only</option></select></label>
+            <label>SMTP server<input name="email.host" placeholder="smtp.gmail.com or smtp.office365.com"></label>
+            <label>Port<input name="email.port" type="number"></label>
+          </div>
+          <div class="row3">
+            <label>Username<input name="email.user" autocomplete="off"></label>
+            <label>Password<input name="smtpPassword" type="password" autocomplete="new-password" placeholder="unchanged"></label>
+            <label>From<input name="email.from"></label>
+          </div>
+          <label>Default recipients (comma-separated)<input name="email.to"></label>
+          <div class="actions">
+            <label class="check"><input type="checkbox" name="email.secure"> SSL (port 465)</label>
+            <label class="check"><input type="checkbox" name="email.alertOnFailure"> Alert on failures / locked register</label>
+            <button class="btn" type="button" id="btn-test-mail">Send test e-mail</button>
+          </div>
+        </div>
+        <div class="panel"><h2>DoH compliance rules</h2>
+          <div class="row3">
+            <label>Facility profile<input name="facility.profile"></label>
+            <label>Reporting authority (J)<input name="compliance.authority"></label>
+            <label>Compliance statuses <span class="lock">fixed</span><input id="status-list" readonly></label>
+          </div>
+          <label class="check"><input type="checkbox" name="facility.itProviderRole"> IT-related circulars are assigned to the IT Department (3rd-Party IT Service Provider)</label>
+          <label>Not-applicable categories (one per line)<textarea name="compliance.notApplicableCategories" rows="5"></textarea></label>
+          <label>Not-applicable services / keywords (one per line)<textarea name="compliance.notApplicableKeywords" rows="6"></textarea></label>
+        </div>
+        <div class="actions"><button class="btn primary" type="submit">Save shared settings</button><span id="settings-msg" class="muted"></span></div>
+      </form>
+    </section>
+</main>
+
+<!-- ============================== Dialogs ============================== -->
+<dialog id="review">
+  <form method="dialog" id="review-form">
+    <h2 id="rv-title"></h2>
+    <p id="rv-sub" class="muted"></p>
+    <div class="reason" id="rv-reason"></div>
+    <div class="row3">
+      <label>Compliance (F)<select name="compliance" id="rv-compliance"></select></label>
+      <label>Responsible (G)<input name="responsible" list="resp-options" required></label>
+      <label>Target date (H)<input name="targetDate" placeholder="YYYY-MM-DD, Immediate or _"></label>
+    </div>
+    <div class="row3">
+      <label>Reporting frequency (I)<input name="frequency" list="freq-options"></label>
+      <label>Reporting authority (J)<input name="authority"></label>
+      <label>Reviewed by<input name="reviewer" required></label>
+    </div>
+    <label>Notes<textarea name="note" rows="3"></textarea></label>
+    <datalist id="freq-options"><option>_</option><option>Daily</option><option>Weekly</option><option>Monthly</option><option>3 Months</option><option>6 Months</option><option>Annually</option></datalist>
+    <div class="actions">
+      <button class="btn primary" value="save" id="rv-save">Save to Excel register</button>
+      <button class="btn" value="cancel" formnovalidate>Cancel</button>
+      <a id="rv-pdf" target="_blank" rel="noopener">Open DoH circular ↗</a>
+      <span id="rv-msg" class="muted"></span>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="entry-dlg">
+  <form id="entry-form">
+    <h2 id="entry-title">Edit entry</h2>
+    <label>Name of department / certificate / contract<input name="name" required></label>
+    <div class="row3">
+      <label>Issued date<input name="issued" type="date"></label>
+      <label>Expiry date<input name="expiry" type="date"></label>
+      <label>Due date<input name="due" type="date"></label>
+    </div>
+    <div class="row3">
+      <label>Responsible person<input name="responsible" list="resp-options" required></label>
+      <label>Compliance<select name="compliance"></select></label>
+    </div>
+    <p class="alert ok small" id="entry-life" hidden>∞ Malaffi is a one-time (lifetime) connection certificate – it has no expiry date and no due date. Only the issue date is kept.</p>
+    <div class="entry-doc" id="entry-doc" data-write><span id="entry-doc-now" class="small muted">No document attached</span><label class="btn small"><input type="file" id="entry-photo" accept="image/*,.pdf,.docx,.doc" hidden>📷 Add photo / document</label></div>
+    <p class="muted small">Leave a date empty to show "______" in the register. A photo of the certificate works too – its dates are read for you.</p>
+    <div class="actions">
+      <button class="btn primary" type="submit">Save</button>
+      <button class="btn" type="button" id="entry-cancel">Cancel</button>
+      <span id="entry-msg" class="muted"></span>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="docs-dlg" class="wide">
+  <form id="docs-form">
+    <h2>Upload facility documents</h2>
+    <p class="muted small">Licences, certificates and contracts (PDF, Word .docx or .doc) – any file names. Each document is read (scans with the built-in Windows OCR), recognised and matched to its LEGAL REGISTER entry with its issue and expiry dates. Check the results, correct anything, then apply.</p>
+    <label class="drop" id="docs-drop">
+      <input type="file" id="docs-files" accept=".pdf,.docx,.doc,image/*" multiple>
+      <span><b>Choose documents</b> or drop them here</span>
+    </label>
+    <div id="docs-result"></div>
+    <div class="actions">
+      <button class="btn primary" type="submit" id="docs-apply" disabled>Apply to the LEGAL REGISTER</button>
+      <button class="btn" type="button" id="docs-cancel">Cancel</button>
+      <span id="docs-msg" class="muted"></span>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="export-dlg">
+  <div class="export-box">
+    <h2>Export the LEGAL REGISTER</h2>
+    <p class="muted small" id="export-sub">Choose a format. Both contain the facility's header, logo and the latest dates and statuses.</p>
+    <div class="export-options">
+      <a class="export-card" id="exp-xlsx" href="/api/register/download">
+        <span class="ex-icon xlsx">XLSX</span>
+        <b>Master Excel</b>
+        <span>The live master workbook: formatted headers, facility logo, document control, all register rows with their dates and compliance, and every DoH circular.</span>
+        <em>Download .xlsx</em>
+      </a>
+      <button type="button" class="export-card" id="exp-pdf">
+        <span class="ex-icon pdf">PDF</span>
+        <b>PDF summary report</b>
+        <span>A print-ready compliance snapshot: status totals (valid / expiring / expired / pending), the LEGAL REGISTER with a status per entry, and circular statistics.</span>
+        <em id="exp-pdf-label">Download .pdf</em>
+      </button>
+    </div>
+    <div class="actions">
+      <a class="btn" id="exp-print" href="/api/master/export" target="_blank">Open print view</a>
+      <button type="button" class="btn" id="exp-close">Close</button>
+      <span class="muted small" id="exp-msg"></span>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="import-dlg">
+  <form id="import-form">
+    <h2>Import from a document</h2>
+    <p class="muted small">Upload this facility's policy or LEGAL REGISTER document (PDF, Word .docx or .doc). Review what was found, then apply it.</p>
+    <div class="row3">
+      <label>Document<input type="file" id="imp-file" accept=".pdf,.docx,.doc,image/png,image/jpeg,.png,.jpg,.jpeg"></label>
+      <label>…or its path<input id="imp-path" placeholder="D:\Documents\LEGAL REGISTER.pdf"></label>
+      <div class="actions"><button class="btn" type="button" id="imp-read">Read document</button></div>
+    </div>
+    <div id="imp-result"></div>
+    <div class="actions">
+      <button class="btn primary" type="submit" id="imp-apply" disabled>Apply to this facility</button>
+      <button class="btn" type="button" id="imp-cancel">Cancel</button>
+      <span id="imp-msg" class="muted"></span>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="add-dlg">
+  <form id="add-form">
+    <h2>Add a facility</h2>
+    <p class="muted small">Upload the facility's policy or LEGAL REGISTER document. The name, logo, approver, author and responsible person are read from it; the Date of Release is the latest circular; the master Excel register is generated automatically.</p>
+    <div class="steps">
+      <div class="step"><span class="num">1</span><div>
+        <b>Upload the document</b> <span class="muted small">PDF, Word .docx or .doc</span>
+        <div class="row3">
+          <label>Document<input type="file" id="add-policy-file" accept=".pdf,.docx,.doc,image/png,image/jpeg,.png,.jpg,.jpeg"></label>
+          <label>…or its path<input id="add-policy-path" placeholder="D:\Policies\PO01-....pdf"></label>
+          <div class="actions"><button class="btn" type="button" id="add-policy-read">Read document</button></div>
+        </div>
+        <div id="add-policy-msg"></div>
+      </div></div>
+      <div class="step"><span class="num">2</span><div>
+        <b>Check the details</b>
+        <div class="extracted">
+          <div class="logo-box"><img id="add-logo" alt="Facility logo" hidden><span id="add-logo-none" class="muted small">Logo appears here</span></div>
+          <div class="extracted-fields">
+            <div class="row3">
+              <label>Facility code<span class="affix"><input name="code" required maxlength="20"><span class="suffix" id="add-suffix"></span></span></label>
+              <label>Facility name<input name="name" required></label>
+              <label>Date of Release <span class="lock">automatic</span><input id="add-release" readonly placeholder="latest circular"></label>
+            </div>
+            <label>Facility title<input name="title" required placeholder="[Facility Name] - LEGAL REGISTER"></label>
+            <div class="row3">
+              <label>Document Approver<input name="approver" required></label>
+              <label>Document Author(s)<input name="authors" required></label>
+              <label>Responsible person<input name="responsible" required></label>
+            </div>
+          </div>
+        </div>
+      </div></div>
+      <div class="step"><span class="num">3</span><div>
+        <b>Master Excel register</b>
+        <label class="check"><input type="radio" name="source" value="template" checked> Generate from the standard template of <select name="templateFrom" id="add-template"></select></label>
+        <details class="more"><summary class="small">Use an existing workbook instead</summary>
+          <label class="check"><input type="radio" name="source" value="upload"> Upload a workbook <input type="file" id="add-file" accept=".xlsx"></label>
+          <label class="check"><input type="radio" name="source" value="link"> Link a path <input name="path" placeholder="\\server\share\LEGAL REGISTER.xlsx"></label>
+        </details>
+        <div id="add-preview"></div>
+      </div></div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" type="submit" id="add-create">Create facility &amp; Excel register</button>
+      <button class="btn" type="button" id="add-cancel">Cancel</button>
+      <span id="add-msg" class="muted"></span>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="pp-new-dlg" class="wide">
+  <form id="pp-new-form" class="np" novalidate>
+    <div class="np-head">
+      <div>
+        <h2>New facility policy pack</h2>
+        <p class="muted small">Type the new facility's details once. The <b id="np-count">33</b> locked policies of <b id="np-base">the master template</b> are copied and the template's facility details are replaced with yours. The template stays untouched.</p>
+      </div>
+      <div class="np-preview"><span>Policy IDs</span><b id="np-idprev">ASH / ADHICS - PO01</b><small id="np-idrange">… PO33</small></div>
+    </div>
+
+    <div class="np-run" id="np-run" hidden>
+      <ol id="np-steps">
+        <li data-s="create">Create the facility from the master template</li>
+        <li data-s="details">Save the details</li>
+        <li data-s="pics">Clean the logo, signature and stamp</li>
+        <li data-s="generate">Generate <span id="np-n">33</span> policies (Word + PDF) <span class="muted small" id="np-progress"></span></li>
+        <li data-s="hr">Create the <span id="np-hr-n">9</span> HR &amp; onboarding documents (Word + PDF) <span class="muted small" id="np-hr-progress"></span></li>
+        <li data-s="link">Link to the LEGAL REGISTER <span class="muted small">– final step</span></li>
+      </ol>
+      <div class="days-bar"><i id="np-bar" style="width:0%"></i></div>
+      <div id="np-result"></div>
+    </div>
+
+    <ol class="pw-steps np-wiz" id="np-wiz">
+      <li data-pw="1"><button type="button"><i>1</i><span><b>Facility</b><small>name, code, contact</small></span></button></li>
+      <li data-pw="2"><button type="button"><i>2</i><span><b>Dates &amp; people</b><small>issued, reviewed, names</small></span></button></li>
+      <li data-pw="3"><button type="button"><i>3</i><span><b>Pictures</b><small>logo, signature, stamp</small></span></button></li>
+      <li data-pw="4"><button type="button"><i>4</i><span><b>Preview &amp; create</b><small>check, then create</small></span></button></li>
+    </ol>
+
+    <div class="np-check" id="np-check" hidden></div>
+
+    <div class="np-grid" id="np-inputs">
+      <fieldset data-npstep="1">
+        <legend><i>1</i> Facility</legend>
+        <label>Facility name<input name="name" required placeholder="e.g. Asher Clinic" autocomplete="off"></label>
+        <div class="row3">
+          <label>Code / prefix<input name="code" required maxlength="12" placeholder="e.g. ASH" autocomplete="off"></label>
+          <label>Standard<input name="standard" value="ADHICS"></label>
+        </div>
+        <div class="row3">
+          <label>Contact e-mail <span class="lock" id="np-email-note">replaces the baseline's</span><input name="contactEmail" type="email" required placeholder="info@yourclinic.ae"></label>
+          <label>Contact phone <span class="lock" id="np-phone-note">replaces the baseline's</span><input name="contactPhone" required placeholder="05X XXX XXXX"></label>
+        </div>
+      </fieldset>
+
+      <fieldset data-npstep="2">
+        <legend><i>2</i> Dates &amp; people</legend>
+        <div class="row3">
+          <label>Issued on<input name="issuedOn" type="date" required></label>
+          <label>Reviewed on<input name="reviewedOn" type="date" required></label>
+          <label>Due for Revision on <span class="lock">automatic</span><input id="np-due" readonly placeholder="1 year after review"></label>
+        </div>
+        <div class="row3">
+          <label>Prepared by<input name="preparedBy" required placeholder="Mr. …"></label>
+          <label>Approved by<input name="approvedBy" required placeholder="Dr. …"></label>
+        </div>
+        <div class="row3">
+          <label>Training date <span class="lock">optional</span><input name="trainingDate" type="date"></label>
+          <p class="muted small np-hint">Entered once, it fills every date in the training documents (training report, policy acknowledgement). A document can get its own dates later on the HR &amp; checklist page.</p>
+        </div>
+      </fieldset>
+
+      <fieldset class="np-pics" data-npstep="3">
+        <legend><i>3</i> Logo, signature &amp; stamp</legend>
+        <p class="muted small">A photo, scan, PDF or Word file. The picture is found, cropped and its background removed straight away – you see the result. ✕ removes it.</p>
+        <label class="np-sort" id="np-sort">
+          <input type="file" id="np-sort-files" accept="image/png,image/jpeg,.png,.jpg,.jpeg,.pdf,.docx,.doc" multiple hidden>
+          <span class="np-sort-ic">✨</span>
+          <span><b>Sort for me</b> – drop the logo, signature and stamp together (photos, PDF or Word). Each picture is recognised and put in its box.</span>
+          <span class="np-sort-btn btn small primary">Choose files</span>
+        </label>
+        <p class="small muted" id="np-sort-msg">Or add each picture to its own box below.</p>
+        <div class="np-pic-row">
+          <label class="np-pic" data-pic="logo"><input type="file" name="logo" accept="image/png,image/jpeg,.png,.jpg,.jpeg,.pdf,.docx,.doc" hidden><span class="np-box"><img alt="" hidden><em>＋ Logo</em></span><small>Facility logo · required</small></label>
+          <label class="np-pic" data-pic="signature"><input type="file" name="signature" accept="image/png,image/jpeg,.png,.jpg,.jpeg,.pdf,.docx,.doc" hidden><span class="np-box"><img alt="" hidden><em>＋ Signature</em></span><small>Approver's signature</small></label>
+          <label class="np-pic" data-pic="stamp"><input type="file" name="stamp" accept="image/png,image/jpeg,.png,.jpg,.jpeg,.pdf,.docx,.doc" hidden><span class="np-box"><img alt="" hidden><em>＋ Stamp</em></span><small>Facility stamp</small></label>
+          <label class="np-pic" data-pic="combined"><input type="file" name="combined" accept="image/png,image/jpeg,.png,.jpg,.jpeg,.pdf,.docx,.doc" hidden><span class="np-box"><img alt="" hidden><em>＋ Both in one</em></span><small>Signature + stamp (optional)</small></label>
+        </div>
+      </fieldset>
+    </div>
+
+    <fieldset class="np-live" data-npstep="4">
+      <legend><i>4</i> Preview <span class="muted small">– updates as you type</span></legend>
+      <div class="np-live-grid">
+        <div class="np-doc" id="np-doc">
+          <div class="np-doc-logo"><img id="np-doc-logo" alt="" hidden><span id="np-doc-nologo">Facility logo</span></div>
+          <table>
+            <tr><th colspan="2" id="np-doc-title">ADHICS - INFORMATION SECURITY HIGH LEVEL POLICY</th></tr>
+            <tr><td>Policy ID</td><td id="np-doc-id">–</td></tr>
+            <tr><td>Issued on</td><td id="np-doc-issued">–</td></tr>
+            <tr><td>Reviewed on</td><td id="np-doc-reviewed">–</td></tr>
+            <tr><td>Due for Revision on</td><td id="np-doc-due">–</td></tr>
+            <tr><td>Prepared by</td><td id="np-doc-prepared">–</td></tr>
+            <tr><td>Approved by</td><td id="np-doc-approved">–</td></tr>
+            <tr><td>Facility Name</td><td id="np-doc-name"><b>–</b></td></tr>
+            <tr><td>Version</td><td id="np-doc-version">1.0</td></tr>
+            <tr><td>Document Classification</td><td><span class="np-badge">● RESTRICTED / داخلي</span></td></tr>
+          </table>
+          <p class="np-doc-text" id="np-doc-text">This policy applies to all Users of <b>–</b>.</p>
+        </div>
+        <div class="np-pdf">
+          <div class="btn-row">
+            <select id="np-prev-no"></select>
+            <button type="button" class="btn primary" id="np-prev-btn">⤢ Preview full screen</button>
+            <button type="button" class="btn" id="np-prev-word" title="Download this one policy as Word">Word</button>
+          </div>
+          <p class="muted small" id="np-prev-msg">Opens the real document full screen – generated from the locked master with the values above. Nothing is saved.</p>
+          <iframe id="np-prev-frame" title="Policy preview" hidden></iframe>
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="actions np-foot">
+      <label class="check"><input type="checkbox" id="np-autolink" checked> Link to the LEGAL REGISTER at the end (final step)</label>
+      <span class="np-spacer"></span>
+      <span class="muted small" id="pp-new-msg"></span>
+      <button class="btn" type="button" id="pp-new-cancel">Close</button>
+      <button class="btn" type="button" id="np-back">← Back</button>
+      <button class="btn primary big" type="button" id="np-next">Next →</button>
+      <button class="btn primary big" type="submit" id="pp-new-create">⚙ Create the policy pack</button>
+    </div>
+  </form>
+</dialog>
+<!-- full-screen document reader -->
+<dialog id="doc-viewer" class="doc-viewer" aria-label="Document preview">
+  <header class="dv-bar">
+    <span class="dv-ic">📄</span>
+    <div class="dv-title"><b id="dv-title">Document</b><small id="dv-sub" class="muted"></small></div>
+    <a class="btn small" id="dv-download" href="#" download>⬇ Download</a>
+    <a class="btn small" id="dv-tab" href="#" target="_blank" rel="noopener">Open in new tab</a>
+    <button type="button" class="btn small primary" id="dv-close">✕ Close</button>
+  </header>
+  <iframe id="dv-frame" title="Document preview"></iframe>
+</dialog>
+<dialog id="pm-dlg" class="wide">
+  <div class="pm">
+    <div class="pm-head">
+      <div><div class="muted small" id="pm-kicker">Master policy</div><h2 id="pm-title">–</h2></div>
+      <div class="pm-vers" id="pm-vers" role="group" aria-label="Version"></div>
+    </div>
+    <div class="chips pm-tabs" id="pm-tabs">
+      <button type="button" data-pm="view" class="active">👁 View document</button>
+      <button type="button" data-pm="edit" data-admin>✎ Edit text &amp; add clauses</button>
+      <button type="button" data-pm="file" data-admin>⇅ Word file</button>
+    </div>
+    <p class="muted small" id="pm-info"></p>
+
+    <div class="pm-pane" data-pane="view">
+      <iframe id="pm-frame" title="Master policy"></iframe>
+      <p class="muted small" id="pm-view-msg"></p>
+    </div>
+
+    <div class="pm-pane" data-pane="edit" hidden>
+      <div class="alert ok small">Change the wording of any paragraph, add a new clause (e.g. a DoH compliance clause) after any paragraph, or delete one. Tables, headers, logo, badge and layout stay exactly as they are. An edited paragraph keeps the formatting of its first word. <b>Save</b> keeps a copy of the previous master, makes this the master for every future generation and locks it again.</div>
+      <input type="search" id="pm-filter" placeholder="Find a paragraph…">
+      <ol class="pm-paras" id="pm-paras"></ol>
+    </div>
+
+    <div class="pm-pane" data-pane="file" hidden>
+      <div class="panel">
+        <h2>Edit in Microsoft Word</h2>
+        <p class="muted small">For larger changes: download this master, edit it in Word (keep the Document Control and version tables), then upload it here. It replaces this version's master, a copy of the previous one is kept, and the set is locked again.</p>
+        <div class="btn-row">
+          <a class="btn" id="pm-download" href="#">⬇ Download this master (.docx)</a>
+          <label class="btn primary"><input type="file" id="pm-upload" accept=".docx,.doc" hidden>⇪ Upload the edited Word file</label>
+        </div>
+        <p class="small" id="pm-file-msg"></p>
+      </div>
+    </div>
+
+    <div class="actions np-foot">
+      <span class="muted small" id="pm-msg"></span>
+      <span class="np-spacer"></span>
+      <button type="button" class="btn" id="pm-close">Close</button>
+      <button type="button" class="btn primary" id="pm-save" data-admin hidden>💾 Save &amp; lock</button>
+    </div>
+  </div>
+</dialog>
+<datalist id="resp-options"></datalist>
+<!-- AI assistant: ask questions about this facility (read-only) -->
+<button type="button" class="ai-fab" id="ai-fab" aria-label="Ask the assistant" aria-expanded="false">
+  <span class="ai-fab-ic"><svg viewBox="0 0 24 24"><path d="M12 3c4.97 0 9 3.36 9 7.5S16.97 18 12 18c-.9 0-1.77-.1-2.6-.3L5 20l1.1-3.6C4.2 15.1 3 12.9 3 10.5 3 6.36 7.03 3 12 3z"/><circle cx="8.5" cy="10.5" r="1.2"/><circle cx="12" cy="10.5" r="1.2"/><circle cx="15.5" cy="10.5" r="1.2"/></svg></span>
+  <span class="ai-fab-txt">Ask AI</span>
+</button>
+<section class="ai-panel" id="ai-panel" hidden aria-label="Compliance assistant">
+  <header class="ai-head">
+    <span class="ai-avatar">AI</span>
+    <div><b>Compliance assistant</b><small id="ai-mode">–</small></div>
+    <button type="button" class="ai-x" id="ai-new" title="New conversation" aria-label="New conversation">↺</button>
+    <button type="button" class="ai-x" id="ai-close" title="Close" aria-label="Close">✕</button>
+  </header>
+  <div class="ai-log" id="ai-log" aria-live="polite"></div>
+  <div class="ai-chips" id="ai-chips">
+    <button type="button">What should I do next?</button>
+    <button type="button">What is expired or expiring?</button>
+    <button type="button">Are my policies ready?</button>
+    <button type="button">How do I renew a licence?</button>
+  </div>
+  <form class="ai-form" id="ai-form" autocomplete="off">
+    <input id="ai-q" maxlength="2000" placeholder="Ask about policies, licences or DoH…" aria-label="Your question">
+    <button type="submit" class="ai-send" aria-label="Send">→</button>
+  </form>
+  <p class="ai-foot">Answers come from your portal's data. The assistant only reads – it never changes anything.</p>
+</section>
+<script src="app.js"></script>
+</body>
+</html>

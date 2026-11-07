@@ -1,0 +1,28 @@
+{
+  "name": "doh-circular-portal",
+  "version": "1.0.0",
+  "description": "Monitors DoH Abu Dhabi circulars nightly, updates the ADHICS Legal Register (Excel) with DoH compliance metadata, and e-mails summaries.",
+  "type": "module",
+  "private": true,
+  "main": "server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node --use-system-ca server.js",
+    "check": "node --use-system-ca cli.js check",
+    "run-now": "node --use-system-ca cli.js run",
+    "fill-missing": "node --use-system-ca cli.js fill-missing",
+    "test": "node --test --test-concurrency=1 test/*.test.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
+    "bcryptjs": "^2.4.3",
+    "express": "^5.1.0",
+    "jszip": "^3.10.1",
+    "node-cron": "^4.2.1",
+    "nodemailer": "^10.3.1",
+    "qrcode": "^1.5.4",
+    "unpdf": "^1.4.0"
+  }
+}

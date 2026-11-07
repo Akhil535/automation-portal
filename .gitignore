@@ -1,0 +1,24 @@
+node_modules/
+data/
+logs/
+backups/
+reports/
+downloads/
+test/_work/
+
+# facility data: documents, registers, generated policies / HR documents, facility list
+facilities/
+facilities.json
+facilities.*.json
+hr/
+policies/
+
+# settings of this PC (paths, e-mail recipients) and any secrets
+config.json
+*.secret*
+.env
+.env.*
+
+# Office lock files and temporary files
+~$*
+*.tmp
