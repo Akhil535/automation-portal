@@ -1,0 +1,187 @@
+{
+  "register": {
+    "sheet": "Circular",
+    "headerRow": 2,
+    "columns": {
+      "serial": "A",
+      "number": "B",
+      "name": "C",
+      "date": "D",
+      "category": "E",
+      "compliance": "F",
+      "responsible": "G",
+      "targetDate": "H",
+      "frequency": "I",
+      "authority": "J"
+    },
+    "hyperlinkColumns": [
+      "B",
+      "C"
+    ],
+    "lastColumn": "J",
+    "categorySeparator": "; "
+  },
+  "master": {
+    "sheet": "LEGAL REGISTER",
+    "firstRow": 4,
+    "columns": {
+      "sl": "B",
+      "name": "C",
+      "issued": "D",
+      "expiry": "E",
+      "due": "F",
+      "responsible": "G",
+      "compliance": "H"
+    },
+    "labels": {
+      "compliant": "Fully Compliant",
+      "notApplicable": "Not Applicable"
+    },
+    "noDate": "______"
+  },
+  "documentControl": {
+    "sheet": "DOCUMENT CONTROLLER",
+    "cells": {
+      "facilityTitle": "B2",
+      "documentNumber": "C4",
+      "releaseDate": "C5",
+      "approver": "C6",
+      "authors": "C7",
+      "version": "C8",
+      "classification": "C9"
+    }
+  },
+  "site": {
+    "baseUrl": "https://www.doh.gov.ae",
+    "listingPage": "/en/resources/Circulars",
+    "apiPath": "/api/feature/Resources/circulars",
+    "itemId": "{A9FC00B4-CE70-4900-8BA8-A94E198EC670}",
+    "culture": "en",
+    "pageSize": 50,
+    "timeoutSeconds": 60,
+    "retries": 3,
+    "delayMs": 800
+  },
+  "facility": {
+    "profile": "Medical Center with Pharmacy",
+    "itProviderRole": true
+  },
+  "compliance": {
+    "labels": {
+      "compliant": "Fully Complaince",
+      "notApplicable": "Not Applicable"
+    },
+    "authority": "DOH",
+    "noValue": "_",
+    "recallTargetDate": "Immediate",
+    "recallFrequency": "_",
+    "notApplicableCategories": [
+      "Ambulance Service Providers",
+      "Blood Banks",
+      "Health Insurance Companies",
+      "Health Insurance",
+      "Homecare Service Providers",
+      "Long-Term Care Providers",
+      "Mortuaries",
+      "School Clinic",
+      "The National Health Insurance Company Daman",
+      "Third Party Administrators TPA",
+      "All Traditional, Complementary and Alternative Medicine Centers (TCAM)",
+      "Drug Stores"
+    ],
+    "notApplicableKeywords": [
+      "home care",
+      "homecare",
+      "home visit",
+      "home health",
+      "ambulance",
+      "emergency medical services",
+      "ademsis",
+      "telemedicine",
+      "tele-medicine",
+      "telehealth",
+      "tele",
+      "surgery",
+      "surgical",
+      "center of excellence",
+      "centre of excellence",
+      "coe",
+      "hospital development",
+      "hospitals",
+      "maternity",
+      "ivf",
+      "assisted reproductive",
+      "fertility",
+      "transplant",
+      "stem cell",
+      "cord blood",
+      "oncology",
+      "cancer",
+      "cardiac",
+      "dialysis",
+      "mortuary",
+      "school screening",
+      "school nurse",
+      "blood bank",
+      "research ethic",
+      "internship",
+      "residency",
+      "fellowship",
+      "undergraduate",
+      "medical education",
+      "drg",
+      "long-term care",
+      "rehabilitation center",
+      "laser hair",
+      "newborn",
+      "birth notification",
+      "premarital",
+      "organ donation",
+      "burns",
+      "psychiatric",
+      "dental laborator",
+      "veterinary"
+    ],
+    "recallKeywords": [
+      "recall",
+      "suspension of registration",
+      "withdrawal",
+      "alert against",
+      "regulatory warning",
+      "unauthorized",
+      "unauthorised",
+      "counterfeit",
+      "falsified",
+      "adulterated",
+      "precautionary"
+    ]
+  },
+  "schedule": {
+    "enabled": true,
+    "nightlyCron": "0 2 * * 0",
+    "summaryCron": "30 7 * * 0",
+    "timezone": "Asia/Dubai",
+    "catchUpOnStart": true
+  },
+  "safety": {
+    "maxNewPerRun": 25,
+    "lockRetries": 5,
+    "lockRetryDelaySeconds": 60,
+    "backupKeep": 60
+  },
+  "email": {
+    "enabled": false,
+    "mode": "both",
+    "host": "",
+    "port": 587,
+    "secure": false,
+    "user": "",
+    "from": "",
+    "to": [],
+    "alertOnFailure": true
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8080
+  }
+}
