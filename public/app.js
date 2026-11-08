@@ -1070,8 +1070,9 @@ async function analyzeFiles(files, forRow = null) {
     try {
       const res = await fetch(u(`/api/facilities/${encodeURIComponent(facility)}/documents/analyze?name=${encodeURIComponent(f.name)}`), { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: f });
       const d = await res.json();
-      if (!res.ok) throw new Error(d.error);
-      Object.assign(slot, d, { pending: false, include: !!d.row });
+      if (res.status === 402 && d.upgrade) { Object.assign(slot, { pending: false, locked: true, include: false }); } // free trial: beyond the first 2
+      else if (!res.ok) throw new Error(d.error);
+      else Object.assign(slot, d, { pending: false, include: !!d.row });
       if (forRow) Object.assign(slot, { row: forRow, include: true }); // added from that entry: it belongs there
     } catch (e) { Object.assign(slot, { pending: false, error: e.message, include: false }); }
     parsing = Math.max(0, parsing - 1); renderHome();
@@ -1086,6 +1087,7 @@ function renderDocs() {
   $('#docs-result').innerHTML = docResults.length ? `<div class="table-wrap flat"><table class="docs-table"><thead><tr>
       <th></th><th>Document</th><th>Recognised as</th><th>Register entry</th><th>Issued</th><th>Expiry</th><th>Due</th><th>Notes</th></tr></thead><tbody>
     ${docResults.map((r, k) => r.pending ? `<tr><td></td><td class="file">${esc(r.file)}</td><td colspan="6"><span class="spin"></span> Reading…</td></tr>`
+      : r.locked ? `<tr class="trial-locked"><td>🔒</td><td class="file">${esc(r.file)}</td><td colspan="6"><span class="tag lock-tag">Premium</span> <span class="muted small">The free trial previews ${planState?.limits?.uploads || 2} uploaded documents – this one is part of Premium.</span> <button type="button" class="icon-btn premium-mini" data-up>🔒 Get Premium</button></td></tr>`
       : r.error ? `<tr><td></td><td class="file">${esc(r.file)}</td><td colspan="6" class="notes">${esc(r.error)}</td></tr>`
       : `<tr data-k="${k}">
         <td><input type="checkbox" data-f="include" ${r.include ? 'checked' : ''}></td>
@@ -2980,7 +2982,7 @@ document.addEventListener('click', e => {
   const realFetch = window.fetch.bind(window);
   window.fetch = async (...args) => {
     const res = await realFetch(...args);
-    if (res.status === 402) res.clone().json().then(d => { if (d?.upgrade) showUpgrade(d); }).catch(() => {});
+    if (res.status === 402) res.clone().json().then(d => { if (d?.upgrade && !(d.info?.kind === 'uploads' && $('#docs-dlg')?.open)) showUpgrade(d); }).catch(() => {}); // (uploads: the dialog marks the row locked)
     else if (res.status === 423 || res.status === 403) res.clone().json().then(d => { // locked details / ask an administrator
       if (d?.locked) openLockDlg({ facility: d.facility });
       else if (d?.adminNeeded) openLockDlg({ limit: true, message: d.error });
@@ -3081,7 +3083,7 @@ document.addEventListener('click', e => {
     if (trial) {
       const l = planState.limits, us = planState.usage;
       $('#plan-chip').title = `Free trial: the first ${l.policies} policies, ${l.hr} HR and ${l.thirdparty} 3rd-party documents · ${us.facilities}/${l.facilities} facilities · LEGAL REGISTER preview`;
-      if (!$('#trial-reg')) $('#master')?.insertAdjacentHTML('afterbegin', '<div class="trial-lock" id="trial-reg"><span class="tl-ic" aria-hidden="true">🔒</span><div><b>Preview – locked on the free trial</b><span>You can look around the LEGAL REGISTER. Editing, renewals, weekly DoH updates and register downloads are part of Premium.</span></div><button type="button" class="btn primary small" data-up>Get Premium</button></div>');
+      if (!$('#trial-reg')) $('#master')?.insertAdjacentHTML('afterbegin', '<div class="trial-lock" id="trial-reg"><span class="tl-ic" aria-hidden="true">🔒</span><div><b>View only – the free trial shows the basic, non-updated LEGAL REGISTER</b><span>You can look around it and preview up to 2 uploaded documents. Applying documents, editing, renewals, weekly DoH updates and every download / export are part of Premium.</span></div><button type="button" class="btn primary small" data-up>Get Premium</button></div>');
       $$('[data-up]').forEach(b => { b.onclick = () => showUpgrade(); });
     } else $('#trial-reg')?.remove();
   };
@@ -3097,7 +3099,7 @@ document.addEventListener('click', e => {
     $('#pack-root').textContent = `${d.root}/`;
     $('#pack-all').href = u(`/api/package.zip?type=${packType}`);
     const show = f => packType === 'all' || f.type === packType || f.type === 'xlsx';
-    tree.innerHTML = `<div class="pk-root"><span aria-hidden="true">📁</span><b>${esc(d.root)}</b></div>` + d.folders.map(fo => {
+    tree.innerHTML = `<div class="pk-root"><span aria-hidden="true">📁</span><b>${esc(d.root)}</b></div>` + d.folders.filter(fo => !(planState?.included && fo.key === 'register')).map(fo => { // free trial: no register downloads
       const files = fo.files.filter(show);
       const open = files.filter(f => !f.locked).length;
       return `<details class="pk-folder${fo.locked ? ' locked' : ''}">

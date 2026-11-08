@@ -19,7 +19,7 @@ import { applyReview, currentRun, runAll, runMonitor } from './src/monitor.js';
 import { startScheduler } from './src/scheduler.js';
 import { formKind, installedForms } from './src/hrforms.js';
 import { MODULE_KEYS, buildPackage, packageTree } from './src/package.js';
-import { allowedSet, claim, createdFacilities, facilityAllowance, isTrial, planInfo, setTrialLimits, trialLimits, upgradeError, upgradeUrl } from './src/plans.js';
+import { allowedSet, claim, claimUpload, createdFacilities, facilityAllowance, isTrial, planInfo, setTrialLimits, trialLimits, upgradeError, upgradeUrl } from './src/plans.js';
 import { addForms, addItem, checklistXlsx, crossCheck, formFile, formsStatus, formsZip, generateForms, getChecklist, pdfState, prewarmPdfs, saveDocSettings, GROUPS, importMasterChecklist, listForms, masterChecklist, removeForm, removeItem, resetChecklist, updateItem } from './src/hrforms.js';
 import { documentHeader, sendMail } from './src/mailer.js';
 import { lockReason, readLogo, readRegister } from './src/xlsx.js';
@@ -611,7 +611,10 @@ app.post('/api/facilities-removed/:archive/restore', wrap(async (req, res) => { 
 // Register entry documents (licences, certificates, contracts): recognise -> review -> apply -------------
 app.post('/api/facilities/:id/documents/analyze', express.raw({ type: () => true, limit: '50mb' }), wrap(async (req, res) => {
   if (!req.body?.length) throw new Error('No file received');
-  res.json(await analyzeDocument(req.params.id, req.body, String(req.query.name || 'document.pdf'), crypto.randomUUID()));
+  const counted = claimUpload(req.user, req.body); // free trial: the first 2 different documents are previewed, then Premium
+  const r = await analyzeDocument(req.params.id, req.body, String(req.query.name || 'document.pdf'), crypto.randomUUID());
+  counted();
+  res.json(r);
 }));
 
 app.post('/api/facilities/:id/documents/apply', wrap(async (req, res) => {

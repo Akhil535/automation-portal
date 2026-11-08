@@ -4,7 +4,8 @@
 //   premium – everything. Administrators are always premium.
 // A trial user "claims" a document the first time they create, view or download it; the same documents can be
 // opened again and again, new ones only while slots remain. Then the portal asks them to upgrade (HTTP 402).
-import { loadUsers } from './auth.js';
+import crypto from 'node:crypto';
+import { loadUsers, saveUsers } from './auth.js';
 import { loadFacilities, loadGlobalConfig, saveConfig } from './config.js';
 import { HR_FORMS, installedForms } from './hrforms.js';
 import { listTemplates } from './policyprep.js';
@@ -71,7 +72,8 @@ export function planInfo(user) {
   if (plan === 'premium') return { plan, limits: null, usage: null, included: null, locked: [], upgradeUrl: upgradeUrl() };
   const limits = { ...trialLimits(), facilities: facilityAllowance(user) };
   const included = Object.fromEntries(['policies', 'hr', 'thirdparty'].map(k => [k, includedIds(k, limits[k])]));
-  const usage = { ...included, facilities: createdFacilities(user.username).length };
+  const usage = { ...included, facilities: createdFacilities(user.username).length, uploads: uploadsUsed(user) };
+  limits.uploads = TRIAL_UPLOADS;
   return { plan, limits, usage, included, locked: ['register', 'doh', 'registerDownloads'], upgradeText: UPGRADE_TEXT, upgradeUrl: upgradeUrl() };
 }
 
@@ -94,6 +96,33 @@ export function claim(user, kind, ids, { quiet = false } = {}) {
   }
   return ok;
 }
+
+/**
+ * Free trial: uploaded facility documents (licences, certificates…) – the first 2 different files are read and
+ * previewed; the same files can be uploaded again, any further file is Premium. Files are remembered by a SHA-256
+ * of their content (not by name), per account.
+ */
+export const TRIAL_UPLOADS = 2;
+/** Checks the file may be read (throws the upgrade error if not) and returns a function that counts it – called
+ *  only after the document was read successfully, so a file that cannot be read does not use up a preview. */
+export function claimUpload(user, buffer) {
+  if (!isTrial(user)) return () => {};
+  const hash = crypto.createHash('sha256').update(buffer).digest('hex');
+  const seen0 = new Set(loadUsers().users.find(x => x.id === user.id)?.usage?.uploads || []);
+  if (seen0.has(hash)) return () => {};
+  if (seen0.size >= TRIAL_UPLOADS) throw upgradeError(`The free trial previews ${TRIAL_UPLOADS} uploaded documents – further documents are part of Premium`, { kind: 'uploads', limit: TRIAL_UPLOADS });
+  return () => {
+    const data = loadUsers();
+    const u = data.users.find(x => x.id === user.id);
+    if (!u) return;
+    const seen = new Set(u.usage?.uploads || []);
+    if (seen.size >= TRIAL_UPLOADS && !seen.has(hash)) return; // (another upload took the last preview meanwhile)
+    seen.add(hash);
+    u.usage = { ...(u.usage || {}), uploads: [...seen] };
+    saveUsers(data);
+  };
+}
+export const uploadsUsed = user => (loadUsers().users.find(x => x.id === user?.id)?.usage?.uploads || []).length;
 
 /** The documents of a module the trial includes: null = premium (all). */
 export function allowedSet(user, kind) {

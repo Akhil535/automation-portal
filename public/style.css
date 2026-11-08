@@ -3729,3 +3729,8 @@ body.fac-locked :is(#pp-form, #pp-assets, #doc-form, #profile-form) { opacity: .
 .dd-lock { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; padding: 10px 12px; border-radius: 12px; border: 1px dashed rgba(245, 158, 11, .6); background: rgba(251, 191, 36, .1); font-size: 13px; }
 .dd-lock > span:nth-child(2) { flex: 1 1 260px; }
 .trial-locked-box .dd-global, .trial-locked-box .dd-list, .trial-locked-box .dd-details { opacity: .6; }
+
+/* Free trial: the LEGAL REGISTER is view-only – no download / export options at all (dashboard, register menu,
+   Downloads page). Viewing the register and its documents stays. */
+body.trial :is(#qa-excel, #qa-pdf, #lnk-download, #btn-export-more, #lnk-export, #ex-reg-xlsx, #ex-reg-pdf, #ex-reg-print, #ex-doh-xlsx, #ex-doh-report) { display: none !important; }
+body.trial .ex-card:has(#ex-reg-xlsx), body.trial .ex-card:has(#ex-doh-xlsx) { display: none !important; }

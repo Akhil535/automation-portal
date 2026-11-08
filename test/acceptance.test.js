@@ -665,7 +665,7 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
     const P = await import('../src/plans.js');
     const nb = { headers: { Cookie: newbieCookie } }, q = `?f=${mgrId}`;
     const plan = await (await fetch(`${base}/api/plan`, nb)).json();
-    assert.equal(plan.plan, 'trial'); assert.deepEqual(plan.limits, { policies: 2, hr: 2, thirdparty: 2, facilities: 1 });
+    assert.equal(plan.plan, 'trial'); assert.deepEqual(plan.limits, { policies: 2, hr: 2, thirdparty: 2, facilities: 1, uploads: 2 });
     assert.equal(plan.usage.facilities, 1, 'facilities are counted by who created them');
     for (const [m, p] of [['PUT', '/api/master'], ['POST', '/api/run'], ['GET', '/api/register/download'], ['GET', '/api/export/pdf'], ['GET', '/api/master/export'], ['POST', '/api/policies/link-register'], ['PUT', '/api/document-control']]) {
       const x = await fetch(base + p + q, { method: m, headers: { 'Content-Type': 'application/json', Cookie: newbieCookie }, body: m === 'GET' ? undefined : '{}' });
@@ -1278,6 +1278,23 @@ test('10q. free trial end to end: the first 2 items open as Word + PDF, everythi
       const lockedKey = H.installedForms('hr').map(d => d.key).find(k => !plan.included.hr.includes(k));
       assert.equal((await fetch(`${base}/api/hr/forms/${lockedKey}${q}&format=docx`, opt())).status, 402, 'a locked HR form is not sent');
     }
+
+    // uploaded facility documents: the first 2 different files are read (preview); a third is Premium; the same
+    // file again is fine; applying any of them to the register is Premium
+    const docx = async text => {
+      const z = new JSZip();
+      z.file('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
+      z.file('word/document.xml', `<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>${text}</w:t></w:r></w:p></w:body></w:document>`);
+      return z.generateAsync({ type: 'nodebuffer' });
+    };
+    const upload = async (buf, name) => fetch(`${base}/api/facilities/${id}/documents/analyze${q}&name=${encodeURIComponent(name)}`, { method: 'POST', headers: { Cookie: `${A.SESSION_COOKIE}=${sid}`, 'Content-Type': 'application/octet-stream' }, body: buf });
+    const d1 = await docx('Trade Licence. Issue date 01/01/2026. Expiry date 31/12/2026.'), d2 = await docx('Civil Defence certificate. Issued 05/02/2026. Valid until 04/02/2027.'), d3 = await docx('Medical waste contract from 01/03/2026 to 28/02/2027.');
+    assert.notEqual((await upload(d1, 'licence.docx')).status, 402, 'first document previewed');
+    assert.notEqual((await upload(d2, 'civil-defence.docx')).status, 402, 'second document previewed');
+    const u3 = await upload(d3, 'waste.docx');
+    assert.equal(u3.status, 402, 'a third document is Premium'); assert.equal((await u3.json()).info?.kind, 'uploads');
+    assert.notEqual((await upload(d1, 'licence-again.docx')).status, 402, 'the same document again is fine');
+    assert.equal((await (await fetch(`${base}/api/plan`, opt())).json()).usage.uploads, 2);
 
     // the LEGAL REGISTER: a preview that can be read, not updated
     assert.notEqual((await fetch(`${base}/api/master${q}`, opt())).status, 402, 'the register preview opens');
