@@ -1317,12 +1317,24 @@ test('10q. free trial end to end: the first 2 items open as Word + PDF, everythi
     };
     const upload = async (buf, name) => fetch(`${base}/api/facilities/${id}/documents/analyze${q}&name=${encodeURIComponent(name)}`, { method: 'POST', headers: { Cookie: `${A.SESSION_COOKIE}=${sid}`, 'Content-Type': 'application/octet-stream' }, body: buf });
     const d1 = await docx('Trade Licence. Issue date 01/01/2026. Expiry date 31/12/2026.'), d2 = await docx('Civil Defence certificate. Issued 05/02/2026. Valid until 04/02/2027.'), d3 = await docx('Medical waste contract from 01/03/2026 to 28/02/2027.');
-    assert.notEqual((await upload(d1, 'licence.docx')).status, 402, 'first document previewed');
-    assert.notEqual((await upload(d2, 'civil-defence.docx')).status, 402, 'second document previewed');
+    const r1 = await upload(d1, 'licence.docx'), r2 = await upload(d2, 'civil-defence.docx');
+    assert.notEqual(r1.status, 402, 'first document previewed'); assert.notEqual(r2.status, 402, 'second document previewed');
+    const t1 = (await r1.json()).token, t2 = (await r2.json()).token;
     const u3 = await upload(d3, 'waste.docx');
     assert.equal(u3.status, 402, 'a third document is Premium'); assert.equal((await u3.json()).info?.kind, 'uploads');
     assert.notEqual((await upload(d1, 'licence-again.docx')).status, 402, 'the same document again is fine');
     assert.equal((await (await fetch(`${base}/api/plan`, opt())).json()).usage.uploads, 2);
+    // applying: the 2 free previews may be applied to the register; foreign documents or more than 2 are Premium
+    const reg = (await (await fetch(`${base}/api/master${q}`, opt())).json()).items?.filter(i => !i.fixed) || [];
+    const apply = items => fetch(`${base}/api/facilities/${id}/documents/apply${q}`, opt({ method: 'POST', body: JSON.stringify({ items }) }));
+    const it = (token, k) => ({ token, file: 'x.docx', row: reg[k]?.row, issued: '2026-01-01', expiry: '2026-12-31', due: '2027-01-01' });
+    assert.equal((await apply([it('not-my-upload', 0)])).status, 402, 'a document that was not a free preview');
+    assert.equal((await apply([it(t1, 0), it(t2, 1), it(t1, 2)])).status, 402, 'more than 2 documents');
+    if (t1 && reg.length) { // (the register is put back afterwards – later tests check its contents)
+      const regFile = loadConfig(id).register.path, saved = fs.readFileSync(regFile);
+      try { assert.notEqual((await apply([it(t1, 0)])).status, 402, 'a free preview can be applied'); }
+      finally { fs.writeFileSync(regFile, saved); }
+    }
 
     // DoH circulars: the basic, non-updated view – nothing from the last 90 days
     const cut = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
@@ -1334,7 +1346,7 @@ test('10q. free trial end to end: the first 2 items open as Word + PDF, everythi
 
     // the LEGAL REGISTER: a preview that can be read, not updated
     assert.notEqual((await fetch(`${base}/api/master${q}`, opt())).status, 402, 'the register preview opens');
-    for (const [m, p] of [['PUT', '/api/master'], ['POST', '/api/run'], ['POST', `/api/facilities/${id}/documents/apply`], ['GET', '/api/register/download'], ['GET', '/api/export/pdf']]) {
+    for (const [m, p] of [['PUT', '/api/master'], ['POST', '/api/run'], ['GET', '/api/register/download'], ['GET', '/api/export/pdf']]) {
       assert.equal((await fetch(base + p + q, opt({ method: m, body: m === 'GET' ? undefined : '{}' }))).status, 402, `register locked: ${m} ${p}`);
     }
     // generating on the trial makes only the free policies, and nobody is signed out on the way

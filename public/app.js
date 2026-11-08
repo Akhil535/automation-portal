@@ -1069,12 +1069,14 @@ async function analyzeFiles(files, forRow = null) {
   for (const f of files) docResults.push({ file: f.name, pending: true });
   parsing += files.length; renderHome();
   renderDocs();
+  let trialFull = false; // free trial bulk upload: once the free previews are used, the rest is not sent – just locked
   for (const f of files) {
     const slot = docResults.find(r => r.pending && r.file === f.name);
+    if (trialFull) { Object.assign(slot, { pending: false, locked: true, include: false }); parsing = Math.max(0, parsing - 1); renderHome(); renderDocs(); continue; }
     try {
       const res = await fetch(u(`/api/facilities/${encodeURIComponent(facility)}/documents/analyze?name=${encodeURIComponent(f.name)}`), { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: f });
       const d = await res.json();
-      if (res.status === 402 && d.upgrade) { Object.assign(slot, { pending: false, locked: true, include: false }); } // free trial: beyond the first 2
+      if (res.status === 402 && d.upgrade) { Object.assign(slot, { pending: false, locked: true, include: false }); trialFull = true; } // free trial: beyond the first 2
       else if (!res.ok) throw new Error(d.error);
       else Object.assign(slot, d, { pending: false, include: !!d.row });
       if (forRow) Object.assign(slot, { row: forRow, include: true }); // added from that entry: it belongs there
@@ -1122,9 +1124,10 @@ function renderDocs() {
 }
 function updateDocsButton() {
   const n = docResults.filter(r => r.include && r.row && !r.pending && !r.error).length;
-  if (document.body.classList.contains('trial')) { // free trial: the register is a preview – applying is Premium
-    $('#docs-apply').disabled = false;
-    $('#docs-apply').textContent = '🔒 Get Premium to apply to the LEGAL REGISTER';
+  if (document.body.classList.contains('trial')) { // free trial: the 2 free documents can be applied; all of them = Premium
+    const free = planState?.limits?.uploads || 2;
+    $('#docs-apply').disabled = !n || n > free;
+    $('#docs-apply').textContent = n > free ? `Tick at most ${free} documents` : `✓ Apply the ${n || free} free document${(n || free) === 1 ? '' : 's'}`;
     return;
   }
   $('#docs-apply').disabled = !n;
@@ -1132,10 +1135,6 @@ function updateDocsButton() {
 }
 $('#docs-form').onsubmit = async e => {
   e.preventDefault();
-  if (document.body.classList.contains('trial')) {
-    showUpgrade({ error: 'Updating the LEGAL REGISTER from your documents is part of Premium. On the free trial the register is a preview that is not updated.' });
-    return;
-  }
   const items = docResults.filter(r => r.include && r.row && !r.error).map(r => ({ token: r.token, file: r.file, row: r.row, issued: r.issued, expiry: docLife(r) ? '' : r.expiry, due: docLife(r) ? '' : r.due }));
   const rows = items.map(i => i.row);
   if (new Set(rows).size !== rows.length) { $('#docs-msg').textContent = 'Two documents are mapped to the same entry – untick one.'; return; }
@@ -3103,7 +3102,7 @@ document.addEventListener('click', e => {
     if (trial) {
       const l = planState.limits, us = planState.usage;
       $('#plan-chip').title = `Free trial: the first ${l.policies} policies, ${l.hr} HR and ${l.thirdparty} 3rd-party documents · ${us.facilities}/${l.facilities} facilities · LEGAL REGISTER preview`;
-      if (!$('#trial-reg')) $('#master')?.insertAdjacentHTML('afterbegin', '<div class="trial-lock" id="trial-reg"><span class="tl-ic" aria-hidden="true">🔒</span><div><b>View only – the free trial shows the basic, non-updated LEGAL REGISTER</b><span>You can look around it and preview up to 2 uploaded documents. Applying documents, editing, renewals, weekly DoH updates and every download / export are part of Premium.</span></div><button type="button" class="btn primary small" data-up>Get Premium</button></div>');
+      if (!$('#trial-reg')) $('#master')?.insertAdjacentHTML('afterbegin', '<div class="trial-lock" id="trial-reg"><span class="tl-ic" aria-hidden="true">🔒</span><div><b>View only – the free trial shows the basic, non-updated LEGAL REGISTER</b><span>You can look around it and apply your 2 free documents. Applying more documents, editing, renewals, weekly DoH updates and every download / export are part of Premium.</span></div><button type="button" class="btn primary small" data-up>Get Premium</button></div>');
       $$('[data-up]').forEach(b => { b.onclick = () => showUpgrade(); });
     } else $('#trial-reg')?.remove();
   };

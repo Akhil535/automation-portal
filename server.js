@@ -19,7 +19,7 @@ import { applyReview, currentRun, runAll, runMonitor } from './src/monitor.js';
 import { startScheduler } from './src/scheduler.js';
 import { formKind, installedForms } from './src/hrforms.js';
 import { MODULE_KEYS, buildPackage, packageTree } from './src/package.js';
-import { allowedSet, checkChecklistItem, checklistFree, claim, claimUpload, maskChecklist, createdFacilities, facilityAllowance, isTrial, planInfo, setTrialLimits, trialLimits, upgradeError, upgradeUrl } from './src/plans.js';
+import { allowedSet, checkChecklistItem, checkTrialApply, checklistFree, claim, claimUpload, maskChecklist, createdFacilities, facilityAllowance, isTrial, planInfo, setTrialLimits, trialLimits, upgradeError, upgradeUrl } from './src/plans.js';
 import { addForms, addItem, checklistXlsx, crossCheck, formFile, formsStatus, formsZip, generateForms, getChecklist, pdfState, prewarmPdfs, saveDocSettings, GROUPS, importMasterChecklist, listForms, masterChecklist, removeForm, removeItem, resetChecklist, updateItem } from './src/hrforms.js';
 import { documentHeader, sendMail } from './src/mailer.js';
 import { lockReason, readLogo, readRegister } from './src/xlsx.js';
@@ -171,7 +171,7 @@ function trialLocked(req) {
   if (p === '/api/master/export' || p === '/api/export/pdf' || p === '/api/register/download' || p.startsWith('/reports/')) return true;
   // ("all facilities" is not caught here: it is refused as admin-only first)
   if ((p === '/api/run' && !(req.body?.all && req.user.role !== 'admin')) || p === '/api/policies/link-register' || /^\/api\/circulars\/[^/]+\/review$/.test(p)) return true;
-  if (/^\/api\/facilities\/[^/]+\/(register|policy|documents\/apply)$/.test(p)) return true;
+  if (/^\/api\/facilities\/[^/]+\/(register|policy)$/.test(p)) return true; // (documents/apply: the trial's 2 free documents are checked in the route)
   return false;
 }
 app.use((req, res, next) => {
@@ -619,13 +619,15 @@ app.post('/api/facilities-removed/:archive/restore', wrap(async (req, res) => { 
 app.post('/api/facilities/:id/documents/analyze', express.raw({ type: () => true, limit: '50mb' }), wrap(async (req, res) => {
   if (!req.body?.length) throw new Error('No file received');
   const counted = claimUpload(req.user, req.body); // free trial: the first 2 different documents are previewed, then Premium
-  const r = await analyzeDocument(req.params.id, req.body, String(req.query.name || 'document.pdf'), crypto.randomUUID());
-  counted();
+  const token = crypto.randomUUID();
+  const r = await analyzeDocument(req.params.id, req.body, String(req.query.name || 'document.pdf'), token);
+  counted(r?.token || token);
   res.json(r);
 }));
 
 app.post('/api/facilities/:id/documents/apply', wrap(async (req, res) => {
   notWhileRunning();
+  checkTrialApply(req.user, req.body?.items || []); // free trial: only its 2 free documents
   res.json(await applyDocuments(req.params.id, req.body?.items || [], m => console.log(m)));
 }));
 

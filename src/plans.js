@@ -109,18 +109,27 @@ export function claimUpload(user, buffer) {
   if (!isTrial(user)) return () => {};
   const hash = crypto.createHash('sha256').update(buffer).digest('hex');
   const seen0 = new Set(loadUsers().users.find(x => x.id === user.id)?.usage?.uploads || []);
-  if (seen0.has(hash)) return () => {};
-  if (seen0.size >= TRIAL_UPLOADS) throw upgradeError(`The free trial previews ${TRIAL_UPLOADS} uploaded documents – further documents are part of Premium`, { kind: 'uploads', limit: TRIAL_UPLOADS });
-  return () => {
+  if (!seen0.has(hash) && seen0.size >= TRIAL_UPLOADS) throw upgradeError(`The free trial previews ${TRIAL_UPLOADS} uploaded documents – further documents are part of Premium`, { kind: 'uploads', limit: TRIAL_UPLOADS });
+  // token: the id of this reading – only documents read this way can be applied to the register on the trial
+  return token => {
     const data = loadUsers();
     const u = data.users.find(x => x.id === user.id);
     if (!u) return;
     const seen = new Set(u.usage?.uploads || []);
     if (seen.size >= TRIAL_UPLOADS && !seen.has(hash)) return; // (another upload took the last preview meanwhile)
     seen.add(hash);
-    u.usage = { ...(u.usage || {}), uploads: [...seen] };
+    const tokens = [...(u.usage?.uploadTokens || []), ...(token ? [token] : [])].slice(-50);
+    u.usage = { ...(u.usage || {}), uploads: [...seen], uploadTokens: tokens };
     saveUsers(data);
   };
+}
+/** Free trial: may these documents be applied to the LEGAL REGISTER? At most 2, and only free previews of this user. */
+export function checkTrialApply(user, items) {
+  if (!isTrial(user)) return;
+  const tokens = new Set(loadUsers().users.find(x => x.id === user.id)?.usage?.uploadTokens || []);
+  if (items.length > TRIAL_UPLOADS || items.some(i => !tokens.has(String(i.token || '')))) {
+    throw upgradeError(`The free trial applies ${TRIAL_UPLOADS} documents to the LEGAL REGISTER – applying all documents is part of Premium`, { kind: 'uploads', limit: TRIAL_UPLOADS });
+  }
 }
 export const uploadsUsed = user => (loadUsers().users.find(x => x.id === user?.id)?.usage?.uploads || []).length;
 
