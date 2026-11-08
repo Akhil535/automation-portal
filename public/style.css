@@ -3683,3 +3683,13 @@ tr.trial-locked .name { opacity: .8; }
 .hr-form.trial-locked b { opacity: .75; }
 .hr-form.trial-locked .lock-tag { background: rgba(251, 191, 36, .18) !important; color: #b45309 !important; border: 1px solid rgba(245, 158, 11, .45); }
 :root[data-theme="dark"] .hr-form.trial-locked .lock-tag { color: #fcd34d !important; }
+
+/* Free trial: the LEGAL REGISTER is a preview – its update / download actions carry a lock (clicking opens Get Premium) */
+body:not(.trial) [data-trial-only] { display: none !important; }
+.trial-note { margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; font-size: 13.5px; line-height: 1.5; border: 1px dashed rgba(245, 158, 11, .6); background: rgba(251, 191, 36, .1); }
+body.trial :is(#btn-check, #btn-run, #btn-run-all, #qa-entry, #qa-excel, #qa-pdf, #btn-import, #lnk-download, #lnk-export, #pp-link, #ex-reg-xlsx, #ex-reg-pdf, #ex-reg-print, #ex-doh-xlsx, #ex-doh-report)::after {
+  content: ' 🔒'; font-size: .9em; }
+body.trial :is(#btn-check, #btn-run, #btn-run-all, #qa-entry, #qa-excel, #qa-pdf, #btn-import, #pp-link, #ex-reg-xlsx, #ex-reg-pdf, #ex-reg-print, #ex-doh-xlsx) { opacity: .85; }
+/* upload dialog: the notes column keeps a readable width */
+.docs-table .notes { min-width: 200px; word-break: normal; overflow-wrap: break-word; }
+.docs-table .ev { min-width: 200px; }

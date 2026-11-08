@@ -980,6 +980,7 @@ let docResults = [];
 function openDocs() {
   docResults = [];
   $('#docs-files').value = ''; $('#docs-result').innerHTML = ''; $('#docs-msg').textContent = ''; $('#docs-apply').disabled = true;
+  updateDocsButton(); // (free trial: shows Get Premium)
   $('#docs-dlg').showModal();
 }
 $('#btn-docs').onclick = async () => { if (!master) await loadMaster(); openDocs(); };
@@ -1054,11 +1055,20 @@ function renderDocs() {
 }
 function updateDocsButton() {
   const n = docResults.filter(r => r.include && r.row && !r.pending && !r.error).length;
+  if (document.body.classList.contains('trial')) { // free trial: the register is a preview – applying is Premium
+    $('#docs-apply').disabled = false;
+    $('#docs-apply').textContent = '🔒 Get Premium to apply to the LEGAL REGISTER';
+    return;
+  }
   $('#docs-apply').disabled = !n;
   $('#docs-apply').textContent = n ? `Apply ${n} document${n === 1 ? '' : 's'} to the LEGAL REGISTER` : 'Apply to the LEGAL REGISTER';
 }
 $('#docs-form').onsubmit = async e => {
   e.preventDefault();
+  if (document.body.classList.contains('trial')) {
+    showUpgrade({ error: 'Updating the LEGAL REGISTER from your documents is part of Premium. On the free trial the register is a preview that is not updated.' });
+    return;
+  }
   const items = docResults.filter(r => r.include && r.row && !r.error).map(r => ({ token: r.token, file: r.file, row: r.row, issued: r.issued, expiry: docLife(r) ? '' : r.expiry, due: docLife(r) ? '' : r.due }));
   const rows = items.map(i => i.row);
   if (new Set(rows).size !== rows.length) { $('#docs-msg').textContent = 'Two documents are mapped to the same entry – untick one.'; return; }
@@ -2863,11 +2873,14 @@ var planState = null; // var: may be read before this line runs
 /** Free trial: is this document locked? (kind: policies | hr | thirdparty; id: policy number or form key) */
 function trialLocked(kind, id) { const inc = planState?.included?.[kind]; return !!inc && !inc.includes(String(id)); }
 // every lock / Get Premium button opens the upgrade gateway – and nothing else happens
+// free trial: the LEGAL REGISTER is a preview – its update and download actions go straight to the gateway
+const TRIAL_REGISTER_ACTIONS = '#btn-check, #btn-run, #btn-run-all, #qa-entry, #qa-excel, #qa-pdf, #btn-import, #lnk-download, #lnk-export, #pp-link, #ex-reg-xlsx, #ex-reg-pdf, #ex-reg-print, #ex-doh-xlsx, #ex-doh-report, [data-edit-row], [data-del-row]';
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-up]');
-  if (!b) return;
+  const reg = !b && document.body.classList.contains('trial') && e.target.closest?.(TRIAL_REGISTER_ACTIONS);
+  if (!b && !reg) return;
   e.preventDefault(); e.stopPropagation();
-  showUpgrade();
+  showUpgrade(reg ? { error: 'The full LEGAL REGISTER – edits, renewals, DoH updates, Excel and PDF reports – is part of Premium. On the free trial it is a preview that is not updated.' } : {});
 }, true);
 (() => {
   const realFetch = window.fetch.bind(window);
