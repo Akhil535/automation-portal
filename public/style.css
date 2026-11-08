@@ -3888,3 +3888,10 @@ tr.reg-locked:hover td { background-color: rgba(251, 191, 36, .05); }
 
 /* progress bar: Start + 4 steps + Finished = 6 columns (desktop) */
 @media (min-width: 901px) { .flow-steps { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; } }
+
+/* Free trial: the PO11 sync panel – values blurred, a padlock with Get Premium on top */
+#hr-sync.sync-locked { position: relative; }
+#hr-sync.sync-locked .blur-txt { filter: blur(6px); user-select: none; pointer-events: none; }
+#hr-sync.sync-locked .hr-sync-txt small { filter: blur(3px); user-select: none; }
+#hr-sync .sync-pill { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2; cursor: pointer; padding: 6px 6px 6px 6px; background: rgba(8, 30, 28, .82); backdrop-filter: blur(6px); box-shadow: 0 16px 34px -16px rgba(0, 0, 0, .8); }
+:root[data-theme="light"] #hr-sync .sync-pill { background: rgba(255, 255, 255, .9); }

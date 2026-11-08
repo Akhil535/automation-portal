@@ -2709,8 +2709,10 @@ function renderHrForms() {
   renderDocDates('#hr-train-dates', 'training');
   if ($('#thirdparty').classList.contains('active')) renderThirdParty();
   const v = d.aupSync.values;
-  const row = (k, l) => `<tr><th>${l}</th><td>${esc(v[k] || '–')}</td></tr>`;
-  $('#hr-sync').innerHTML = `<div class="hr-sync-txt"><b>Acceptable Usage Acknowledgement = Acceptable Usage Policy (PO11)</b>
+  const syncLocked = !!planState?.included; // free trial: the Acceptable Usage forms are Premium – the values are blurred
+  const row = (k, l) => `<tr><th>${l}</th><td>${syncLocked ? `<span class="blur-txt" aria-hidden="true">${esc(v[k] || '–')}</span>` : esc(v[k] || '–')}</td></tr>`;
+  $('#hr-sync').classList.toggle('sync-locked', syncLocked);
+  $('#hr-sync').innerHTML = `${syncLocked ? '<span class="reg-lock-pill sync-pill" data-up><span class="lock-emblem"></span><b>Premium</b><span class="btn small premium-btn">★ Get Premium</span></span>' : ''}<div class="hr-sync-txt"><b>Acceptable Usage Acknowledgement = Acceptable Usage Policy (PO11)</b>
       <small>The acknowledgement (and the third-party one) always shows the same Policy ID, dates, people and version as PO11. Change them once under <a href="#" data-goto-pol>Prepare policies → Details</a> and all follow.${d.aupSync.generatedPolicy ? ' Opening the form also compares it with the created PO11 file.' : ' PO11 has not been created yet.'}</small></div>
     <table class="hr-sync-tbl">${row('policyId', 'Policy ID')}${row('issued', 'Issued on')}${row('reviewed', 'Reviewed on')}${row('due', 'Due for revision')}${row('prepared', 'Prepared by')}${row('approved', 'Approved by')}${row('version', 'Version')}</table>`;
   $$('#hr-sync [data-goto-pol]').forEach(a => a.onclick = e => { e.preventDefault(); showTab('policies'); });
