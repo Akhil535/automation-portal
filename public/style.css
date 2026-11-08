@@ -3693,3 +3693,35 @@ body.trial :is(#btn-check, #btn-run, #btn-run-all, #qa-entry, #qa-excel, #qa-pdf
 /* upload dialog: the notes column keeps a readable width */
 .docs-table .notes { min-width: 200px; word-break: normal; overflow-wrap: break-word; }
 .docs-table .ev { min-width: 200px; }
+
+/* v23 · Facility details lock: warning in the New facility wizard, banner on locked pages, the lock window */
+.lock-warn { display: flex; gap: 12px; align-items: flex-start; margin: 12px 0 0; padding: 12px 14px; border-radius: 14px;
+  border: 1px solid rgba(245, 158, 11, .6); background: rgba(251, 191, 36, .12); color: var(--ink); }
+.lock-warn > span { font-size: 20px; line-height: 1; }
+.lock-warn b { display: block; font-size: 13.5px; line-height: 1.45; }
+.lock-warn .check { margin-top: 8px; font-size: 13px; }
+body:not(.not-admin) .lock-warn .check { display: none; } /* administrators can always change details */
+.lock-warn.shake { animation: lkShake .5s ease; }
+@keyframes lkShake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+.fac-lock { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 0 0 16px; padding: 14px 16px; border-radius: 16px;
+  border: 1px solid rgba(245, 158, 11, .55); background: linear-gradient(135deg, rgba(251, 191, 36, .14), rgba(20, 184, 166, .06)); }
+.fac-lock.open { border-color: rgba(20, 184, 166, .55); background: rgba(20, 184, 166, .1); }
+.fac-lock .fl-ic { font-size: 22px; }
+.fac-lock > div { flex: 1 1 320px; display: grid; gap: 3px; }
+.fac-lock b { color: var(--ink); font-size: 14px; line-height: 1.45; }
+.fac-lock span { color: var(--muted); font-size: 13px; }
+body.fac-locked :is(#pp-form, #pp-assets, #doc-form, #profile-form) { opacity: .6; filter: saturate(.6); }
+.chg-req { margin-top: 6px; padding: 8px 10px; border-radius: 10px; background: rgba(251, 191, 36, .14); border: 1px solid rgba(245, 158, 11, .45); font-size: 12px; line-height: 1.4; max-width: 280px; white-space: normal; }
+.lock-dlg { width: min(480px, calc(100vw - 24px)); border-radius: 22px !important; padding: 0 !important; }
+.lock-dlg form { display: grid; gap: 12px; padding: 24px; }
+.lk-badge { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; font-size: 22px; background: rgba(251, 191, 36, .18); }
+.lock-dlg h2 { margin: 0; }
+.lock-dlg p { margin: 0; line-height: 1.5; }
+.lock-dlg label { display: grid; gap: 6px; font-weight: 600; }
+.lock-dlg textarea { width: 100%; resize: vertical; }
+.lock-dlg .btn-row { justify-content: flex-end; }
+.lock-dlg[open] { animation: wlIn .4s cubic-bezier(.16, 1, .3, 1) both; }
+.lock-dlg::backdrop { background: rgba(2, 14, 13, .5); backdrop-filter: blur(4px); }
+@media (prefers-reduced-motion: reduce) { .lock-dlg[open], .lock-warn.shake { animation: none !important; } }
+.access-allow { display: grid; gap: 6px; margin-top: 12px; font-weight: 600; }
+.access-allow input { max-width: 120px; }

@@ -67,9 +67,13 @@ async function loadFacilities() {
     <td><img class="fac-mini" src="/api/facility-logo?f=${encodeURIComponent(f.id)}" alt="" onerror="this.style.visibility='hidden'"></td>
     <td><b>${esc(f.name)}</b><br><span class="muted small">${esc(f.code)}${f.isDefault ? ' · default' : ''}${f.id === facility ? ' · selected' : ''}${f.createdBy ? ` · created by ${esc(f.createdBy)}` : ''}</span></td>
     <td>${healthBar(f.health)}</td>
-    <td class="small">${f.lock ? `<span class="tag warn">${esc(f.lock)}</span>` : '<span class="tag ok">Ready</span>'}</td>
+    <td class="small">${f.lock ? `<span class="tag warn">${esc(f.lock)}</span>` : '<span class="tag ok">Ready</span>'}
+      ${f.editUnlock ? `<br><span class="tag warn" title="Allowed by ${esc(f.editUnlock.by)}">✎ Edits allowed until ${fmt(f.editUnlock.until)}</span>` : f.detailsLocked ? '<br><span class="tag na">🔒 Details locked</span>' : ''}
+      ${f.changeRequest ? `<div class="chg-req"><b>Change requested by ${esc(f.changeRequest.by)}</b> · ${fmt(f.changeRequest.at)}<br>“${esc(f.changeRequest.note)}”</div>` : ''}</td>
     <td class="num">${f.lastSuccess ? fmt(f.lastSuccess) : 'Never'}</td><td>${f.lastStatus ? tagFor(f.lastStatusCode, f.lastStatus) : '–'}</td>
     <td><div class="row-actions">
+      ${f.finalized && !f.editUnlock ? `<button class="icon-btn" data-admin data-unlock="${esc(f.id)}" title="Let this facility's users change its details for 24 hours">${f.changeRequest ? '✓ Allow edits (24 h)' : 'Allow edits'}</button>` : ''}
+      ${f.editUnlock ? `<button class="icon-btn" data-admin data-relock="${esc(f.id)}">🔒 Lock again</button>` : ''}
       ${f.id === facility ? '' : `<button class="icon-btn" data-open="${esc(f.id)}">Open</button>`}
       <button class="icon-btn" data-write data-edit="${esc(f.id)}">Edit</button>
       <button class="icon-btn del" data-admin data-del="${esc(f.id)}" ${f.isDefault ? 'disabled title="The default facility cannot be removed"' : ''}>Delete</button>
@@ -77,7 +81,63 @@ async function loadFacilities() {
   $$('#fac-tbl [data-open]').forEach(b => b.onclick = () => selectFacility(b.dataset.open));
   $$('#fac-tbl [data-edit]').forEach(b => b.onclick = () => { selectFacility(b.dataset.edit); showTab('settings'); });
   $$('#fac-tbl [data-del]').forEach(b => b.onclick = () => removeFacility(b.dataset.del));
+  $$('#fac-tbl [data-unlock]').forEach(b => b.onclick = async () => {
+    try { const r = await apiGlobal(`/api/facilities/${encodeURIComponent(b.dataset.unlock)}/unlock`, { method: 'POST', body: JSON.stringify({ hours: 24 }) }); toast(`Edits allowed until ${fmt(r.until)} – then the details lock again by themselves`); await loadFacilities(); }
+    catch (e) { toast(`⚠ ${esc(e.message)}`); }
+  });
+  $$('#fac-tbl [data-relock]').forEach(b => b.onclick = async () => {
+    try { await apiGlobal(`/api/facilities/${encodeURIComponent(b.dataset.relock)}/lock`, { method: 'POST', body: '{}' }); toast('Details locked again'); await loadFacilities(); }
+    catch (e) { toast(`⚠ ${esc(e.message)}`); }
+  });
+  renderFacLock();
 }
+
+/**
+ * Facility details lock (non-administrators): once the policies are created, the facility's name, code, contacts,
+ * dates & people and pictures can be changed only with an administrator's permission. The forms are shown but
+ * cannot be used, with the warning and a "Request a change" button; while an administrator allows edits, a note says
+ * until when.
+ */
+const LOCK_WARNING = 'Warning: Once a facility is created, details cannot be edited directly. Any subsequent changes require explicit Administrator permission.';
+function renderFacLock() {
+  const f = facilities.find(x => x.id === facility);
+  const admin = me?.role === 'admin';
+  const locked = !admin && !!f?.detailsLocked, open = !admin && !!f?.editUnlock;
+  document.body.classList.toggle('fac-locked', locked);
+  for (const sel of ['#pp-form', '#pp-assets', '#doc-form', '#profile-form']) { const el = $(sel); if (el) el.inert = locked; }
+  const html = locked
+    ? `<span class="fl-ic" aria-hidden="true">🔒</span><div><b>${esc(LOCK_WARNING)}</b>
+        <span>${f.changeRequest ? `Your change request was sent on ${fmt(f.changeRequest.at)} – an administrator will allow the edit.` : 'Need to correct something? Send a change request – an administrator allows the edit.'}</span></div>
+        <button type="button" class="btn small" data-chg-req>${f.changeRequest ? 'Update the request' : 'Request a change'}</button>`
+    : open ? `<span class="fl-ic" aria-hidden="true">✎</span><div><b>An administrator allowed edits until ${fmt(f.editUnlock.until)}.</b><span>After that the details lock again by themselves.</span></div>` : '';
+  for (const [host, id, where] of [['#pp-steps', 'fac-lock-pol', 'beforebegin'], ['#fac-settings', 'fac-lock-set', 'afterbegin']]) {
+    let el = $(`#${id}`);
+    if (!html) { el?.remove(); continue; }
+    if (!el) { $(host)?.insertAdjacentHTML(where, `<div class="fac-lock" id="${id}" role="status"></div>`); el = $(`#${id}`); }
+    if (el) { el.innerHTML = html; el.classList.toggle('open', open); }
+  }
+  $$('[data-chg-req]').forEach(b => { b.onclick = () => openLockDlg({ facility: f.id }); });
+}
+/** The "details are locked" / "ask an administrator" window – with a change request for a locked facility. */
+function openLockDlg({ facility: fid = null, message = '', limit = false } = {}) {
+  const dlg = $('#lock-dlg');
+  if (!dlg) return alert(message || LOCK_WARNING);
+  $('#lk-title').textContent = limit ? 'Facility limit reached' : 'Facility details are locked';
+  $('#lk-text').textContent = message || LOCK_WARNING;
+  $('#lk-req').hidden = !fid; $('#lk-send').hidden = !fid;
+  $('#lk-note').value = '';
+  $('#lk-msg').textContent = '';
+  dlg.dataset.fac = fid || '';
+  if (!dlg.open) dlg.showModal();
+}
+$('#lk-send').onclick = async () => {
+  const fid = $('#lock-dlg').dataset.fac;
+  try {
+    await apiGlobal(`/api/facilities/${encodeURIComponent(fid)}/change-request`, { method: 'POST', body: JSON.stringify({ note: $('#lk-note').value }) });
+    $('#lk-msg').textContent = 'Sent – an administrator will allow the edit. You will see it here when they do.';
+    await loadFacilities();
+  } catch (e) { $('#lk-msg').textContent = e.message; }
+};
 
 /** Stacked bar + counts of a facility's register entries by status. */
 function healthBar(h) {
@@ -1559,6 +1619,7 @@ function editAccess(u) {
       <p class="muted small">${esc(ROLE_LABEL[u.role] || u.role)}. They see and work on only the facilities ticked here – nothing else is shown to them. Nothing ticked = no access.</p>
       <label class="check access-all"><input type="checkbox" value="*"${all ? ' checked' : ''}> All facilities (also every new one)</label>
       <div class="access-list">${facilities.map(f => `<label class="check"><input type="checkbox" value="${esc(f.id)}"${!all && u.facilities.includes(f.id) ? ' checked' : ''}${all ? ' disabled' : ''}> <b>${esc(f.code)}</b> ${esc(f.name)}${f.createdBy ? ` <span class="muted small">· created by ${esc(f.createdBy)}</span>` : ''}</label>`).join('') || '<p class="muted small">No facilities yet.</p>'}</div>
+      ${u.role === 'admin' ? '' : `<label class="access-allow">Facilities this user may create themselves <input type="number" id="acc-allow" min="0" max="50" value="${u.facilityAllowance ?? 1}"><span class="muted small">Every account: 1. Raise it to let them add or replace a facility (they have created ${facilities.filter(f => f.createdBy === u.username).length}).</span></label>`}
       <div class="btn-row"><button type="button" class="btn" value="cancel">Cancel</button><button type="submit" class="btn primary" value="save">Save access</button></div>
     </form>`;
     document.body.append(dlg);
@@ -1568,7 +1629,8 @@ function editAccess(u) {
     dlg.addEventListener('close', async () => {
       if (dlg.returnValue === 'save') {
         const facs = allBox.checked ? ['*'] : [...dlg.querySelectorAll('.access-list input:checked')].map(i => i.value);
-        try { await apiGlobal(`/api/users/${u.id}`, { method: 'PUT', body: JSON.stringify({ facilities: facs }) }); toast(`Access saved – ${esc(u.username)} now sees ${facs[0] === '*' ? 'all facilities' : facs.length ? `${facs.length} facilit${facs.length > 1 ? 'ies' : 'y'}` : 'no facility'}`); }
+        const allow = dlg.querySelector('#acc-allow');
+        try { await apiGlobal(`/api/users/${u.id}`, { method: 'PUT', body: JSON.stringify({ facilities: facs, ...(allow ? { facilityAllowance: Number(allow.value) } : {}) }) }); toast(`Access saved – ${esc(u.username)} now sees ${facs[0] === '*' ? 'all facilities' : facs.length ? `${facs.length} facilit${facs.length > 1 ? 'ies' : 'y'}` : 'no facility'}`); }
         catch (e) { toast(`⚠ ${esc(e.message)}`); }
       }
       dlg.remove(); loadUsersPanel(); resolve();
@@ -2248,6 +2310,12 @@ np().onsubmit = async e => {
   if (!npCheck([1, 2, 3])) return; // shows what is missing and opens that step
   if (!pp?.templates?.length) { $('#np-check').hidden = false; $('#np-check').innerHTML = '<div class="alert warn">No master policies are uploaded yet – an administrator adds them in Admin console → Master policies.</div>'; return; }
   const name = v('name'), code = v('code');
+  if (me?.role !== 'admin' && !$('#np-ack').checked) { // the details lock after creation – confirm they are right
+    $('#pp-new-msg').innerHTML = '<span class="warn-txt">Tick “I have checked …” – the details cannot be changed later without an administrator.</span>';
+    $('#np-lockwarn').classList.add('shake'); setTimeout(() => $('#np-lockwarn').classList.remove('shake'), 600);
+    $('#np-ack').focus();
+    return;
+  }
   $('#pp-new-msg').textContent = '';
   const btn = $('#pp-new-create'); btn.disabled = true; btn.innerHTML = '<span class="spin light"></span> Creating the pack…';
   $$('#pp-new-form fieldset').forEach(x => { x.disabled = true; });
@@ -2909,6 +2977,10 @@ document.addEventListener('click', e => {
   window.fetch = async (...args) => {
     const res = await realFetch(...args);
     if (res.status === 402) res.clone().json().then(d => { if (d?.upgrade) showUpgrade(d); }).catch(() => {});
+    else if (res.status === 423 || res.status === 403) res.clone().json().then(d => { // locked details / ask an administrator
+      if (d?.locked) openLockDlg({ facility: d.facility });
+      else if (d?.adminNeeded) openLockDlg({ limit: true, message: d.error });
+    }).catch(() => {});
     else if (res.ok && res.headers.get('content-type')?.includes('json')) res.clone().json().then(d => {
       // bulk generation on the trial makes only the included documents – say so in the upgrade gateway
       // (the New facility wizard says it in its summary instead)
@@ -2973,6 +3045,14 @@ document.addEventListener('click', e => {
   };
   /** Free trial: a new facility only while the trial allows one more – otherwise the upgrade gateway. */
   window.canAddFacility = async function canAddFacility() {
+    if (me?.role !== 'admin') { // every plan: one facility per account (an administrator can allow more)
+      const lim = Number.isInteger(me?.facilityAllowance) ? me.facilityAllowance : 1;
+      const mine = facilities.filter(f => f.createdBy === me?.username).length;
+      if (mine >= lim) {
+        openLockDlg({ limit: true, message: `Each account can create ${lim} facilit${lim === 1 ? 'y' : 'ies'} – you have created ${mine}. To add or replace a facility, ask an administrator.` });
+        return false;
+      }
+    }
     if (!document.body.classList.contains('trial')) return true;
     await refreshPlan();
     const p = planState;
@@ -3045,7 +3125,7 @@ document.addEventListener('click', e => {
   };
   $('#limits-form').onsubmit = async e => {
     e.preventDefault();
-    const f = e.target, body = Object.fromEntries(['policies', 'hr', 'thirdparty', 'facilities'].map(k => [k, Number(f.elements[k].value)]));
+    const f = e.target, body = Object.fromEntries(['policies', 'hr', 'thirdparty'].map(k => [k, Number(f.elements[k].value)]));
     try { await apiGlobal('/api/plans', { method: 'PUT', body: JSON.stringify({ trial: body, upgradeUrl: f.elements.upgradeUrl.value.trim() }) }); $('#limits-msg').textContent = 'Saved.'; }
     catch (err) { $('#limits-msg').textContent = err.message; }
   };

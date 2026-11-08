@@ -44,6 +44,8 @@ export const publicUser = u => u && ({
   plan: u.role === 'admin' ? 'premium' : u.plan === 'trial' ? 'trial' : 'premium',
   premiumRequest: u.premiumRequest || null,
   welcomeSeen: Number(u.welcomeSeen) || 0, // the version of the welcome message this user chose not to see again
+  // facilities this account may create itself (every plan: 1, unless an administrator allows more)
+  facilityAllowance: u.role === 'admin' ? null : Number.isInteger(u.facilityAllowance) ? u.facilityAllowance : 1,
   usage: { policies: u.usage?.policies?.length || 0, hr: u.usage?.hr?.length || 0, thirdparty: u.usage?.thirdparty?.length || 0 },
 });
 export const PLANS = ['trial', 'premium'];
@@ -128,6 +130,11 @@ export function updateUser(id, fields) {
   if (fields.resetUsage) u.usage = {};
   if (fields.premiumRequest !== undefined) u.premiumRequest = fields.premiumRequest;
   if (fields.welcomeSeen !== undefined) u.welcomeSeen = Math.max(0, Math.floor(Number(fields.welcomeSeen) || 0));
+  if (fields.facilityAllowance !== undefined) {
+    const n = Number(fields.facilityAllowance);
+    if (!Number.isInteger(n) || n < 0 || n > 50) throw new Error('Facilities this user may create: a whole number from 0 to 50');
+    u.facilityAllowance = n;
+  }
   if (fields.plan === 'premium') u.premiumRequest = null;
   if (fields.email !== undefined) u.email = String(fields.email).trim();
   if (fields.password !== undefined) {

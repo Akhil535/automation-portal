@@ -665,7 +665,7 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
     const P = await import('../src/plans.js');
     const nb = { headers: { Cookie: newbieCookie } }, q = `?f=${mgrId}`;
     const plan = await (await fetch(`${base}/api/plan`, nb)).json();
-    assert.equal(plan.plan, 'trial'); assert.deepEqual(plan.limits, { policies: 2, hr: 2, thirdparty: 2, facilities: 2 });
+    assert.equal(plan.plan, 'trial'); assert.deepEqual(plan.limits, { policies: 2, hr: 2, thirdparty: 2, facilities: 1 });
     assert.equal(plan.usage.facilities, 1, 'facilities are counted by who created them');
     for (const [m, p] of [['PUT', '/api/master'], ['POST', '/api/run'], ['GET', '/api/register/download'], ['GET', '/api/export/pdf'], ['GET', '/api/master/export'], ['POST', '/api/policies/link-register'], ['PUT', '/api/document-control']]) {
       const x = await fetch(base + p + q, { method: m, headers: { 'Content-Type': 'application/json', Cookie: newbieCookie }, body: m === 'GET' ? undefined : '{}' });
@@ -673,13 +673,43 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
       const d = await x.json(); assert.equal(d.upgrade, true); assert.match(d.error, /Get Premium to unlock full compliance packs/);
     }
     assert.notEqual((await fetch(`${base}/api/master${q}`, nb)).status, 402, 'the register can still be looked at (preview)');
-    const second = await post('/api/facilities', { source: 'template', code: 'MG2', name: 'Second Clinic', title: 'SECOND - LEGAL REGISTER', approver: 'Dr. T', authors: 'Mr. T', responsible: 'Dr. T' }, newbieCookie);
-    assert.equal(second.status, 200, 'a second facility is part of the trial');
-    const secondId = (await second.json()).id;
-    const third = await post('/api/facilities', { source: 'template', code: 'MG3', name: 'Third Clinic', title: 'THIRD - LEGAL REGISTER', approver: 'Dr. T', authors: 'Mr. T', responsible: 'Dr. T' }, newbieCookie);
-    assert.equal(third.status, 402, 'a third facility needs Premium');
-    assert.match((await third.json()).error, /2 facilities.*Get Premium/);
-    assert.equal((await (await fetch(`${base}/api/plan`, nb)).json()).usage.facilities, 2);
+    // one facility per account, on every plan – only an administrator can allow more
+    const facBody = c => ({ source: 'template', code: c, name: `${c} Clinic`, title: `${c} - LEGAL REGISTER`, approver: 'Dr. T', authors: 'Mr. T', responsible: 'Dr. T' });
+    const second = await post('/api/facilities', facBody('MG2'), newbieCookie);
+    assert.equal(second.status, 403, 'a second facility needs an administrator');
+    const sj = await second.json(); assert.equal(sj.adminNeeded, true); assert.match(sj.error, /ask an administrator/);
+    assert.equal((await (await fetch(`${base}/api/plan`, nb)).json()).usage.facilities, 1);
+    const nbId = A.loadUsers().users.find(x => x.username === 'newbie').id;
+    assert.equal((await put(`/api/users/${nbId}`, { facilityAllowance: 2 }, newbieCookie)).status, 403, 'users cannot raise their own allowance');
+    assert.equal((await put(`/api/users/${nbId}`, { facilityAllowance: 2 }, adminCookie)).status, 200);
+    const second2 = await post('/api/facilities', facBody('MG2'), newbieCookie);
+    assert.equal(second2.status, 200, 'allowed by the administrator');
+    const secondId = (await second2.json()).id;
+    assert.equal((await post('/api/facilities', facBody('MG3'), newbieCookie)).status, 403, 'and no more than that');
+    assert.equal((await put(`/api/users/${nbId}`, { facilityAllowance: 1 }, adminCookie)).status, 200);
+
+    // after creation the facility's details lock: changes only with an administrator's permission
+    const edit = (cookie, p, body) => fetch(`${base}${p}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify(body) });
+    assert.equal((await edit(newbieCookie, `/api/policies/settings${q}`, { contactPhone: '0500000001' })).status !== 423, true, 'not locked before the policies are created');
+    assert.equal((await post(`/api/facilities/${mgrId}/lock`, {}, newbieCookie)).status, 403, 'users cannot lock / unlock');
+    assert.equal((await post(`/api/facilities/${mgrId}/lock`, {}, adminCookie)).status, 200, '(finalised – as after creating the policies)');
+    const lk = await edit(newbieCookie, `/api/policies/settings${q}`, { contactPhone: '0500000002' });
+    assert.equal(lk.status, 423, 'policy details locked'); assert.match((await lk.json()).error, /require explicit Administrator permission/);
+    assert.equal((await edit(newbieCookie, `/api/facilities/${mgrId}`, { name: 'Renamed Clinic' })).status, 423, 'facility name locked');
+    assert.equal((await fetch(`${base}/api/policies/assets/logo${q}&name=x.png`, { method: 'POST', headers: { Cookie: newbieCookie, 'Content-Type': 'application/octet-stream' }, body: Buffer.from('x') })).status, 423, 'pictures locked');
+    assert.equal((await edit(newbieCookie, `/api/facilities/${mgrId}`, { emailTo: ['ops@example.test'] })).status, 200, 'notification e-mails stay editable');
+    assert.equal((await edit(adminCookie, `/api/facilities/${mgrId}`, { name: 'Manager Clinic' })).status, 200, 'administrators can always edit');
+    assert.equal((await post(`/api/facilities/${mgrId}/change-request`, { note: 'x' }, newbieCookie)).status, 400, 'say what should change');
+    assert.equal((await post(`/api/facilities/${mgrId}/change-request`, { note: 'New phone number 0501112222' }, newbieCookie)).status, 200);
+    let fx = (await (await fetch(`${base}/api/facilities`, { headers: { Cookie: adminCookie } })).json()).list.find(f => f.id === mgrId);
+    assert.equal(fx.detailsLocked, true); assert.equal(fx.changeRequest.by, 'newbie');
+    assert.equal((await post(`/api/facilities/${mgrId}/unlock`, { hours: 1 }, newbieCookie)).status, 403);
+    assert.equal((await post(`/api/facilities/${mgrId}/unlock`, { hours: 1 }, adminCookie)).status, 200);
+    assert.notEqual((await edit(newbieCookie, `/api/policies/settings${q}`, { contactPhone: '0501112222' })).status, 423, 'editable while allowed');
+    fx = (await (await fetch(`${base}/api/facilities`, { headers: { Cookie: adminCookie } })).json()).list.find(f => f.id === mgrId);
+    assert.equal(fx.changeRequest, null, 'the request is answered'); assert.ok(fx.editUnlock?.until);
+    assert.equal((await post(`/api/facilities/${mgrId}/lock`, {}, adminCookie)).status, 200);
+    assert.equal((await edit(newbieCookie, `/api/policies/settings${q}`, { contactPhone: '0509999999' })).status, 423, 'locked again');
     // Get Premium can send people to the subscription page the administrator sets (web addresses only)
     assert.equal((await put('/api/plans', { upgradeUrl: 'javascript:alert(1)' }, adminCookie)).status, 400);
     assert.equal((await put('/api/plans', { upgradeUrl: 'https://example.test/premium' }, adminCookie)).status, 200);

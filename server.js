@@ -19,7 +19,7 @@ import { applyReview, currentRun, runAll, runMonitor } from './src/monitor.js';
 import { startScheduler } from './src/scheduler.js';
 import { formKind, installedForms } from './src/hrforms.js';
 import { MODULE_KEYS, buildPackage, packageTree } from './src/package.js';
-import { allowedSet, claim, createdFacilities, isTrial, planInfo, setTrialLimits, trialLimits, upgradeError, upgradeUrl } from './src/plans.js';
+import { allowedSet, claim, createdFacilities, facilityAllowance, isTrial, planInfo, setTrialLimits, trialLimits, upgradeError, upgradeUrl } from './src/plans.js';
 import { addForms, addItem, checklistXlsx, crossCheck, formFile, formsStatus, formsZip, generateForms, getChecklist, pdfState, prewarmPdfs, saveDocSettings, GROUPS, importMasterChecklist, listForms, masterChecklist, removeForm, removeItem, resetChecklist, updateItem } from './src/hrforms.js';
 import { documentHeader, sendMail } from './src/mailer.js';
 import { lockReason, readLogo, readRegister } from './src/xlsx.js';
@@ -90,6 +90,7 @@ const NEW_PACK = new Set(['/api/policies', '/api/policies/preview', '/api/polici
 function requiredRole(req) {
   const p = req.path, m = req.method;
   if (p.startsWith('/api/account/') || p === '/api/me' || p === '/api/plan' || p === '/api/plan/request') return 'viewer';
+  if (/^\/api\/facilities\/[^/]+\/(unlock|lock)$/.test(p)) return 'admin'; // unlocking a facility's details
   if (m === 'DELETE') return 'admin'; // deleting (entries, items, pictures, facilities, users…) is for administrators only
   if (p === '/api/plans' || p === '/api/welcome') return m === 'GET' ? 'viewer' : 'admin';
   if (p === '/api/assistant/ask') return 'viewer'; // everyone may ask (read-only answers)
@@ -135,6 +136,34 @@ app.use((req, res, next) => {
   next();
 });
 
+// ---------------------------------------------------------------------------------------------------
+// Facility details lock: once a facility's policies have been created, its identity (name, code, contacts, dates &
+// people, logo, signature, stamp, register header) can only be changed by an administrator – or by the user while
+// an administrator has allowed edits (for a limited time, after a change request). Stops one account being reused
+// for several facilities.
+// ---------------------------------------------------------------------------------------------------
+const LOCK_WARNING = 'Warning: Once a facility is created, details cannot be edited directly. Any subsequent changes require explicit Administrator permission.';
+const finalized = f => !!(f?.policyPrep?.lastGenerated || f?.finalizedAt);
+const editsAllowed = f => !!(f?.editUnlock?.until && Date.parse(f.editUnlock.until) > Date.now());
+const detailsLocked = f => finalized(f) && !editsAllowed(f);
+/** The facility a request would change details of, or null. */
+function detailsEdit(req) {
+  const p = req.path, m = req.method, b = req.body || {};
+  const fm = p.match(/^\/api\/facilities\/([^/]+)(\/(policy|register))?$/);
+  if (fm && m === 'PUT' && !fm[2] && ['name', 'responsible', 'responsibleOptions', 'scopeStartDate'].some(k => b[k] !== undefined)) return fm[1];
+  if (fm && m === 'POST' && fm[3]) return fm[1];
+  if ((p === '/api/policies/settings' && m === 'PUT') || (/^\/api\/policies\/assets\/[^/]+$/.test(p) && m !== 'GET') || (p === '/api/document-control' && m === 'PUT')) return req.query.f || req.facOverride || loadFacilities().default || null;
+  return null;
+}
+app.use((req, res, next) => {
+  if (!req.user || req.user.role === 'admin') return next();
+  const id = detailsEdit(req);
+  if (!id) return next();
+  const f = loadFacilities().list.find(x => x.id === id);
+  if (detailsLocked(f)) return res.status(423).json({ error: LOCK_WARNING, locked: true, facility: id });
+  next();
+});
+
 /** Free trial: what is locked – the LEGAL REGISTER (edits, DoH checks, reviews, register downloads and reports). */
 function trialLocked(req) {
   const p = req.path, m = req.method;
@@ -153,7 +182,7 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static(path.join(APP_DIR, 'public')));
-const wrap = fn => (req, res) => Promise.resolve(fn(req, res)).catch(e => res.status(e.status || 400).json({ error: e.message, ...(e.upgrade ? { upgrade: true, info: e.info || {} } : {}) }));
+const wrap = fn => (req, res) => Promise.resolve(fn(req, res)).catch(e => res.status(e.status || 400).json({ error: e.message, ...(e.upgrade ? { upgrade: true, info: e.info || {} } : {}), ...(e.adminNeeded ? { adminNeeded: true } : {}), ...(e.locked ? { locked: true, facility: e.facility } : {}) }));
 const fac = req => req.query.f || req.facOverride || undefined;
 
 // --- sign-in API (public) ---
@@ -268,6 +297,7 @@ function facilitySummary(f, def) {
   const last = store.data.runs[0];
   return {
     id: f.id, code: f.code, name: f.name, title: f.title, isDefault: f.id === def, registerPath: cfg.register.path, createdBy: f.createdBy || null, createdAt: f.createdAt || null,
+    finalized: finalized(f), detailsLocked: detailsLocked(f), editUnlock: editsAllowed(f) ? f.editUnlock : null, changeRequest: f.changeRequest || null,
     lastSuccess: store.meta.lastSuccess || null, lastStatus: last?.statusLabel || null, lastStatusCode: last?.status || null,
     lock: cfg.register.path ? lockReason(cfg.register.path) : 'No master register linked',
   };
@@ -316,6 +346,33 @@ app.put('/api/facilities/:id', wrap(async (req, res) => {
   if (b.makeDefault) { const d = loadFacilities(); d.default = req.params.id; saveFacilities(d); }
   updateFacility(req.params.id, fields);
   res.json({ saved: true });
+}));
+
+/** A user asks to change their (locked) facility's details – the administrators decide. */
+app.post('/api/facilities/:id/change-request', wrap(async (req, res) => {
+  const f = loadFacilities().list.find(x => x.id === req.params.id);
+  if (!f) throw new Error('Facility not found');
+  const note = String(req.body?.note || '').trim().slice(0, 500);
+  if (note.length < 5) throw new Error('Describe the change you need (what should be changed, and why)');
+  updateFacility(f.id, { changeRequest: { by: req.user.username, at: new Date().toISOString(), note } });
+  const admins = loadUsers().users.filter(x => x.role === 'admin' && x.email && x.status !== 'pending').map(x => x.email);
+  if (admins.length) {
+    const h = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    sendMail(loadConfig(), `Facility change requested: ${f.name} (${f.code})`, `<p><b>${h(req.user.username)}</b> asks to change the details of <b>${h(f.name)}</b> (${h(f.code)}):</p><p>${h(note)}</p><p>Allow edits in Admin console → Facilities.</p>`, admins)
+      .catch(e => console.log(`change request notice not sent: ${e.message}`));
+  }
+  res.json({ ok: true });
+}));
+/** Administrators: allow the facility's users to edit its details for a while (default 24 h), or lock it again. */
+app.post('/api/facilities/:id/unlock', wrap(async (req, res) => {
+  const hours = Math.min(168, Math.max(1, Number(req.body?.hours) || 24));
+  const until = new Date(Date.now() + hours * 3600e3).toISOString();
+  updateFacility(req.params.id, { editUnlock: { by: req.user.username, at: new Date().toISOString(), until }, changeRequest: null });
+  res.json({ ok: true, until });
+}));
+app.post('/api/facilities/:id/lock', wrap(async (req, res) => {
+  updateFacility(req.params.id, { editUnlock: null, finalizedAt: loadFacilities().list.find(x => x.id === req.params.id)?.finalizedAt || new Date().toISOString() });
+  res.json({ ok: true });
 }));
 
 /** Upload a workbook for preview/validation. Body: the .xlsx bytes. Returns { token, preview }. */
@@ -575,9 +632,9 @@ app.post('/api/facilities', wrap(async (req, res) => {
   const b = { ...(req.body || {}) };
   // Managers: a new facility is copied from the master template or from a facility they can open – never from
   // someone else's facility, and never from a file path on this PC (attaching an existing register is for admins).
-  if (isTrial(req.user)) {
-    const lim = trialLimits().facilities, have = createdFacilities(req.user.username).length; // facilities this user created
-    if (have >= lim) throw upgradeError(`The free trial includes ${lim} facilit${lim === 1 ? 'y' : 'ies'}`, { kind: 'facilities', limit: lim });
+  if (req.user.role !== 'admin') { // every plan: one facility per account, unless an administrator allows more
+    const lim = facilityAllowance(req.user), have = createdFacilities(req.user.username).length;
+    if (have >= lim) throw Object.assign(new Error(`Each account can create ${lim} facilit${lim === 1 ? 'y' : 'ies'} – you have created ${have}. To add or replace a facility, ask an administrator.`), { status: 403, adminNeeded: true });
   }
   if (req.user.role !== 'admin') {
     const facs0 = loadFacilities();

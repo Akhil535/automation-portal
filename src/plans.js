@@ -9,7 +9,7 @@ import { loadFacilities, loadGlobalConfig, saveConfig } from './config.js';
 import { HR_FORMS, installedForms } from './hrforms.js';
 import { listTemplates } from './policyprep.js';
 
-export const DEFAULT_LIMITS = Object.freeze({ policies: 2, hr: 2, thirdparty: 2, facilities: 2 });
+export const DEFAULT_LIMITS = Object.freeze({ policies: 2, hr: 2, thirdparty: 2 });
 export const KIND_LABEL = { policies: 'policies', hr: 'HR documents', thirdparty: '3rd-party documents', facilities: 'facility' };
 export const UPGRADE_TEXT = 'Get Premium to unlock full compliance packs';
 
@@ -34,7 +34,6 @@ export function setTrialLimits(body = {}) {
     if (!Number.isInteger(n) || n < 0 || n > 999) throw new Error(`Trial limit for ${KIND_LABEL[k]}: a whole number from 0 to 999`);
     next[k] = n;
   }
-  if (next.facilities < 1) throw new Error('A trial account needs at least one facility');
   cfg.plans = { ...(cfg.plans || {}), trial: next, upgradeUrl: url };
   saveConfig(cfg);
   return next;
@@ -63,11 +62,14 @@ export function includedIds(kind, limit = trialLimits()[kind]) {
   return (installed.length ? installed : HR_FORMS.filter(inGroup)).slice(0, limit).map(d => d.key);
 }
 
+/** Facilities an account may create itself – on every plan 1, unless an administrator allows more. Admins: no limit. */
+export const facilityAllowance = u => (u?.role === 'admin' ? Infinity : Number.isInteger(u?.facilityAllowance) ? u.facilityAllowance : 1);
+
 /** What the trial includes (the same for every trial account), and the limits. */
 export function planInfo(user) {
   const plan = planOf(user);
   if (plan === 'premium') return { plan, limits: null, usage: null, included: null, locked: [], upgradeUrl: upgradeUrl() };
-  const limits = trialLimits();
+  const limits = { ...trialLimits(), facilities: facilityAllowance(user) };
   const included = Object.fromEntries(['policies', 'hr', 'thirdparty'].map(k => [k, includedIds(k, limits[k])]));
   const usage = { ...included, facilities: createdFacilities(user.username).length };
   return { plan, limits, usage, included, locked: ['register', 'doh', 'registerDownloads'], upgradeText: UPGRADE_TEXT, upgradeUrl: upgradeUrl() };

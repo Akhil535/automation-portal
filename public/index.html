@@ -724,7 +724,6 @@
             <label>Policies<input name="policies" type="number" min="0" max="999" required></label>
             <label>HR &amp; training documents<input name="hr" type="number" min="0" max="999" required></label>
             <label>3rd-party documents<input name="thirdparty" type="number" min="0" max="999" required></label>
-            <label>Facilities<input name="facilities" type="number" min="1" max="999" required></label>
           </div>
           <label>Upgrade page (optional)<input name="upgradeUrl" type="url" placeholder="https://… your subscription / payment page" autocomplete="off"></label>
           <p class="muted small">When set, <b>Get Premium</b> opens this page in a new tab (and the administrators are still told). Empty: Get Premium sends the request to the administrators.</p>
@@ -1070,6 +1069,11 @@
       </div>
     </fieldset>
 
+    <div class="lock-warn" id="np-lockwarn" role="note">
+      <span aria-hidden="true">⚠</span>
+      <div><b>Warning: Once a facility is created, details cannot be edited directly. Any subsequent changes require explicit Administrator permission.</b>
+        <label class="check"><input type="checkbox" id="np-ack"> I have checked the facility name, code, contacts, dates, people and pictures</label></div>
+    </div>
     <div class="actions np-foot">
       <label class="check"><input type="checkbox" id="np-autolink" checked> Link to the LEGAL REGISTER at the end (final step)</label>
       <span class="np-spacer"></span>
@@ -1162,6 +1166,18 @@
   </form>
   <p class="ai-foot">Answers come from your portal's data. The assistant only reads – it never changes anything.</p>
 </section>
+<dialog id="lock-dlg" class="lock-dlg" aria-labelledby="lk-title">
+  <form method="dialog">
+    <span class="lk-badge" aria-hidden="true">🔒</span>
+    <h2 id="lk-title">Facility details are locked</h2>
+    <p id="lk-text"></p>
+    <div id="lk-req">
+      <label>What should be changed, and why?<textarea id="lk-note" rows="3" maxlength="500" placeholder="e.g. The facility phone number changed to …"></textarea></label>
+    </div>
+    <div class="btn-row"><button class="btn" value="close">Close</button><button type="button" class="btn primary" id="lk-send">Send to the administrator</button></div>
+    <p class="small muted" id="lk-msg" role="status"></p>
+  </form>
+</dialog>
 <dialog id="welcome-dlg" class="welcome-dlg" aria-labelledby="wl-title" aria-describedby="wl-text">
   <form method="dialog">
     <div class="wl-glow" aria-hidden="true"></div>
