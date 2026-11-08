@@ -707,7 +707,13 @@
           <p class="muted small">Shown to every user after they sign in, until they tick <b>Don't show this again</b> (remembered on their account).</p>
           <label class="check"><input type="checkbox" name="enabled"> Show the welcome message</label>
           <label>Title<input name="title" maxlength="120" required></label>
-          <label>Text<textarea name="text" rows="3" maxlength="1200" required></textarea></label>
+          <label>Text <span class="muted small">(an empty line starts a new paragraph)</span><textarea name="text" rows="5" maxlength="2000" required></textarea></label>
+          <label>Support heading<input name="supportTitle" maxlength="120"></label>
+          <label>Support text<textarea name="supportText" rows="2" maxlength="600"></textarea></label>
+          <div class="row3">
+            <label>Contact number<input name="phone" maxlength="40" placeholder="+971 50 000 0000" inputmode="tel"></label>
+            <label>Note next to the number<input name="phoneNote" maxlength="60" placeholder="e.g. Sun–Thu, 9:00–18:00"></label>
+          </div>
           <label class="check"><input type="checkbox" name="showAgain"> Show it again to everyone (also those who chose not to see it)</label>
           <div class="actions"><button class="btn primary" type="submit">Save message</button><button class="btn" type="button" id="welcome-preview">Preview</button><span id="welcome-msg" class="muted"></span></div>
         </form>
@@ -1161,12 +1167,15 @@
     <div class="wl-badge" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5zm-1.2 14.2-3.5-3.5 1.4-1.4 2.1 2.1 4.9-4.9 1.4 1.4z"/></svg></div>
     <span class="wl-kicker">Compliance information</span>
     <h2 id="wl-title">Welcome to the Compliance Portal</h2>
-    <p class="wl-text" id="wl-text"></p>
-    <ul class="wl-points">
-      <li><b>ADHICS</b><span>Updated as the standard changes</span></li>
-      <li><b>Audit findings</b><span>Built from real finding reports</span></li>
-      <li><b>Your facility</b><span>Name, logo and dates filled in</span></li>
-    </ul>
+    <div class="wl-text" id="wl-text"></div>
+    <section class="wl-support" id="wl-support" aria-labelledby="wl-sup-title">
+      <span class="wl-sup-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 1a9 9 0 0 0-9 9v7a3 3 0 0 0 3 3h2v-8H5v-2a7 7 0 0 1 14 0v2h-3v8h3v1h-6v2h6a2 2 0 0 0 2-2V10a9 9 0 0 0-9-9z"/></svg></span>
+      <div class="wl-sup-body">
+        <h3 id="wl-sup-title"></h3>
+        <p id="wl-sup-text"></p>
+        <a class="wl-call" id="wl-call" href="#"><span aria-hidden="true">📞</span><span>Contact us: <b id="wl-phone"></b> <small id="wl-phone-note"></small></span></a>
+      </div>
+    </section>
     <div class="wl-foot">
       <label class="check wl-check"><input type="checkbox" id="wl-dont"> Don't show this again</label>
       <button class="btn primary" value="ok" id="wl-ok" autofocus>Get started →</button>

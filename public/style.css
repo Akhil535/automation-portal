@@ -3646,3 +3646,29 @@ body.trial #master .register, body.trial #master table { filter: saturate(.75); 
 #welcome-form .actions { margin-top: 12px; }
 
 .np-trial { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; font-weight: 700; }
+
+/* v22b · welcome: paragraphs + "Need assistance?" box with a call button; scrolls inside on short screens */
+.welcome-dlg { width: min(600px, calc(100vw - 24px)); max-height: calc(100dvh - 24px) !important; overflow: auto !important; }
+.wl-text { display: grid; gap: 10px; }
+.wl-text p { margin: 0; font-size: 15px; line-height: 1.6; color: rgba(238, 246, 244, .88); }
+.wl-support { display: flex; gap: 14px; align-items: flex-start; padding: 16px; border-radius: 18px;
+  background: linear-gradient(135deg, rgba(20, 184, 166, .16), rgba(251, 191, 36, .08)); border: 1px solid rgba(94, 234, 212, .28); }
+.wl-sup-ic { flex: none; width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; background: rgba(94, 234, 212, .16); }
+.wl-sup-ic svg { width: 22px; height: 22px; fill: #5eead4; }
+.wl-sup-body { display: grid; gap: 6px; min-width: 0; }
+.wl-support h3 { margin: 0; font: 800 16px/1.3 var(--font) !important; color: #fff !important; -webkit-text-fill-color: #fff !important; background: none !important; }
+.wl-support p { margin: 0; font-size: 13.5px; line-height: 1.55; color: rgba(238, 246, 244, .8); }
+.wl-call { justify-self: start; display: inline-flex; align-items: center; gap: 10px; margin-top: 4px; padding: 10px 14px; border-radius: 12px; text-decoration: none;
+  background: #fff; color: #063a36 !important; font-size: 14px; box-shadow: 0 10px 22px -12px rgba(0, 0, 0, .6); transition: transform .15s, box-shadow .15s; }
+.wl-call b { font-weight: 800; letter-spacing: .01em; white-space: nowrap; }
+.wl-call small { color: #4b6b68; font-size: 12px; }
+.wl-call:hover { transform: translateY(-1px); box-shadow: 0 14px 26px -12px rgba(0, 0, 0, .7); }
+.wl-call:focus-visible { outline: 3px solid #5eead4; outline-offset: 2px; }
+.welcome-dlg[open] .wl-support { animation-delay: .26s; }
+@media (max-width: 520px) {
+  .wl-support { flex-direction: column; padding: 14px; }
+  .wl-call { justify-self: stretch; justify-content: center; flex-wrap: wrap; text-align: center; }
+}
+#welcome-form .row3 { margin-top: 10px; }
+.welcome-dlg { overflow-x: hidden !important; overflow-y: auto !important; }
+.welcome-dlg form { overflow: hidden; }

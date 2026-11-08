@@ -2995,11 +2995,21 @@ var planState = null; // var: may be read before this line runs
   const dlg = $('#welcome-dlg');
   if (!dlg) return;
   const key = v => `welcome-seen:${me?.id || ''}:${v}`;
+  const WL_FIELDS = ['title', 'text', 'supportTitle', 'supportText', 'phone', 'phoneNote'];
   let current = null;
   function open(w, { preview = false } = {}) {
     current = { ...w, preview };
     $('#wl-title').textContent = w.title;
-    $('#wl-text').textContent = w.text;
+    // paragraphs (an empty line in the text starts a new one), then the support box with a tap-to-call number
+    $('#wl-text').innerHTML = String(w.text || '').split(/\n\s*\n/).map(p => p.trim()).filter(Boolean).map(p => `<p>${esc(p)}</p>`).join('');
+    $('#wl-sup-title').textContent = w.supportTitle || 'Need assistance?';
+    $('#wl-sup-text').textContent = w.supportText || '';
+    $('#wl-sup-text').hidden = !w.supportText;
+    $('#wl-phone').textContent = w.phone || '';
+    $('#wl-phone-note').textContent = w.phoneNote || '';
+    $('#wl-call').hidden = !w.phone;
+    $('#wl-call').href = w.phone ? `tel:${String(w.phone).replace(/[^\d+]/g, '')}` : '#';
+    $('#wl-support').hidden = !w.phone && !w.supportText;
     $('#wl-dont').checked = false;
     $('#wl-dont').closest('label').hidden = preview;
     dlg.classList.remove('closing');
@@ -3038,20 +3048,21 @@ var planState = null; // var: may be read before this line runs
     if (!f || me?.role !== 'admin') return;
     try {
       const w = await apiGlobal('/api/welcome');
-      f.elements.enabled.checked = !!w.enabled; f.elements.title.value = w.title; f.elements.text.value = w.text; f.elements.showAgain.checked = false;
+      f.elements.enabled.checked = !!w.enabled; f.elements.showAgain.checked = false;
+      for (const k of WL_FIELDS) f.elements[k].value = w[k] || '';
     } catch { /* shown on save */ }
   };
   $('#welcome-form').onsubmit = async e => {
     e.preventDefault();
     const f = e.target;
     try {
-      await apiGlobal('/api/welcome', { method: 'PUT', body: JSON.stringify({ enabled: f.elements.enabled.checked, title: f.elements.title.value, text: f.elements.text.value, showAgain: f.elements.showAgain.checked }) });
+      await apiGlobal('/api/welcome', { method: 'PUT', body: JSON.stringify({ enabled: f.elements.enabled.checked, ...Object.fromEntries(WL_FIELDS.map(k => [k, f.elements[k].value])), showAgain: f.elements.showAgain.checked }) });
       $('#welcome-msg').textContent = f.elements.showAgain.checked ? 'Saved – everyone sees it again at their next sign-in.' : 'Saved.';
       f.elements.showAgain.checked = false;
     } catch (err) { $('#welcome-msg').textContent = err.message; }
   };
   $('#welcome-preview').onclick = () => {
     const f = $('#welcome-form');
-    open({ title: f.elements.title.value || 'Welcome', text: f.elements.text.value, version: 0 }, { preview: true });
+    open({ ...Object.fromEntries(WL_FIELDS.map(k => [k, f.elements[k].value])), title: f.elements.title.value || 'Welcome', version: 0 }, { preview: true });
   };
 })();

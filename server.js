@@ -221,17 +221,23 @@ app.put('/api/plans', wrap(async (req, res) => {
   res.json({ trial: setTrialLimits({ ...(b.trial || {}), ...(b.upgradeUrl !== undefined ? { upgradeUrl: b.upgradeUrl } : {}) }), upgradeUrl: upgradeUrl() });
 }));
 // Welcome message shown after sign-in (administrators edit it; "show again to everyone" raises its version).
+// version 2: the real-time audit experience message with a contact number (everyone sees it once more)
 const WELCOME_DEFAULT = {
-  enabled: true, version: 1, title: 'Welcome to the Compliance Portal',
-  text: 'These documents are 99% accurate, updated dynamically as per ADHICS standards, and built directly from real audit findings and finding reports.',
+  enabled: true, version: 2, title: 'Welcome to the Compliance Portal!',
+  text: 'Please note that all documents generated through this platform are 99% accurate and built directly from our real-time hands-on experience in managing and conducting technical ADHICS compliance audits across various healthcare facilities.\n\nWhenever regulatory standards change, our team updates the platform in real-time to keep your documentation fully compliant.',
+  supportTitle: 'Need Technical or Audit Assistance?',
+  supportText: 'If you require dedicated technical support, document preparation, or full audit support, our expert team is here to assist you.',
+  phone: '+971 50 000 0000', phoneNote: '(Sample Number)',
 };
-const welcome = () => ({ ...WELCOME_DEFAULT, ...(loadGlobalConfig().welcome || {}) });
+const welcome = () => { const w = { ...WELCOME_DEFAULT, ...(loadGlobalConfig().welcome || {}) }; w.version = Math.max(w.version, WELCOME_DEFAULT.version); return w; };
 app.get('/api/welcome', wrap(async (req, res) => res.json(welcome())));
 app.put('/api/welcome', wrap(async (req, res) => {
   const b = req.body || {}, cfg = loadGlobalConfig(), cur = welcome();
-  const title = String(b.title ?? cur.title).trim().slice(0, 120), text = String(b.text ?? cur.text).trim().slice(0, 1200);
-  if (!title || !text) throw new Error('The welcome message needs a title and a text');
-  cfg.welcome = { enabled: b.enabled === undefined ? cur.enabled : !!b.enabled, title, text, version: cur.version + (b.showAgain ? 1 : 0) };
+  const field = (k, max) => String(b[k] ?? cur[k] ?? '').trim().slice(0, max);
+  const w = { title: field('title', 120), text: field('text', 2000), supportTitle: field('supportTitle', 120), supportText: field('supportText', 600), phone: field('phone', 40), phoneNote: field('phoneNote', 60) };
+  if (!w.title || !w.text) throw new Error('The welcome message needs a title and a text');
+  if (w.phone && !/^[+\d][\d\s().-]{5,}$/.test(w.phone)) throw new Error('Contact number: digits, spaces and + ( ) - only');
+  cfg.welcome = { enabled: b.enabled === undefined ? cur.enabled : !!b.enabled, ...w, version: cur.version + (b.showAgain ? 1 : 0) };
   saveConfig(cfg);
   res.json(cfg.welcome);
 }));
