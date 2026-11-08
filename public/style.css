@@ -4001,3 +4001,7 @@ tr.reg-locked:hover td { background-color: rgba(251, 191, 36, .05); }
 i[class^="i-"], i[class*=" i-"] { width: 1.05em !important; height: 1.05em !important; min-width: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; display: inline-block !important; background: currentColor !important; flex: none !important; }
 #hx-activity li > i { color: var(--brand, #0f766e); }
 :root[data-theme="dark"] #hx-activity li > i { color: #5eead4; }
+
+/* v28c · free trial: the training / 3rd-party dates and details are Premium – values blurred and read-only */
+.trial-locked-box :is(.dd-global input, .dd-own, .dd-what small, .dd-global small, .dd-grid input, .link-btn) { filter: blur(4px); user-select: none; pointer-events: none; }
+.trial-locked-box .dd-lock { filter: none; opacity: 1; }

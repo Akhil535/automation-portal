@@ -2764,7 +2764,11 @@ function renderDocDates(sel, setting) {
   const forms = d.forms.filter(f => f.dates?.setting === setting || (f.details && setting === 'training'));
   if (!forms.length) { box.innerHTML = ''; return; }
   // free trial: the 3rd-party documents use the default dates (PO11 / the policy review date) – own dates are Premium
-  const tpLocked = setting === 'thirdparty' && !!planState?.included;
+  // free trial: the training date and details are Premium too (shown blurred, read-only)
+  const tpLocked = (setting === 'thirdparty' || setting === 'training') && !!planState?.included;
+  const lockMsg = setting === 'training'
+    ? '<b>Training dates and details are part of Premium.</b> On the free trial the training date, document dates and trainer details are view-only.'
+    : '<b>Own document dates are part of Premium.</b> On the free trial the 3rd-party documents use the policy review date and follow PO11.';
   const ro = me?.role === 'viewer' || tpLocked ? ' disabled' : '';
   const globalDate = d.dateSettings[setting] || '';
   const fallback = setting === 'thirdparty' ? d.dateSettings.thirdpartyDefault : '';
@@ -2773,7 +2777,7 @@ function renderDocDates(sel, setting) {
     ? 'Enter it once – it fills every date in the training documents. A document can have its own date below (e.g. the acknowledgement signed on another day).'
     : `One date for the 3rd-party documents${fallback ? ` – empty = the policy review date (${ymdToDmy(fallback)})` : ''}. Policy ID, issued / reviewed / due dates follow PO11.`;
   box.innerHTML = `<div class="doc-dates${tpLocked ? ' trial-locked-box' : ''}" data-setting="${setting}">
-    ${tpLocked ? '<div class="dd-lock"><span aria-hidden="true"><i class=i-lock></i></span><span><b>Own document dates are part of Premium.</b> On the free trial the 3rd-party documents use the policy review date and follow PO11.</span><button type="button" class="btn small premium-btn" data-up>Get Premium</button></div>' : ''}
+    ${tpLocked ? '<div class="dd-lock"><span aria-hidden="true"><i class=i-lock></i></span><span>' + lockMsg + '</span><button type="button" class="btn small premium-btn" data-up>Get Premium</button></div>' : ''}
     <div class="dd-global"><label><b>${title}</b><input type="date" data-dd-global value="${esc(globalDate)}"${ro}></label><small class="muted">${hint}</small></div>
     <div class="dd-list">${forms.filter(f => f.dates).map(f => {
       const dt = f.dates;
