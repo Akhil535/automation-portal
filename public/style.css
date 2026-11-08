@@ -2824,3 +2824,54 @@ input:focus, select:focus, textarea:focus { border-color: var(--brand-2) !import
   --stripes: repeating-linear-gradient(-55deg, #ff8a1f 0 14px, #ffb02e 14px 22px, #ffc83d 22px 34px, #ff9a3c 34px 40px);
   --head-fade: none; --dots: none;
 }
+
+/* =====================================================================================================
+   Process guide v15: a connected stepper – badge on top, name + status centred underneath (never cut off),
+   one progress line through the badges that fills with the gradient up to the current step.
+   ===================================================================================================== */
+.flow { padding: 22px 18px 14px !important; }
+.flow-steps { display: grid !important; grid-template-columns: repeat(5, minmax(0, 1fr)) !important; gap: 0 !important; align-items: start; }
+.flow-steps > li { position: relative; display: flex !important; flex-direction: column; align-items: center; text-align: center; padding: 0 4px !important; min-width: 0; }
+.flow-steps > li > button, .flow-steps > li:not(:has(button)) { all: unset; box-sizing: border-box; display: flex !important; flex-direction: column; align-items: center; gap: 10px;
+  width: 100%; padding: 12px 8px 12px !important; border-radius: 18px; text-align: center; position: relative; z-index: 1; }
+.flow-steps > li > button { cursor: pointer; transition: background .15s; }
+.flow-steps > li > button:hover { background: var(--panel-2); }
+.flow-steps > li > button:hover .fl-txt b { color: var(--brand-2); }
+/* the line between badges (from this badge to the next) */
+.flow-steps > li::before { display: none !important; }
+.flow-steps > li:not(:last-child)::after { content: "" !important; display: block !important; position: absolute; z-index: 0; top: 33px; left: calc(50% + 28px); right: calc(-50% + 28px);
+  height: 4px; margin: 0; border-radius: 99px; background: var(--line); }
+.flow-steps > li.done:not(:last-child)::after { background: var(--grad); }
+/* badges */
+.fl-dot { width: 44px !important; height: 44px !important; border-radius: 50% !important; border: 2px solid var(--line) !important; background: var(--panel) !important; color: var(--muted) !important;
+  font: 600 15px/1 var(--font-display) !important; display: grid; place-items: center; box-shadow: 0 4px 12px -8px rgba(31, 45, 85, .4); }
+.fl-dot svg { width: 16px; height: 16px; }
+.flow-steps > li.done .fl-dot { background: var(--grad) !important; border-color: transparent !important; color: #fff !important; }
+.flow-steps > li.now:not(.done) .fl-dot { background: var(--panel) !important; border: 3px solid var(--brand-2) !important; color: var(--brand-2) !important;
+  box-shadow: 0 0 0 6px var(--brand-soft) !important; animation: flowPulse 2.4s ease-in-out infinite; }
+.flow-steps > li.warn .fl-dot { border-color: var(--warn) !important; color: var(--warn) !important; background: var(--warn-soft) !important; }
+.flow-steps > li.bad .fl-dot { border-color: var(--bad) !important; color: var(--bad) !important; background: var(--bad-soft) !important; }
+/* text: full, centred, up to two lines */
+.fl-txt { display: grid !important; justify-items: center; gap: 2px; min-width: 0; }
+.fl-txt b { font: 600 14px/1.25 var(--font-display) !important; color: var(--ink) !important; white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
+.fl-txt small { font-size: 12px !important; line-height: 1.35; color: var(--muted) !important; white-space: normal !important; overflow: hidden !important; text-overflow: clip !important;
+  display: -webkit-box !important; -webkit-line-clamp: 2; -webkit-box-orient: vertical; max-width: 210px; }
+.flow-steps > li.done .fl-txt small { color: var(--ok) !important; }
+.flow-steps > li.now:not(.done) .fl-txt small { color: var(--brand-2) !important; font-weight: 500; }
+.flow-steps > li.bad .fl-txt small { color: var(--bad) !important; }
+.flow-steps > li.warn .fl-txt small { color: var(--warn) !important; }
+/* the page you are on: a soft card with a centred tag */
+.flow-steps > li.here > button { background: var(--brand-soft) !important; box-shadow: none !important; }
+.flow-steps > li.here > button::before { content: "You are here" !important; position: absolute !important; top: -9px !important; left: 50% !important; transform: translateX(-50%);
+  background: var(--grad) !important; color: #fff !important; font: 600 10.5px/1 var(--font) !important; letter-spacing: 0 !important; text-transform: none !important;
+  padding: 4px 9px !important; border-radius: 999px !important; white-space: nowrap; order: 0 !important; margin: 0 !important; }
+/* phones: a vertical list – badge left, text right, the line runs down */
+@media (max-width: 760px) {
+  .flow-steps { grid-template-columns: minmax(0, 1fr) !important; }
+  .flow-steps > li { align-items: stretch; padding: 0 !important; }
+  .flow-steps > li > button, .flow-steps > li:not(:has(button)) { flex-direction: row; text-align: left; gap: 14px; padding: 10px !important; }
+  .fl-txt { justify-items: start; }
+  .fl-txt small { display: -webkit-box !important; max-width: none; }
+  .flow-steps > li:not(:last-child)::after { top: 56px; bottom: -8px; left: 30px; right: auto; width: 4px; height: auto; }
+  .flow-steps > li.here > button::before { position: static !important; transform: none; margin-left: auto !important; order: 9 !important; }
+}
