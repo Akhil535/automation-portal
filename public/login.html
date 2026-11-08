@@ -10,13 +10,33 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body class="auth-page">
-<aside class="auth-art" aria-hidden="true">
-  <div class="aa-top"><span class="aa-logo"><i><svg viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5zm-1.2 14.2-3.5-3.5 1.4-1.4 2.1 2.1 4.9-4.9 1.4 1.4z"/></svg></i>Compliance Portal</span></div>
-  <div class="aa-blocks"><span></span><span></span><span></span><span></span></div>
-  <span class="aa-label">ADHICS · Abu Dhabi</span>
-  <h2>Policies, licences and DoH updates – in one place.</h2>
-  <p>Prepare your policies, keep every licence and certificate current, and get new DoH circulars every week. An AI assistant answers your questions on the way.</p>
-  <div class="aa-steps"><span><b>1</b>Policies</span><span><b>2</b>LEGAL REGISTER</span><span><b>3</b>DoH updates</span></div>
+<aside class="auth-art la" aria-label="What the Compliance Portal does">
+  <div class="la-top">
+    <span class="aa-logo"><i><svg viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5zm-1.2 14.2-3.5-3.5 1.4-1.4 2.1 2.1 4.9-4.9 1.4 1.4z"/></svg></i>Compliance Portal</span>
+    <span class="la-pill">For Abu Dhabi healthcare facilities</span>
+  </div>
+  <div class="la-hero">
+    <h2>ADHICS compliance,<span>on autopilot.</span></h2>
+    <p>Policies, HR and vendor forms, licences and DoH circulars – prepared, tracked and kept up to date for your facility, in one secure place.</p>
+  </div>
+  <figure class="la-video">
+    <div class="la-screen">
+      <div class="la-stage iso-stage" id="la-stage"></div>
+      <div class="la-ai" id="la-ai" aria-hidden="true"><i>✦</i><span><b>AI assistant</b>“3 licences expire in 30 days – renew the DoH licence first.”</span></div>
+    </div>
+    <figcaption class="la-caption in" id="la-caption"><span class="la-tag" id="la-tag">Step 1 · Policies</span><b id="la-title">Your 33 ADHICS policies – written for you</b><small id="la-sub"></small></figcaption>
+    <div class="la-ctrl">
+      <div class="la-dots" id="la-dots" role="tablist" aria-label="Steps"><button type="button" role="tab">1</button><button type="button" role="tab">2</button><button type="button" role="tab">3</button><button type="button" role="tab">↻</button></div>
+      <button type="button" class="la-play" id="la-play">❚❚ Pause</button>
+    </div>
+    <div class="la-bar"><i id="la-bar"></i></div>
+  </figure>
+  <ul class="la-facts">
+    <li><b>33</b><span>ADHICS policies<br>Word + PDF</span></li>
+    <li><b>13</b><span>HR, training &amp;<br>vendor forms</span></li>
+    <li><b>Weekly</b><span>DoH circular<br>check</span></li>
+    <li><b>2FA</b><span>secure sign-in,<br>roles per facility</span></li>
+  </ul>
 </aside>
 <div class="auth-wrap">
   <div class="auth-brand">
@@ -118,5 +138,6 @@
   <p class="auth-foot muted small">RESTRICTED / داخلي · Authorised users only. Sign-ins are logged.</p>
 </div>
 <script src="login.js"></script>
+<script src="/login-scene.js" defer></script>
 </body>
 </html>
