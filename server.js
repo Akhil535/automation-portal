@@ -44,7 +44,9 @@ app.use((req, res, next) => (['/api/policies/preview', '/api/policies/picture-de
 // Security: sign-in with username + password + 2FA, sessions, roles (RBAC), facility scoping
 // ===================================================================================================
 app.use((req, res, next) => {
-  res.set({ 'X-Frame-Options': 'DENY', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Cache-Control': 'no-store' });
+  // SAMEORIGIN (+ frame-ancestors 'self'): the portal's own document viewers may show its PDFs in a frame; no other
+  // site can frame the portal (clickjacking stays blocked). DENY also blocked our own viewers (blank master policies).
+  res.set({ 'X-Frame-Options': 'SAMEORIGIN', 'Content-Security-Policy': "frame-ancestors 'self'", 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Cache-Control': 'no-store' });
   next();
 });
 const cookies = req => Object.fromEntries((req.headers.cookie || '').split(';').map(c => c.trim()).filter(Boolean)

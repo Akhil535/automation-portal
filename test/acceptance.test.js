@@ -548,6 +548,10 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
     const post = (p, body, cookie) => fetch(base + p, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) });
     const totpNow = secret => A.totpAt(secret.replace(/\s/g, ''), Math.floor(Date.now() / 30000));
 
+    // other sites cannot frame the portal, but its own document viewers can (DENY made the master policies blank)
+    const hs = (await fetch(`${base}/api/auth/state`)).headers;
+    assert.equal(hs.get('x-frame-options'), 'SAMEORIGIN'); assert.equal(hs.get('content-security-policy'), "frame-ancestors 'self'");
+
     // nothing is reachable without signing in
     assert.equal((await fetch(`${base}/`, { redirect: 'manual' })).status, 302);
     assert.equal((await fetch(`${base}/api/status`)).status, 401);
