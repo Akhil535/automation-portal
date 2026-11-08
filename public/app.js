@@ -74,6 +74,7 @@ async function loadFacilities() {
     <td><div class="row-actions">
       ${f.finalized && !f.editUnlock ? `<button class="icon-btn" data-admin data-unlock="${esc(f.id)}" title="Let this facility's users change its details for 24 hours">${f.changeRequest ? '✓ Allow edits (24 h)' : 'Allow edits'}</button>` : ''}
       ${f.editUnlock ? `<button class="icon-btn" data-admin data-relock="${esc(f.id)}">🔒 Lock again</button>` : ''}
+      ${!f.finalized && f.createdBy ? `<button class="icon-btn" data-admin data-relock="${esc(f.id)}" title="Lock its details now (otherwise they lock when its policies are created)">🔒 Lock details</button>` : ''}
       ${f.id === facility ? '' : `<button class="icon-btn" data-open="${esc(f.id)}">Open</button>`}
       <button class="icon-btn" data-write data-edit="${esc(f.id)}">Edit</button>
       <button class="icon-btn del" data-admin data-del="${esc(f.id)}" ${f.isDefault ? 'disabled title="The default facility cannot be removed"' : ''}>Delete</button>
