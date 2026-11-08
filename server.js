@@ -201,7 +201,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.static(path.join(APP_DIR, 'public')));
+app.use(express.static(path.join(APP_DIR, 'public'))); // (every response is 'no-store' – see the security headers above)
 const wrap = fn => (req, res) => Promise.resolve(fn(req, res)).catch(e => res.status(e.status || 400).json({ error: e.message, ...(e.upgrade ? { upgrade: true, info: e.info || {} } : {}), ...(e.adminNeeded ? { adminNeeded: true } : {}), ...(e.locked ? { locked: true, facility: e.facility } : {}) }));
 const fac = req => req.query.f || req.facOverride || undefined;
 

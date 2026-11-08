@@ -3956,3 +3956,48 @@ tr.reg-locked:hover td { background-color: rgba(251, 191, 36, .05); }
 .lock-tag { display: inline-flex !important; align-items: center; gap: .3em; white-space: nowrap; }
 .reg-lock-pill, .ck-lock { align-items: center; }
 .reg-lock-pill:hover .premium-btn, .ck-lock .premium-mini:hover { filter: saturate(1.1) brightness(1.04); }
+
+/* =====================================================================================================
+   v28 · Theme contrast: tooltips always dark-on-light / light-on-dark; warnings amber in dark mode and crimson in
+   light mode; premium notices readable in both.
+   ===================================================================================================== */
+/* small hover tips: a dark tip in light mode, a light tip in dark mode – never the page colour */
+.hovercard:not(.wide) { background: #0f2a2a !important; color: #f1f7f5 !important; border: 1px solid rgba(255, 255, 255, .08) !important; box-shadow: 0 12px 28px -12px rgba(0, 0, 0, .45) !important; }
+.hovercard:not(.wide) * { color: inherit !important; }
+:root[data-theme="dark"] .hovercard:not(.wide) { background: #eef6f4 !important; color: #0f2a2a !important; border-color: rgba(0, 0, 0, .08) !important; }
+/* detail cards: the panel colour with the ink colour */
+.hovercard.wide { background: var(--panel) !important; color: var(--ink) !important; border: 1px solid var(--line) !important; }
+.hovercard.wide :is(b, p, span, small, li, dt, dd):not(.pill-status):not(.tag) { color: inherit; }
+.hovercard.wide .hc-line, .hovercard.wide small { color: var(--muted) !important; }
+
+/* warnings: crimson in light mode (amber reads poorly on white), amber in dark mode */
+:root:not([data-theme="dark"]) { --warn: #be123c; --warn-soft: rgba(190, 18, 60, .08); --bad: #9f1239; --bad-soft: rgba(159, 18, 57, .09); }
+:root[data-theme="dark"] { --warn: #fbbf24; --warn-soft: rgba(251, 191, 36, .13); }
+:root:not([data-theme="dark"]) :is(.tag.warn, .pill-status.warn, .warn-txt, .alert.warn, .conf.medium, .conf.low, .jr-state.warn, .t2.warn .t2-chip, .ck-kpi.warn > b, .t2-chip.warn) { color: var(--warn) !important; }
+:root:not([data-theme="dark"]) :is(.tag.warn, .pill-status.warn, .t2.warn .t2-chip) { background: var(--warn-soft) !important; border-color: rgba(190, 18, 60, .25) !important; }
+:root:not([data-theme="dark"]) .alert.warn { background: var(--warn-soft) !important; border-color: rgba(190, 18, 60, .3) !important; }
+:root:not([data-theme="dark"]) .t2.warn .t2-ring b, :root:not([data-theme="dark"]) .tl.warn .tl-date b { color: var(--warn) !important; }
+
+/* premium notices (gold) – readable on white: deeper gold text, soft gold surface */
+:root:not([data-theme="dark"]) :is(.lock-tag, .tag.lock-tag, .t2.t2-locked .t2-chip) { color: #92400e !important; background: #fef3c7 !important; border-color: #fcd34d !important; }
+:root:not([data-theme="dark"]) :is(.trial-lock, .dl-item.dl-locked, .dd-lock, .reg-lock-pill) { background: linear-gradient(120deg, #fffbeb, #f0fdfa) !important; border-color: #fcd34d !important; }
+:root:not([data-theme="dark"]) :is(.trial-note) { background: #fffbeb; border-color: #f59e0b; color: #78350f; }
+:root:not([data-theme="dark"]) .lock-msg { color: #57534e !important; }
+
+/* v28b · contrast: secondary text and labels at least 4.5:1 in light mode; dark-mode teal badges with dark digits */
+:root:not([data-theme="dark"]) { --muted: #4b5f5c; --ok: #047857; --ok-soft: rgba(4, 120, 87, .09); }
+:root:not([data-theme="dark"]) :is(.muted, .sec-sub, th, .tag.na, .lock, .reg-doc-k, .pw-steps small, .t2-date, small) { color: var(--muted); }
+:root:not([data-theme="dark"]) :is(.ok, .tag.ok, .jr-state.done, .hr-pdf.ok, small.ok) { color: var(--ok) !important; }
+:root:not([data-theme="dark"]) .jr-state.done { background: var(--ok-soft) !important; }
+:root:not([data-theme="dark"]) .pp-lockbar, :root:not([data-theme="dark"]) .pp-lockbar * { color: #3f514e !important; }
+:root[data-theme="dark"] :is(#tabs button.active .sb-step, .pw-num, .pw-steps .on i, .pw-steps button.on i, .vtoggle .active, .chips button.active, .seg button.on, .filter-chips .active, .flt.active, button.on > i) { color: #042f2c !important; }
+:root[data-theme="dark"] .icon-btn.del, :root[data-theme="dark"] .danger-txt { color: #fda4af !important; }
+:root[data-theme="dark"] .pend-count { color: #fff !important; background: #be123c !important; }
+:root[data-theme="dark"] .jr-track li.done i { color: #04221b !important; }
+:root:not([data-theme="dark"]) :is(.vchip, .scope.all, .pill-status.na) { color: #3f514e !important; }
+:root:not([data-theme="dark"]) .pend-count { color: #fff !important; background: #be123c !important; }
+
+/* icons keep their own look inside containers that style every <i> (badges, list bullets) */
+i[class^="i-"], i[class*=" i-"] { width: 1.05em !important; height: 1.05em !important; min-width: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; display: inline-block !important; background: currentColor !important; flex: none !important; }
+#hx-activity li > i { color: var(--brand, #0f766e); }
+:root[data-theme="dark"] #hx-activity li > i { color: #5eead4; }
