@@ -2404,91 +2404,40 @@ async function renderAiSettings() {
 })();
 
 // ===================================================================================================
-// "How it works" – an animated isometric scene of the process (SVG built here, no video file):
-// three islands (1 Policies · 2 LEGAL REGISTER · 3 DoH updates) and a finish flag, a glowing package travelling
-// along the path, the active island lit, a caption per step, and badges with this facility's real progress.
+// "How it works" – the shared isometric "compliance factory" (public/iso-factory.js): four stations on a moving
+// conveyor belt (1 Policies · 2 HR forms · 3 LEGAL REGISTER · DoH updates), documents riding the belt, a glowing
+// package hopping to the active station, a caption per step, and badges with this facility's real progress.
 // ===================================================================================================
 var iso = (() => { // var: renderFlow may ask for it during start-up
-  const O = { x: 140, y: 250 };
-  const P = (x, y, z = 0) => [O.x + (x - y) * 0.866, O.y + (x + y) * 0.5 - z];
-  const pts = a => a.map(p => p.map(n => n.toFixed(1)).join(',')).join(' ');
-  /** An isometric box: three visible faces (top, front-left = +y side, front-right = +x side). */
-  const box = (x, y, z, w, d, h, cls = '') => {
-    const top = [P(x, y, z + h), P(x + w, y, z + h), P(x + w, y + d, z + h), P(x, y + d, z + h)];
-    const left = [P(x, y + d, z), P(x + w, y + d, z), P(x + w, y + d, z + h), P(x, y + d, z + h)];
-    const right = [P(x + w, y, z), P(x + w, y + d, z), P(x + w, y + d, z + h), P(x + w, y, z + h)];
-    return `<g class="${cls}"><polygon class="f-l" points="${pts(left)}"/><polygon class="f-r" points="${pts(right)}"/><polygon class="f-t" points="${pts(top)}"/></g>`;
-  };
-  const G = 170, T = 130; // spacing between islands, island size
-  const isle = k => ({ x: k * G, y: -k * G });
-  const centre = k => [isle(k).x + T / 2, isle(k).y + T / 2, 14];
+  const LABELS = ['Policies', 'HR forms', 'Register', 'DoH'];
   const STEPS = [
-    { title: 'Step 1 · Prepare policies → Step 2 · HR documents', sub: 'The ADHICS policies are created as Word + PDF, then the HR & onboarding documents with the same logo and name.', tab: 'policies' },
-    { title: 'Step 3 · LEGAL REGISTER – the final step', sub: 'The policies are linked and every licence, certificate and contract is listed with its dates.', tab: 'master' },
+    { title: 'Step 1 · Prepare the ADHICS policies', sub: 'The policies are printed as Word + PDF with your logo, signature and stamp – each one stamped with your facility’s details.', tab: 'policies' },
+    { title: 'Step 2 · HR, training & 3rd-party documents', sub: 'NDA, orientation, exit clearance, training records and vendor forms – same logo, each with its own Ref. No.', tab: 'hr' },
+    { title: 'Step 3 · LEGAL REGISTER – the final step', sub: 'Policies are filed in the register and every licence, certificate and contract is tracked with its dates.', tab: 'master' },
     { title: 'Always on · DoH updates', sub: 'New Department of Health circulars are checked every week and added to your register.', tab: 'circulars' },
-    { title: 'Finished', sub: 'Everything is up to date. The portal keeps checking and tells you when something needs you.', tab: 'overview' },
   ];
-
-  function scene() {
-    let s = '';
-    // the path between the islands (on the ground)
-    const path = [0, 1, 2, 3].map(k => P(...centre(k)));
-    s += `<polyline class="iso-path" points="${pts(path)}"/>`;
-    for (let k = 0; k < 4; k++) {
-      const { x, y } = isle(k), size = k === 3 ? 110 : T, off = k === 3 ? 10 : 0;
-      s += `<g class="iso-isle" data-k="${k}">${box(x + off, y + off, 0, size, size, 14, 'slab')}`;
-      if (k === 0) { // policies: a stack of documents and a stamp
-        s += box(x + 28, y + 40, 14, 62, 44, 4, 'paper') + box(x + 32, y + 36, 18, 62, 44, 4, 'paper') + box(x + 36, y + 32, 22, 62, 44, 4, 'paper top-sheet');
-        s += box(x + 86, y + 84, 14, 20, 20, 16, 'stamp') + box(x + 92, y + 90, 30, 8, 8, 14, 'stamp-h');
-      } else if (k === 1) { // LEGAL REGISTER: a cabinet and a calendar
-        s += box(x + 24, y + 30, 14, 34, 70, 78, 'cabinet') + box(x + 58, y + 38, 22, 3, 54, 14, 'drawer') + box(x + 58, y + 38, 44, 3, 54, 14, 'drawer') + box(x + 58, y + 38, 66, 3, 54, 14, 'drawer');
-        s += box(x + 78, y + 80, 14, 30, 30, 30, 'calendar') + box(x + 78, y + 80, 44, 30, 30, 6, 'calendar-top');
-      } else if (k === 2) { // DoH: a government building with columns, a roof and signals
-        s += box(x + 22, y + 22, 14, 86, 86, 8, 'plinth');
-        for (const c of [30, 52, 74, 96]) s += box(x + c, y + 98, 22, 8, 8, 40, 'column');
-        s += box(x + 30, y + 30, 22, 74, 66, 40, 'hall') + box(x + 18, y + 18, 62, 94, 94, 8, 'eave');
-        const apex = P(x + 65, y + 65, 100);
-        s += `<polygon class="roof-l" points="${pts([P(x + 18, y + 112, 70), P(x + 112, y + 112, 70), apex])}"/><polygon class="roof-r" points="${pts([P(x + 112, y + 18, 70), P(x + 112, y + 112, 70), apex])}"/>`;
-        s += `<g class="signal">${[0, 1, 2].map(i => `<circle cx="${apex[0].toFixed(1)}" cy="${(apex[1] - 6).toFixed(1)}" r="10" style="animation-delay:${i * 0.6}s"/>`).join('')}</g>`;
-      } else { // finished: a flag
-        s += box(x + 62, y + 62, 14, 5, 5, 74, 'pole');
-        const a = P(x + 64, y + 64, 86), b = P(x + 64, y + 64, 66);
-        s += `<polygon class="flag" points="${pts([a, [a[0] + 44, a[1] + 8], [b[0] + 44, b[1] + 8], b])}"/>`;
-      }
-      // badge above the island (filled with the facility's real progress)
-      const [bx, by] = P(...centre(k).slice(0, 2), k === 2 ? 128 : 116);
-      s += `<g class="iso-badge" transform="translate(${bx.toFixed(1)},${by.toFixed(1)})"><rect x="-58" y="-15" width="116" height="30" rx="15"/><text class="b-num" x="-40" y="5">${['1', '3', '↻', '✓'][k]}</text><text class="b-txt" x="-26" y="5">${['Policies', 'Register', 'DoH', 'Finished'][k]}</text></g>`;
-      s += '</g>';
-    }
-    // the travelling package
-    s += `<g class="iso-pkg" id="iso-pkg">${box(-9, -9, 0, 18, 18, 18, 'pkg')}</g>`;
-    return `<svg viewBox="12 156 1122 238" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
-      <defs><linearGradient id="isoGlow" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6a4cf0"/><stop offset=".5" stop-color="#a64ff0"/><stop offset="1" stop-color="#ff5fb8"/></linearGradient>
-      <filter id="isoBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter></defs>
-      <g class="iso-world">${s}</g></svg>`;
-  }
-
-  // timeline: 4 steps × 3.6 s; the package moves to the next island during the first 0.9 s of a step
-  const STEP_MS = 3600, MOVE_MS = 900;
+  let F = null;
+  const STEP_MS = 3800, MOVE_MS = 900;
   const st = { k: 0, t0: 0, playing: true, raf: 0, visible: true, built: false };
   const reduce = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const lerp = (a, b, f) => a.map((v, i) => v + (b[i] - v) * f);
   const ease = f => (f < 0.5 ? 2 * f * f : 1 - (-2 * f + 2) ** 2 / 2);
 
   function place(k, f) {
-    const from = centre(Math.max(0, k - 1)), to = centre(k);
-    const g = k === 0 ? to : lerp(from, to, ease(Math.min(1, f)));
-    const hop = k > 0 && f < 1 ? Math.sin(Math.PI * f) * 40 : 0;
-    const [sx, sy] = P(g[0], g[1], g[2] + 6 + hop), [ox, oy] = P(0, 0, 0);
+    if (!F) return;
+    const from = F.centre(k === 0 ? 3 : k - 1), to = F.centre(k);
+    const g = lerp(from, to, ease(Math.min(1, f)));
+    const hop = f < 1 ? Math.sin(Math.PI * Math.min(1, f)) * (k === 0 ? 70 : 42) : 0;
+    const [sx, sy] = F.P(g[0], g[1], g[2] + 8 + hop), [ox, oy] = F.P(0, 0, 0);
     $('#iso-pkg')?.setAttribute('transform', `translate(${(sx - ox).toFixed(1)},${(sy - oy).toFixed(1)})`);
   }
   function show(k) {
     st.k = k;
+    const svg = $('#iso-stage svg'); if (svg) IsoFactory.fit(svg, k);
     $$('#iso-stage .iso-isle').forEach(g => g.classList.toggle('on', Number(g.dataset.k) === k));
     $$('#iso-dots button').forEach(b => { const on = Number(b.dataset.k) === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
     $('#iso-title').textContent = STEPS[k].title; $('#iso-sub').textContent = STEPS[k].sub;
-    $('#iso-go').textContent = k === 3 ? 'Open the dashboard →' : `Open step ${k + 1} →`;
-    $('#iso-go').hidden = k === 3;
+    $('#iso-go').textContent = k === 3 ? 'Open DoH updates →' : `Open step ${k + 1} →`;
   }
   function frame(now) {
     st.raf = 0;
@@ -2502,38 +2451,35 @@ var iso = (() => { // var: renderFlow may ask for it during start-up
   const run = () => { if (!st.raf && st.playing && st.visible) st.raf = requestAnimationFrame(frame); };
   function setPlaying(on) {
     st.playing = on;
+    $('#iso-stage')?.classList.toggle('paused', !on);
     $('#iso-play').innerHTML = on ? '❚❚ Pause' : '▶ Play'; $('#iso-play').setAttribute('aria-label', on ? 'Pause' : 'Play');
     if (on) { st.t0 = performance.now() - st.k * STEP_MS - MOVE_MS; run(); } else { cancelAnimationFrame(st.raf); st.raf = 0; }
   }
   function jump(k) { show(k); place(k, 1); $('#iso-bar').style.width = `${((k + 1) / 4) * 100}%`; st.t0 = performance.now() - k * STEP_MS - MOVE_MS; }
 
-  /** Badges: done ✓ / do this now / later – from the same data as the process guide. */
+  /** Badges: done ✓ / do this now / later – from the same data as the process guide (steps 1-3; DoH follows the register). */
   function progress() {
     if (!st.built || !flowState) return;
-    const { st: steps, firstOpen } = flowState;
+    const { st: steps, firstOpen, s, r } = flowState;
     $$('#iso-stage .iso-isle').forEach(g => {
-      // islands: 0 policies (step 1), 1 register (step 3, final), 2 DoH (keeps the register current), 3 finished
-      const k = Number(g.dataset.k), state = k === 0 ? steps[0]?.[0] : k < 3 ? steps[2]?.[0] : (firstOpen < 0 ? 'done' : 'todo');
-      const nowK = { 0: 0, 2: 1 }[firstOpen];
+      const k = Number(g.dataset.k);
+      const state = k < 3 ? steps[k]?.[0] : (r && (r.status === 'failed' || r.status === 'register_locked')) ? 'bad' : s?.lastSuccess ? 'done' : 'todo';
       g.classList.toggle('done', state === 'done');
-      g.classList.toggle('now', k === nowK);
+      g.classList.toggle('now', k === firstOpen);
       g.classList.toggle('warn', state === 'warn' || state === 'bad');
       const t = g.querySelector('.b-txt');
-      if (t) t.textContent = state === 'done' ? `${['Policies', 'Register', 'DoH', 'Finished'][k]} ✓` : k === nowK ? 'Do this now' : ['Policies', 'Register', 'DoH', 'Finished'][k];
+      if (t) t.textContent = state === 'done' ? `${LABELS[k]} ✓` : k === firstOpen ? 'Do this now' : LABELS[k];
     });
   }
 
   function init() {
     const stage = $('#iso-stage');
-    if (!stage || st.built) return;
-    stage.innerHTML = scene();
+    if (!stage || st.built || !window.IsoFactory) return;
+    F = IsoFactory.create({ labels: LABELS, nums: ['1', '2', '3', '↻'], pkgId: 'iso-pkg', gradId: 'isoGlow' });
+    stage.innerHTML = F.svg;
     st.built = true;
-    // fit the frame to the drawing (no empty band above or below)
-    const fit = () => {
-      const svg = stage.querySelector('svg'), w = svg?.querySelector('.iso-world');
-      try { const b = w.getBBox(); if (b.width > 0) svg.setAttribute('viewBox', `${(b.x - 14).toFixed(0)} ${(b.y - 14).toFixed(0)} ${(b.width + 28).toFixed(0)} ${(b.height + 28).toFixed(0)}`); } catch { /* not rendered yet */ }
-    };
-    requestAnimationFrame(fit); setTimeout(fit, 400); window.addEventListener("load", fit);
+    const svg = stage.querySelector('svg'), fit = () => IsoFactory.fit(svg, st.k);
+    requestAnimationFrame(fit); setTimeout(fit, 400); window.addEventListener('load', fit); IsoFactory.watch(svg);
     $$('#iso-dots button').forEach(b => b.onclick = () => { setPlaying(false); jump(Number(b.dataset.k)); });
     $('#iso-play').onclick = () => setPlaying(!st.playing);
     $('#iso-go').onclick = () => showTab(STEPS[st.k].tab);
@@ -2837,3 +2783,40 @@ $('#hr-gen').onclick = async () => {
 };
 
 $('#pp-to-hr').onclick = () => showTab('hr');
+
+// ===================================================================================================
+// Screen fit: drop-down menus stay inside the screen, and on a phone every data table becomes a list of cards
+// (each cell shows its column name), so nothing has to be scrolled sideways.
+// ===================================================================================================
+(() => {
+  document.addEventListener('toggle', e => {
+    const d = e.target;
+    if (!(d instanceof HTMLDetailsElement) || !d.open || !d.classList.contains('menu')) return;
+    const pop = d.querySelector('.menu-pop');
+    if (!pop) return;
+    pop.style.left = pop.style.right = pop.style.maxWidth = '';
+    const W = document.documentElement.clientWidth, r = pop.getBoundingClientRect();
+    pop.style.maxWidth = `${W - 16}px`;
+    if (r.left < 8) { pop.style.right = 'auto'; pop.style.left = `${8 - d.getBoundingClientRect().left}px`; }
+    else if (r.right > W - 8) { pop.style.left = 'auto'; pop.style.right = `${d.getBoundingClientRect().right - (W - 8)}px`; }
+  }, true);
+
+  function label(root = document) {
+    root.querySelectorAll('table:not(.no-cards)').forEach(t => {
+      const heads = [...(t.tHead?.rows[t.tHead.rows.length - 1]?.cells || [])].map(th => th.textContent.trim());
+      if (!heads.length) return;
+      t.classList.add('rt');
+      for (const tb of t.tBodies) for (const tr of tb.rows) {
+        let c = 0;
+        for (const td of tr.cells) {
+          const span = td.colSpan || 1;
+          if (!td.hasAttribute('data-label')) td.setAttribute('data-label', span > 1 && tr.cells.length === 1 ? '' : heads[c] || '');
+          c += span;
+        }
+      }
+    });
+  }
+  let t = 0;
+  new MutationObserver(() => { clearTimeout(t); t = setTimeout(label, 60); }).observe(document.body, { childList: true, subtree: true });
+  label();
+})();

@@ -3329,3 +3329,144 @@ table th { background: var(--panel-2); color: var(--muted) !important; }
 :root[data-theme] .la .iso-stage, :root .la .iso-stage { --s-top: #134e4a; --s-l: #072624; --s-r: #0b3b3a; --line-c: rgba(255, 255, 255, .14);
   --paper-t: #f0fdfa; --paper-l: #99c9c1; --paper-r: #c4e6e0; --c-t: #1f5f59; --c-l: #0b3b3a; --c-r: #134e4a; --b-t: #1f5f59; --b-l: #0b3b3a; --b-r: #134e4a;
   --badge: rgba(4, 30, 28, .88); --badge-ink: #ffffff; }
+
+/* =====================================================================================================
+   v20 · Isometric "compliance factory" (public/iso-factory.js) – shared by the dashboard and the sign-in page.
+   Teal pads on a soft glow, a moving conveyor belt, working machines; colours from tokens (light + dark).
+   ===================================================================================================== */
+.iso-stage { --s-top: #ffffff; --s-l: #cfe7e3; --s-r: #e3f2ef; --s-in: #f2faf8; --line-c: rgba(15, 60, 56, .16);
+  --m-t: #e6f4f1; --m-l: #9cc9c2; --m-r: #bfdeda; --belt: #1f2f2e; --belt-s: #0f1a19; --belt-run: rgba(255, 255, 255, .55);
+  --paper-t: #ffffff; --paper-l: #d6e4e2; --paper-r: #e9f2f0; --badge: #ffffff; --badge-ink: #0f2a2a; --glow: rgba(20, 184, 166, .28);
+  --accent-t: #fb7185; --accent-l: #be3455; --accent-r: #e0506e; --amber-t: #fde68a; --amber-l: #d97706; --amber-r: #f59e0b; }
+:root[data-theme="dark"] .iso-stage, .la .iso-stage { --s-top: #134e4a; --s-l: #072624; --s-r: #0b3b3a; --s-in: #175a55; --line-c: rgba(255, 255, 255, .12);
+  --m-t: #2a6a64; --m-l: #0e3f3c; --m-r: #155450; --belt: #041816; --belt-s: #020d0c; --belt-run: rgba(94, 234, 212, .7);
+  --paper-t: #f0fdfa; --paper-l: #99c9c1; --paper-r: #c4e6e0; --badge: rgba(4, 30, 28, .9); --badge-ink: #ffffff; --glow: rgba(45, 212, 191, .3); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .iso-stage { --s-top: #134e4a; --s-l: #072624; --s-r: #0b3b3a; --s-in: #175a55; --line-c: rgba(255, 255, 255, .12);
+  --m-t: #2a6a64; --m-l: #0e3f3c; --m-r: #155450; --belt: #041816; --belt-s: #020d0c; --belt-run: rgba(94, 234, 212, .7);
+  --paper-t: #f0fdfa; --paper-l: #99c9c1; --paper-r: #c4e6e0; --badge: rgba(4, 30, 28, .9); --badge-ink: #ffffff; --glow: rgba(45, 212, 191, .3); } }
+
+.iso-stage { margin: 4px 0 0 !important; }
+.iso-stage svg { display: block; width: 100%; height: auto; max-height: min(360px, 46vh) !important; }
+.iso-factory polygon { stroke: var(--line-c); stroke-width: .7; stroke-linejoin: round; transition: fill .45s ease; }
+.iso-factory .pad-glow { fill: var(--glow); opacity: .6; }
+.iso-factory .slab .f-t { fill: var(--s-top) !important; } .iso-factory .slab .f-l { fill: var(--s-l) !important; } .iso-factory .slab .f-r { fill: var(--s-r) !important; }
+.iso-factory .slab-inset .f-t { fill: var(--s-in); }
+.iso-factory .mach .f-t, .iso-factory .desk .f-t, .iso-factory .cabinet .f-t, .iso-factory .hall .f-t, .iso-factory .plinth .f-t, .iso-factory .eave .f-t, .iso-factory .calendar .f-t, .iso-factory .tray .f-t { fill: var(--m-t) !important; }
+.iso-factory .mach .f-l, .iso-factory .desk .f-l, .iso-factory .cabinet .f-l, .iso-factory .hall .f-l, .iso-factory .plinth .f-l, .iso-factory .eave .f-l, .iso-factory .calendar .f-l, .iso-factory .tray .f-l { fill: var(--m-l) !important; }
+.iso-factory .mach .f-r, .iso-factory .desk .f-r, .iso-factory .cabinet .f-r, .iso-factory .hall .f-r, .iso-factory .plinth .f-r, .iso-factory .eave .f-r, .iso-factory .calendar .f-r, .iso-factory .tray .f-r { fill: var(--m-r) !important; }
+.iso-factory .mach-top .f-t { fill: #0f766e; } .iso-factory .mach-top .f-l { fill: #0b5f58; } .iso-factory .mach-top .f-r { fill: #0d6b64; }
+.iso-factory .sheet .f-t { fill: var(--paper-t); } .iso-factory .sheet .f-l { fill: var(--paper-l); } .iso-factory .sheet .f-r { fill: var(--paper-r); }
+.iso-factory .stamp .f-t, .iso-factory .stamp-h .f-t, .iso-factory .calendar-top .f-t { fill: var(--accent-t) !important; }
+.iso-factory .stamp .f-l, .iso-factory .stamp-h .f-l, .iso-factory .calendar-top .f-l { fill: var(--accent-l) !important; }
+.iso-factory .stamp .f-r, .iso-factory .stamp-h .f-r, .iso-factory .calendar-top .f-r { fill: var(--accent-r) !important; }
+.iso-factory .screen .f-l { fill: #0f766e; } .iso-factory .screen .f-r, .iso-factory .screen .f-t { fill: #0b5f58; }
+.iso-factory .screen .f-l { animation: isoScreen 2.4s ease-in-out infinite; }
+@keyframes isoScreen { 50% { fill: #14b8a6; } }
+.iso-factory .person .f-t { fill: #fbbf24; } .iso-factory .person .f-l { fill: #d97706; } .iso-factory .person .f-r { fill: #f59e0b; }
+.iso-factory .person-head { fill: #fcd9b6; stroke: var(--line-c); }
+.iso-factory .idcard .f-l { fill: #ffffff; } .iso-factory .idcard .f-r, .iso-factory .idcard .f-t { fill: #cbd5e1; }
+.iso-factory .idcard.alt .f-l { fill: #ccfbf1; }
+.iso-factory .drawer .f-l, .iso-factory .drawer .f-r, .iso-factory .drawer .f-t { fill: #14b8a6 !important; }
+.iso-factory .drawer.open .f-t { fill: #5eead4 !important; }
+.iso-factory .cal-tick { fill: none; stroke: #0f766e; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.iso-factory .column .f-t, .iso-factory .column .f-l, .iso-factory .column .f-r { fill: var(--paper-r) !important; } .iso-factory .column .f-l { fill: var(--paper-l) !important; }
+.iso-factory .roof-l { fill: #0f766e !important; } .iso-factory .roof-r { fill: #14b8a6 !important; }
+.iso-factory .mast { stroke: var(--m-l); stroke-width: 3; stroke-linecap: round; }
+.iso-factory .signal circle { stroke: #14b8a6 !important; }
+/* the belt */
+.iso-factory .belt-top { fill: var(--belt); } .iso-factory .belt-side { fill: var(--belt-s); }
+.iso-factory .belt-run { stroke: var(--belt-run); stroke-width: 2.4; stroke-dasharray: 3 9; stroke-linecap: round; animation: isoBelt .7s linear infinite; }
+@keyframes isoBelt { to { stroke-dashoffset: -12; } }
+.iso-factory .route { fill: none; stroke: none; }
+.iso-factory .rider { filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .25)); }
+/* working machines */
+.iso-factory .print-sheet { animation: isoPrint 2.8s ease-in-out infinite; }
+@keyframes isoPrint { 0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: 1; } 60% { transform: translate(-10px, 6px); opacity: 1; } 100% { transform: translate(-14px, 9px); opacity: 0; } }
+.iso-factory .stamp-press { animation: isoStamp 1.8s cubic-bezier(.6, 0, .3, 1) infinite; }
+@keyframes isoStamp { 0%, 55%, 100% { transform: translateY(0); } 70% { transform: translateY(14px); } 80% { transform: translateY(12px); } }
+.iso-factory .drawer-slide { animation: isoDrawer 3.2s ease-in-out infinite; }
+@keyframes isoDrawer { 0%, 30%, 100% { transform: translate(0, 0); } 50%, 75% { transform: translate(11px, 6px); } }
+.iso-factory .cal-tick { stroke-dasharray: 30; stroke-dashoffset: 30; animation: isoTick 3.2s ease-in-out infinite; }
+@keyframes isoTick { 0%, 40% { stroke-dashoffset: 30; } 60%, 90% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 30; } }
+/* the active station */
+.iso-factory .iso-isle { transition: opacity .4s ease, transform .5s cubic-bezier(.2, .8, .2, 1); }
+.iso-stage .iso-factory .iso-isle:not(.on) { opacity: .78; }
+.iso-factory .iso-isle.on { transform: translateY(-6px); }
+.iso-factory .iso-isle.on .slab .f-t { fill: url(#isoGlow) !important; }
+.la .iso-factory .iso-isle.on .slab .f-t { fill: url(#laGlow) !important; }
+.iso-factory .iso-isle.on .slab .f-l { fill: #0b5f58 !important; } .iso-factory .iso-isle.on .slab .f-r { fill: #0f766e !important; }
+/* package */
+.iso-factory .pkg .f-t { fill: var(--amber-t, #fde68a) !important; } .iso-factory .pkg .f-l { fill: var(--amber-l, #d97706) !important; } .iso-factory .pkg .f-r { fill: var(--amber-r, #f59e0b) !important; }
+.iso-factory .iso-pkg { filter: drop-shadow(0 0 10px rgba(251, 191, 36, .85)); }
+/* badges */
+.iso-factory .iso-badge rect { fill: var(--badge) !important; stroke: var(--line-c) !important; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .14)); }
+.iso-factory .iso-badge text { font: 700 13px var(--font, sans-serif) !important; fill: var(--badge-ink) !important; }
+.iso-factory .iso-badge .b-num { fill: #0f766e !important; }
+:root[data-theme="dark"] .iso-factory .iso-badge .b-num, .la .iso-factory .iso-badge .b-num { fill: #5eead4 !important; }
+.iso-factory .iso-isle.done .iso-badge rect { stroke: #16a34a !important; } .iso-factory .iso-isle.done .iso-badge .b-num { fill: #16a34a !important; }
+.iso-factory .iso-isle.warn .iso-badge rect { stroke: #f59e0b !important; }
+.iso-factory .iso-isle.now .iso-badge rect { fill: #0f766e !important; stroke: #5eead4 !important; }
+.iso-factory .iso-isle.now .iso-badge text, .iso-factory .iso-isle.now .iso-badge .b-num { fill: #ffffff !important; }
+.la .iso-factory .iso-isle.now .iso-badge rect { fill: #14b8a6 !important; } .la .iso-factory .iso-isle.now .iso-badge text, .la .iso-factory .iso-isle.now .iso-badge .b-num { fill: #042f2c !important; }
+/* paused / less motion: everything still */
+.iso-stage.paused .iso-factory *, .iso-stage.paused .iso-factory { animation-play-state: paused !important; }
+@media (prefers-reduced-motion: reduce) { .iso-factory *, .iso-factory { animation: none !important; } .iso-factory .rider { display: none; } .iso-factory .cal-tick { stroke-dashoffset: 0; } }
+
+/* sign-in: the video sits in the middle of the spare height */
+.auth-art.la .la-video { margin-block: auto !important; }
+.auth-art.la .la-facts { margin-top: 0 !important; }
+.la-stage svg { max-height: min(300px, 32vh) !important; }
+
+/* =====================================================================================================
+   v20 · Screen fit – every page fits the screen from a 320 px phone to a 2560 px monitor
+   ===================================================================================================== */
+html, body { max-width: 100%; overflow-x: clip; }
+img, svg, video, canvas { max-width: 100%; }
+.page { min-width: 0; max-width: 100%; }
+.page > *, .tab > *, .panel, .card { min-width: 0; }
+.tab { max-width: 1600px; margin-inline: auto; }
+pre, code { white-space: pre-wrap; overflow-wrap: anywhere; }
+h1, h2, h3, b, strong, td, .card p { overflow-wrap: anywhere; }
+.table-wrap { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+dialog { max-width: calc(100vw - 24px) !important; max-height: calc(100dvh - 24px) !important; overflow: auto; }
+dialog[open] { margin: auto; }
+input, select, textarea, button { max-width: 100%; }
+.menu-pop { max-width: calc(100vw - 16px); }
+
+/* tablet */
+@media (max-width: 1024px) {
+  .hx-mosaic, .jr-grid, .hr-form-grid, .tiles, .grid-2, .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+/* phone */
+@media (max-width: 640px) {
+  .page { padding-inline: 12px !important; }
+  .hx-mosaic, .jr-grid, .hr-form-grid, .tiles, .grid-2, .grid-3, .la-facts { grid-template-columns: minmax(0, 1fr) !important; }
+  .card, .panel { padding-inline: 14px !important; border-radius: 18px !important; }
+  h1 { font-size: clamp(24px, 7vw, 32px) !important; }
+  h2 { font-size: clamp(18px, 5.4vw, 22px) !important; }
+  .btn, button.btn { min-height: 40px; }
+  .actions, .row-actions, .btn-row, .toolbar { flex-wrap: wrap !important; }
+  dialog { width: calc(100vw - 16px) !important; max-width: none !important; border-radius: 18px !important; }
+}
+/* data tables become cards whenever the space they have is narrow (phone, tablet, or a laptop with the side menu) */
+.table-wrap { container: tbl / inline-size; }
+@container tbl (max-width: 760px) {
+  /* data tables → cards */
+  table.rt { min-width: 0 !important; width: 100% !important; border: 0 !important; background: none !important; }
+  table.rt thead { display: none; }
+  table.rt, table.rt tbody, table.rt tr, table.rt td { display: block; width: 100% !important; }
+  table.rt tr { margin: 0 0 10px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: 0 6px 18px -14px rgba(0, 0, 0, .35); }
+  table.rt td { display: block; padding: 7px 0 !important; border: 0 !important; border-bottom: 1px dashed var(--line) !important; text-align: left !important; white-space: normal !important; position: static !important; min-width: 0 !important; max-width: none !important; background: none !important; }
+  table.rt td:last-child { border-bottom: 0 !important; }
+  table.rt td::before { content: attr(data-label); display: block; margin-bottom: 3px; font: 700 11.5px/1.35 var(--font); letter-spacing: .02em; color: var(--muted); text-transform: none; }
+  table.rt td[data-label=""] { padding: 2px 0 !important; border-bottom: 0 !important; }
+  table.rt td .hbar { width: 100%; }
+  table.rt td .row-actions { justify-content: flex-start !important; flex-wrap: wrap; } table.rt td[data-label=""]::before { content: none; }
+  table.rt td > * { min-width: 0; max-width: 100%; }
+  table.rt td:empty { display: none; }
+}
+@media (max-width: 760px) { .table-wrap:has(table.rt) { border: 0 !important; background: none !important; box-shadow: none !important; } }
+/* big screens: keep lines readable */
+@media (min-width: 1800px) {
+  .tab { max-width: 1680px; }
+}
