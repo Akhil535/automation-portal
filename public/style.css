@@ -3828,3 +3828,17 @@ tr.ck-locked td { background: repeating-linear-gradient(135deg, transparent 0 14
   .premium-btn::after, .icon-btn.premium-mini::after { display: none; }
 }
 .btn.premium-btn.premium-btn, button.premium-btn.premium-btn, .icon-btn.premium-mini.premium-mini { border-radius: 999px !important; }
+
+/* Free trial: LEGAL REGISTER entries after the first ones – blurred under a padlock, the whole row opens Get Premium */
+tr.reg-locked { cursor: pointer; position: relative; }
+tr.reg-locked td { background: repeating-linear-gradient(135deg, transparent 0 14px, rgba(148, 163, 184, .045) 14px 28px); }
+tr.reg-locked .blur-txt, .ecard.reg-locked .blur-txt { filter: blur(6px); user-select: none; pointer-events: none; opacity: .85; }
+tr.reg-locked:hover td { background-color: rgba(251, 191, 36, .05); }
+.reg-lock-pill { display: inline-flex; align-items: center; gap: 10px; padding: 4px 4px 4px 4px; border-radius: 999px;
+  border: 1px solid rgba(251, 191, 36, .35); background: linear-gradient(120deg, rgba(251, 191, 36, .1), rgba(16, 185, 129, .07)); white-space: nowrap; }
+.reg-lock-pill .lock-emblem { width: 30px !important; height: 30px; border-radius: 50%; }
+.reg-lock-pill .lock-emblem::after { width: 15px; height: 15px; }
+.reg-lock-pill b { font-size: 13px; color: var(--ink); }
+:root[data-theme="dark"] .reg-lock-pill b { color: #f4fbf9; }
+.reg-lock-pill .premium-btn { padding: 6px 12px !important; font-size: 12.5px; }
+.ecard.reg-locked { cursor: pointer; border-style: dashed !important; display: grid; gap: 10px; align-content: start; }

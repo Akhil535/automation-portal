@@ -156,6 +156,29 @@ export function checkChecklistItem(user, c, sectionId, itemId) {
   if (i >= checklistFree(sec?.items.length || 0)) throw upgradeError(`On the free trial the checklist shows the first ${checklistFree(sec?.items.length || 0)} document${checklistFree(sec?.items.length || 0) === 1 ? '' : 's'} of each section – this one is part of Premium`, { kind: 'checklist' });
 }
 
+/**
+ * LEGAL REGISTER on the free trial: the first TRIAL_REGISTER_ROWS entries are shown and can be worked on; every
+ * entry after them is masked (no name, dates, person, compliance or document reaches the browser) and locked.
+ */
+export const TRIAL_REGISTER_ROWS = 2;
+export const freeRegisterRows = items => new Set((items || []).slice(0, TRIAL_REGISTER_ROWS).map(i => i.row));
+export function maskMaster(user, data) {
+  if (!isTrial(user) || !data?.items) return data;
+  const free = freeRegisterRows(data.items);
+  const names = new Set(data.items.filter(i => free.has(i.row)).map(i => i.name));
+  return {
+    ...data, trialMasked: true, trialRows: TRIAL_REGISTER_ROWS,
+    items: data.items.map(i => (free.has(i.row) ? i : { row: i.row, sl: i.sl, fixed: !!i.fixed, locked: true, name: 'Premium entry', status: 'locked', issued: '', expiry: '', due: '', responsible: '', compliance: '' })),
+    documents: Object.fromEntries(Object.entries(data.documents || {}).filter(([n]) => names.has(n))),
+  };
+}
+/** Throws the upgrade error unless every row is one of the free register entries (trial only). */
+export function checkFreeRows(user, items, rows) {
+  if (!isTrial(user)) return;
+  const free = freeRegisterRows(items);
+  if (!rows.length || rows.some(r => !free.has(Number(r)))) throw upgradeError(`On the free trial you work on the first ${TRIAL_REGISTER_ROWS} entries of the LEGAL REGISTER – this entry is part of Premium`, { kind: 'register' });
+}
+
 /** The documents of a module the trial includes: null = premium (all). */
 export function allowedSet(user, kind) {
   return isTrial(user) ? new Set(includedIds(kind)) : null;

@@ -19,7 +19,7 @@ import { applyReview, currentRun, runAll, runMonitor } from './src/monitor.js';
 import { startScheduler } from './src/scheduler.js';
 import { formKind, installedForms } from './src/hrforms.js';
 import { MODULE_KEYS, buildPackage, packageTree } from './src/package.js';
-import { allowedSet, checkChecklistItem, checkTrialApply, checklistFree, claim, claimUpload, maskChecklist, createdFacilities, facilityAllowance, isTrial, planInfo, setTrialLimits, trialLimits, upgradeError, upgradeUrl } from './src/plans.js';
+import { allowedSet, checkFreeRows, freeRegisterRows, maskMaster, checkChecklistItem, checkTrialApply, checklistFree, claim, claimUpload, maskChecklist, createdFacilities, facilityAllowance, isTrial, planInfo, setTrialLimits, trialLimits, upgradeError, upgradeUrl } from './src/plans.js';
 import { addForms, addItem, checklistXlsx, crossCheck, formFile, formsStatus, formsZip, generateForms, getChecklist, pdfState, prewarmPdfs, saveDocSettings, GROUPS, importMasterChecklist, listForms, masterChecklist, removeForm, removeItem, resetChecklist, updateItem } from './src/hrforms.js';
 import { documentHeader, sendMail } from './src/mailer.js';
 import { lockReason, readLogo, readRegister } from './src/xlsx.js';
@@ -167,7 +167,7 @@ app.use((req, res, next) => {
 /** Free trial: what is locked – the LEGAL REGISTER (edits, DoH checks, reviews, register downloads and reports). */
 function trialLocked(req) {
   const p = req.path, m = req.method;
-  if (/^\/api\/(master|document-control)(\/|$)/.test(p) && m !== 'GET') return true;
+  if (/^\/api\/(master|document-control)(\/|$)/.test(p) && m !== 'GET' && !(p === '/api/master' && m === 'PUT')) return true; // (PUT /api/master: the free entries, checked in the route)
   if (p === '/api/master/export' || p === '/api/export/pdf' || p === '/api/register/download' || p.startsWith('/reports/')) return true;
   // ("all facilities" is not caught here: it is refused as admin-only first)
   if ((p === '/api/run' && !(req.body?.all && req.user.role !== 'admin')) || p === '/api/policies/link-register' || /^\/api\/circulars\/[^/]+\/review$/.test(p)) return true;
@@ -627,12 +627,14 @@ app.post('/api/facilities/:id/documents/analyze', express.raw({ type: () => true
 
 app.post('/api/facilities/:id/documents/apply', wrap(async (req, res) => {
   notWhileRunning();
-  checkTrialApply(req.user, req.body?.items || []); // free trial: only its 2 free documents
+  checkTrialApply(req.user, req.body?.items || []); // free trial: only its 2 free documents …
+  if (isTrial(req.user)) checkFreeRows(req.user, await readMaster(loadConfig(req.params.id)), (req.body?.items || []).map(i => i.row)); // … to the free entries
   res.json(await applyDocuments(req.params.id, req.body?.items || [], m => console.log(m)));
 }));
 
 /** The stored source document of a register entry (opens in the browser). */
 app.get('/api/facility-document', wrap(async (req, res) => {
+  if (isTrial(req.user)) { const its = await readMaster(cfgOf(req)); const free = freeRegisterRows(its); if (!its.some(i => free.has(i.row) && i.name === String(req.query.entry || ''))) throw upgradeError('This document belongs to a LEGAL REGISTER entry that is part of Premium', { kind: 'register' }); }
   const d = cfgOf(req)._facility.documents?.[String(req.query.entry || '')];
   if (!d?.file || !fs.existsSync(d.file)) return res.status(404).send('Document not found');
   res.type(path.extname(d.file)).set('Content-Disposition', `inline; filename="${path.basename(d.file).replace(/"/g, '')}"`).sendFile(d.file);
@@ -801,7 +803,7 @@ app.get('/api/package.zip', wrap(async (req, res) => {
 app.get('/api/master', wrap(async (req, res) => {
   const cfg = cfgOf(req);
   if (!cfg.register.path) throw new Error('No master register linked for this facility - add one in Settings');
-  res.json({ documents: Object.fromEntries(Object.entries(cfg._facility.documents || {}).map(([k, d]) => [k, { issued: d.issued, expiry: d.expiry, appliedAt: d.appliedAt, original: d.original, hasFile: !!(d.file && fs.existsSync(d.file)) }])), items: await readMaster(cfg), labels: cfg.master.labels, documentControl: await readDocumentControl(cfg), branch: cfg.branch, lock: lockReason(cfg.register.path) });
+  res.json(maskMaster(req.user, { documents: Object.fromEntries(Object.entries(cfg._facility.documents || {}).map(([k, d]) => [k, { issued: d.issued, expiry: d.expiry, appliedAt: d.appliedAt, original: d.original, hasFile: !!(d.file && fs.existsSync(d.file)) }])), items: await readMaster(cfg), labels: cfg.master.labels, documentControl: await readDocumentControl(cfg), branch: cfg.branch, lock: lockReason(cfg.register.path) }));
 }));
 
 app.post('/api/master/entries', wrap(async (req, res) => {
@@ -818,8 +820,11 @@ app.delete('/api/master/entries/:row', wrap(async (req, res) => {
 
 app.put('/api/master', wrap(async (req, res) => {
   notWhileRunning();
-  const r = await saveMaster(req.body?.items || [], fac(req), m => console.log(m));
-  res.json({ ...r, items: await readMaster(cfgOf(req)) });
+  const items = req.body?.items || [];
+  if (isTrial(req.user)) checkFreeRows(req.user, await readMaster(cfgOf(req)), items.map(i => i.row)); // free trial: the first entries only
+  const r = await saveMaster(items, fac(req), m => console.log(m));
+  const out = { ...r, items: await readMaster(cfgOf(req)) };
+  res.json(isTrial(req.user) ? { ...out, items: maskMaster(req.user, { items: out.items }).items } : out);
 }));
 
 app.get('/api/document-control', wrap(async (req, res) => res.json(await readDocumentControl(cfgOf(req)))));

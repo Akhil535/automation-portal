@@ -1330,6 +1330,23 @@ test('10q. free trial end to end: the first 2 items open as Word + PDF, everythi
     const it = (token, k) => ({ token, file: 'x.docx', row: reg[k]?.row, issued: '2026-01-01', expiry: '2026-12-31', due: '2027-01-01' });
     assert.equal((await apply([it('not-my-upload', 0)])).status, 402, 'a document that was not a free preview');
     assert.equal((await apply([it(t1, 0), it(t2, 1), it(t1, 2)])).status, 402, 'more than 2 documents');
+    // the register table: the first 2 entries are shown and can be edited; SL 3 onwards is masked and locked
+    const full = await (await import('../src/master.js')).readMaster(loadConfig(id));
+    const mm = await (await fetch(`${base}/api/master${q}`, opt())).json();
+    assert.equal(mm.items.length, full.length, 'every row is still listed');
+    mm.items.forEach((x, k) => {
+      if (k < 2) assert.equal(x.name, full[k].name, `SL ${x.sl} is shown`);
+      else { assert.equal(x.locked, true); assert.equal(x.name, 'Premium entry'); assert.equal(x.issued + x.expiry + x.responsible + x.compliance, '', `SL ${x.sl} is masked`); }
+    });
+    if (full.length > 2) {
+      const regFile = loadConfig(id).register.path, saved = fs.readFileSync(regFile);
+      try {
+        const put = row => fetch(`${base}/api/master${q}`, opt({ method: 'PUT', body: JSON.stringify({ items: [{ row, issued: '2026-01-05' }] }) }));
+        assert.equal((await put(full[2].row)).status, 402, 'SL 3 cannot be edited');
+        assert.notEqual((await put(full[0].row)).status, 402, 'SL 1 can');
+        assert.equal((await fetch(`${base}/api/facility-document${q}&entry=${encodeURIComponent(full[full.length - 1].name)}`, opt())).status, 402, 'no document of a locked entry');
+      } finally { fs.writeFileSync(regFile, saved); }
+    }
     if (t1 && reg.length) { // (the register is put back afterwards – later tests check its contents)
       const regFile = loadConfig(id).register.path, saved = fs.readFileSync(regFile);
       try { assert.notEqual((await apply([it(t1, 0)])).status, 402, 'a free preview can be applied'); }

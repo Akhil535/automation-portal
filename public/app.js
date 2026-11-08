@@ -948,6 +948,9 @@ function renderMasterRows() {
   // Cards view: one card per entry (status colour, dates, time left, actions); details on hover
   const ecls = { expired: 'bad', expiring: 'warn', missing: 'missing', 'no-expiry': 'missing', valid: 'ok', lifetime: 'ok', fixed: 'na' };
   $('#mcards').innerHTML = rows.map(i => {
+    if (i.locked) return `<article class="ecard reg-locked" data-up title="Part of Premium"><header><span class="ecard-sl">${esc(i.sl)}</span></header>
+      <h3 class="blur-txt" aria-hidden="true">XXXXXXXX XXXXXXXXXX XXXX</h3><span class="sr-only">Locked entry – part of Premium</span>
+      <span class="reg-lock-pill"><span class="lock-emblem"></span><b>Premium entry</b><span class="btn small premium-btn">★ Get Premium</span></span></article>`;
     const d = ISO.test(i.expiry || '') ? daysTo(i.expiry) : null;
     const fill = i.status === 'lifetime' ? 100 : d === null ? 0 : Math.max(4, Math.min(100, (d / 365) * 100));
     const doc = master.documents?.[i.name];
@@ -962,7 +965,17 @@ function renderMasterRows() {
         <span class="row-actions">${doc?.hasFile ? `<a class="icon-btn" href="${u(`/api/facility-document?entry=${encodeURIComponent(i.name)}`)}" target="_blank" title="${esc(doc.original || 'Source document')}">📄</a>` : ''}<label class="icon-btn" data-write title="Add a photo or document (dates are read for you)">📷<input type="file" accept="image/*,.pdf,.docx,.doc" hidden data-photo-row="${i.row}"></label><button class="icon-btn" data-write data-edit-row="${i.row}">Edit</button><button class="icon-btn del" data-write data-del-row="${i.row}">Delete</button></span></footer>`}
     </article>`;
   }).join('');
-  $('#mtbl tbody').innerHTML = rows.map(i => `<tr class="${i.fixed ? 'fixed' : ''} st-${i.status}" data-hc="entry" data-row="${i.row}">
+  // free trial: entries after the first ones are masked by the server – a blurred row under a padlock, a click = Get Premium
+  const FAKE = ['XXXXXXXXXX XX XXXXXX XXXX', 'XXXXXXXX XXXXXXXXXXX', 'XXXXX XXXXXXXXXX XXXXXXXX XXX', 'XXXXXXXXX XXXXXXX'];
+  const lockedRow = i => `<tr class="reg-locked" data-up title="Part of Premium – Get Premium to see this entry">
+    <td class="num">${esc(i.sl)}</td>
+    <td class="name"><span class="blur-txt" aria-hidden="true">${FAKE[Number(i.sl) % FAKE.length] || FAKE[0]}</span><span class="sr-only">Locked entry – part of Premium</span></td>
+    <td><span class="blur-txt" aria-hidden="true"><span class="pill">● Valid</span></span></td>
+    <td><span class="blur-txt" aria-hidden="true">01 Jan 2026</span></td><td><span class="blur-txt" aria-hidden="true">31 Dec 2026</span></td><td><span class="blur-txt" aria-hidden="true">01 Jan 2027</span></td>
+    <td><span class="blur-txt" aria-hidden="true">Mr XXXXXX XXXXX</span></td>
+    <td colspan="2"><span class="reg-lock-pill"><span class="lock-emblem"></span><b>Premium entry</b><span class="btn small premium-btn">★ Get Premium</span></span></td>
+  </tr>`;
+  $('#mtbl tbody').innerHTML = rows.map(i => i.locked ? lockedRow(i) : `<tr class="${i.fixed ? 'fixed' : ''} st-${i.status}" data-hc="entry" data-row="${i.row}">
     <td class="num">${esc(i.sl)}</td>
     <td class="name">${esc(i.name)}${master.documents?.[i.name]?.hasFile ? `<a class="doc-link" href="${u(`/api/facility-document?entry=${encodeURIComponent(i.name)}`)}" target="_blank" title="Source document: ${esc(master.documents[i.name].original || '')}">📄 source document</a>` : ''}</td>
     <td>${statusPill(i.status)}</td>
@@ -1079,6 +1092,9 @@ async function analyzeFiles(files, forRow = null) {
       if (res.status === 402 && d.upgrade) { Object.assign(slot, { pending: false, locked: true, include: false }); trialFull = true; } // free trial: beyond the first 2
       else if (!res.ok) throw new Error(d.error);
       else Object.assign(slot, d, { pending: false, include: !!d.row });
+      if (slot.row && master?.items?.find(x => x.row === slot.row)?.locked) { // free trial: matched to a locked entry
+        Object.assign(slot, { row: null, include: false, warnings: [...(slot.warnings || []), 'This matches a LEGAL REGISTER entry that is part of Premium – choose one of your free entries, or Get Premium.'] });
+      }
       if (forRow) Object.assign(slot, { row: forRow, include: true }); // added from that entry: it belongs there
     } catch (e) { Object.assign(slot, { pending: false, error: e.message, include: false }); }
     parsing = Math.max(0, parsing - 1); renderHome();
@@ -1088,7 +1104,7 @@ async function analyzeFiles(files, forRow = null) {
 
 const docLife = r => r.lifetime || isLifetimeName((master?.items || []).find(i => i.row === r.row)?.name);
 function renderDocs() {
-  const options = r => `<option value="">— skip —</option>` + (master?.items || []).filter(i => !i.fixed)
+  const options = r => `<option value="">— skip —</option>` + (master?.items || []).filter(i => !i.fixed && !i.locked)
     .map(i => `<option value="${i.row}"${i.row === r.row ? ' selected' : ''}>${esc(i.name)}</option>`).join('');
   $('#docs-result').innerHTML = docResults.length ? `<div class="table-wrap flat"><table class="docs-table"><thead><tr>
       <th></th><th>Document</th><th>Recognised as</th><th>Register entry</th><th>Issued</th><th>Expiry</th><th>Due</th><th>Notes</th></tr></thead><tbody>
@@ -2989,7 +3005,7 @@ var planState = null; // var: may be read before this line runs
 function trialLocked(kind, id) { const inc = planState?.included?.[kind]; return !!inc && !inc.includes(String(id)); }
 // every lock / Get Premium button opens the upgrade gateway – and nothing else happens
 // free trial: the LEGAL REGISTER is a preview – its update and download actions go straight to the gateway
-const TRIAL_REGISTER_ACTIONS = '#btn-check, #btn-run, #btn-run-all, #qa-entry, #qa-excel, #qa-pdf, #btn-import, #lnk-download, #lnk-export, #pp-link, #ex-reg-xlsx, #ex-reg-pdf, #ex-reg-print, #ex-doh-xlsx, #ex-doh-report, [data-edit-row], [data-del-row]';
+const TRIAL_REGISTER_ACTIONS = '#btn-check, #btn-run, #btn-run-all, #qa-entry, #qa-excel, #qa-pdf, #btn-import, #lnk-download, #lnk-export, #pp-link, #ex-reg-xlsx, #ex-reg-pdf, #ex-reg-print, #ex-doh-xlsx, #ex-doh-report, [data-del-row]'; // (Edit stays for the free entries – the locked ones have no Edit)
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-up]');
   const reg = !b && document.body.classList.contains('trial') && e.target.closest?.(TRIAL_REGISTER_ACTIONS);
@@ -3102,7 +3118,7 @@ document.addEventListener('click', e => {
     if (trial) {
       const l = planState.limits, us = planState.usage;
       $('#plan-chip').title = `Free trial: the first ${l.policies} policies, ${l.hr} HR and ${l.thirdparty} 3rd-party documents · ${us.facilities}/${l.facilities} facilities · LEGAL REGISTER preview`;
-      if (!$('#trial-reg')) $('#master')?.insertAdjacentHTML('afterbegin', '<div class="trial-lock" id="trial-reg"><span class="tl-ic" aria-hidden="true">🔒</span><div><b>View only – the free trial shows the basic, non-updated LEGAL REGISTER</b><span>You can look around it and apply your 2 free documents. Applying more documents, editing, renewals, weekly DoH updates and every download / export are part of Premium.</span></div><button type="button" class="btn small premium-btn" data-up>★ Get Premium</button></div>');
+      if (!$('#trial-reg')) $('#master')?.insertAdjacentHTML('afterbegin', '<div class="trial-lock" id="trial-reg"><span class="tl-ic" aria-hidden="true">🔒</span><div><b>View only – the free trial shows the basic, non-updated LEGAL REGISTER</b><span>You can see and edit its first 2 entries and apply your 2 free documents to them. The other entries, renewals, weekly DoH updates and every download / export are part of Premium.</span></div><button type="button" class="btn small premium-btn" data-up>★ Get Premium</button></div>');
       $$('[data-up]').forEach(b => { b.onclick = () => showUpgrade(); });
     } else $('#trial-reg')?.remove();
   };
