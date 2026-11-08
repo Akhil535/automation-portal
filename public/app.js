@@ -2770,7 +2770,7 @@ function renderDocDates(sel, setting) {
   const tpLocked = (setting === 'thirdparty' || setting === 'training') && !!planState?.included;
   const lockMsg = setting === 'training'
     ? '<b>Training dates and details are part of Premium.</b> On the free trial the training date, document dates and trainer details are view-only.'
-    : '<b>Own document dates are part of Premium.</b> On the free trial the 3rd-party documents use the policy review date and follow PO11.';
+    : (planState?.included?.thirdparty?.length ? '<b>Own document dates are part of Premium.</b> On the free trial the 3rd-party documents use the policy review date and follow PO11.' : '<b>3rd-party documents are part of Premium.</b> The vendor forms, their dates and Ref. No. unlock with Premium.');
   const ro = me?.role === 'viewer' || tpLocked ? ' disabled' : '';
   const globalDate = d.dateSettings[setting] || '';
   const fallback = setting === 'thirdparty' ? d.dateSettings.thirdpartyDefault : '';
