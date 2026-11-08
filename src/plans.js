@@ -5,9 +5,9 @@
 // A trial user "claims" a document the first time they create, view or download it; the same documents can be
 // opened again and again, new ones only while slots remain. Then the portal asks them to upgrade (HTTP 402).
 import { loadUsers, saveUsers } from './auth.js';
-import { loadGlobalConfig, saveConfig } from './config.js';
+import { loadFacilities, loadGlobalConfig, saveConfig } from './config.js';
 
-export const DEFAULT_LIMITS = Object.freeze({ policies: 2, hr: 2, thirdparty: 2, facilities: 1 });
+export const DEFAULT_LIMITS = Object.freeze({ policies: 2, hr: 2, thirdparty: 2, facilities: 2 });
 export const KIND_LABEL = { policies: 'policies', hr: 'HR documents', thirdparty: '3rd-party documents', facilities: 'facility' };
 export const UPGRADE_TEXT = 'Get Premium to unlock full compliance packs';
 
@@ -16,9 +16,16 @@ export function trialLimits() {
   const set = loadGlobalConfig().plans?.trial || {};
   return Object.fromEntries(Object.entries(DEFAULT_LIMITS).map(([k, v]) => [k, Number.isInteger(set[k]) && set[k] >= 0 ? set[k] : v]));
 }
+/** Where Get Premium sends people (a subscription / payment page), or empty: the request goes to the administrators. */
+export const upgradeUrl = () => loadGlobalConfig().plans?.upgradeUrl || '';
 export function setTrialLimits(body = {}) {
   const cfg = loadGlobalConfig();
   const next = { ...trialLimits() };
+  let url = upgradeUrl();
+  if (body.upgradeUrl !== undefined) {
+    url = String(body.upgradeUrl || '').trim();
+    if (url && !/^https?:\/\/[^\s]+$/i.test(url)) throw new Error('Upgrade page: a web address starting with https://');
+  }
   for (const k of Object.keys(DEFAULT_LIMITS)) {
     if (body[k] === undefined) continue;
     const n = Number(body[k]);
@@ -26,7 +33,7 @@ export function setTrialLimits(body = {}) {
     next[k] = n;
   }
   if (next.facilities < 1) throw new Error('A trial account needs at least one facility');
-  cfg.plans = { ...(cfg.plans || {}), trial: next };
+  cfg.plans = { ...(cfg.plans || {}), trial: next, upgradeUrl: url };
   saveConfig(cfg);
   return next;
 }
@@ -43,12 +50,18 @@ const usedOf = (u, kind) => new Set((u?.usage?.[kind] || []).map(String));
 /** What a trial user has used so far, and the limits. */
 export function planInfo(user) {
   const plan = planOf(user);
-  if (plan === 'premium') return { plan, limits: null, usage: null, locked: [] };
+  if (plan === 'premium') return { plan, limits: null, usage: null, locked: [], upgradeUrl: upgradeUrl() };
   const u = loadUsers().users.find(x => x.id === user.id);
   const limits = trialLimits();
   const usage = Object.fromEntries(['policies', 'hr', 'thirdparty'].map(k => [k, [...usedOf(u, k)]]));
-  usage.facilities = (user.facilities || []).filter(f => f !== '*').length;
-  return { plan, limits, usage, locked: ['register', 'doh', 'registerDownloads'], upgradeText: UPGRADE_TEXT };
+  usage.facilities = createdFacilities(user.username).length;
+  return { plan, limits, usage, locked: ['register', 'doh', 'registerDownloads'], upgradeText: UPGRADE_TEXT, upgradeUrl: upgradeUrl() };
+}
+
+/** Facilities this user created (the master template never counts). */
+export function createdFacilities(username) {
+  const { list, templateId } = loadFacilities();
+  return list.filter(f => f.id !== templateId && f.createdBy && f.createdBy === username);
 }
 
 /** Documents a trial user may get now: those already claimed, plus new ones (in the order given) while slots remain.

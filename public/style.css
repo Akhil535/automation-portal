@@ -3580,3 +3580,11 @@ body.trial #master .register, body.trial #master table { filter: saturate(.75); 
 #users-tbl td:nth-child(4) { min-width: 140px; }
 #users-tbl select { min-width: 116px; max-width: 150px; }
 #users-tbl td:nth-child(2) select { min-width: 134px; }
+
+/* Get Premium: the call to action in the upgrade gateway */
+.premium-btn { background: linear-gradient(135deg, #fbbf24, #f59e0b) !important; color: #3b2300 !important; border: 0 !important; font-weight: 800 !important; box-shadow: 0 10px 22px -10px rgba(245, 158, 11, .8) !important; }
+.premium-btn:hover:not(:disabled) { filter: brightness(1.05); transform: translateY(-1px); }
+.premium-btn:disabled { opacity: .75; cursor: default; }
+.up-meter.full b { color: #d97706; }
+.up-meter.full i::after { background: linear-gradient(90deg, #f59e0b, #ef4444) !important; }
+#limits-form > label { display: grid; gap: 6px; margin-top: 12px; }

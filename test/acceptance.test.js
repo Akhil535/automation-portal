@@ -656,7 +656,8 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
     const P = await import('../src/plans.js');
     const nb = { headers: { Cookie: newbieCookie } }, q = `?f=${mgrId}`;
     const plan = await (await fetch(`${base}/api/plan`, nb)).json();
-    assert.equal(plan.plan, 'trial'); assert.deepEqual(plan.limits, { policies: 2, hr: 2, thirdparty: 2, facilities: 1 });
+    assert.equal(plan.plan, 'trial'); assert.deepEqual(plan.limits, { policies: 2, hr: 2, thirdparty: 2, facilities: 2 });
+    assert.equal(plan.usage.facilities, 1, 'facilities are counted by who created them');
     for (const [m, p] of [['PUT', '/api/master'], ['POST', '/api/run'], ['GET', '/api/register/download'], ['GET', '/api/export/pdf'], ['GET', '/api/master/export'], ['POST', '/api/policies/link-register'], ['PUT', '/api/document-control']]) {
       const x = await fetch(base + p + q, { method: m, headers: { 'Content-Type': 'application/json', Cookie: newbieCookie }, body: m === 'GET' ? undefined : '{}' });
       assert.equal(x.status, 402, `trial: ${m} ${p} is locked`);
@@ -664,7 +665,17 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
     }
     assert.notEqual((await fetch(`${base}/api/master${q}`, nb)).status, 402, 'the register can still be looked at (preview)');
     const second = await post('/api/facilities', { source: 'template', code: 'MG2', name: 'Second Clinic', title: 'SECOND - LEGAL REGISTER', approver: 'Dr. T', authors: 'Mr. T', responsible: 'Dr. T' }, newbieCookie);
-    assert.equal(second.status, 402, 'one facility on the trial');
+    assert.equal(second.status, 200, 'a second facility is part of the trial');
+    const secondId = (await second.json()).id;
+    const third = await post('/api/facilities', { source: 'template', code: 'MG3', name: 'Third Clinic', title: 'THIRD - LEGAL REGISTER', approver: 'Dr. T', authors: 'Mr. T', responsible: 'Dr. T' }, newbieCookie);
+    assert.equal(third.status, 402, 'a third facility needs Premium');
+    assert.match((await third.json()).error, /2 facilities.*Get Premium/);
+    assert.equal((await (await fetch(`${base}/api/plan`, nb)).json()).usage.facilities, 2);
+    // Get Premium can send people to the subscription page the administrator sets (web addresses only)
+    assert.equal((await put('/api/plans', { upgradeUrl: 'javascript:alert(1)' }, adminCookie)).status, 400);
+    assert.equal((await put('/api/plans', { upgradeUrl: 'https://example.test/premium' }, adminCookie)).status, 200);
+    assert.equal((await (await fetch(`${base}/api/plan`, nb)).json()).upgradeUrl, 'https://example.test/premium');
+    assert.equal((await put('/api/plans', { upgradeUrl: '' }, adminCookie)).status, 200);
     // documents are claimed: 2 policies, then the gateway; the same ones stay available
     const nbUser = A.loadUsers().users.find(x => x.username === 'newbie');
     assert.deepEqual([...P.claim(nbUser, 'policies', [1, 2, 3])], ['1', '2']);
@@ -707,6 +718,7 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
     assert.equal((await fetch(`${base}/api/status?f=${mgrId}`, { headers: { Cookie: adminCookie } })).status, 200);
     assert.equal((await fetch(`${base}/api/log`, { headers: { Cookie: adminCookie } })).status, 200);
     assert.equal((await fetch(`${base}/api/facilities/${mgrId}`, { method: 'DELETE', headers: { Cookie: adminCookie } })).status, 200, 'admin removes it');
+    assert.equal((await fetch(`${base}/api/facilities/${secondId}`, { method: 'DELETE', headers: { Cookie: adminCookie } })).status, 200);
     assert.equal((await put('/api/facilities-template', { id: null }, adminCookie)).status, 200);
 
     // 5 wrong passwords lock the account

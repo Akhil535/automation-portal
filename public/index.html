@@ -33,9 +33,9 @@
     <div class="fs-pop" id="fs-pop" hidden>
       <input type="search" id="fs-search" placeholder="Find a facility…" autocomplete="off">
       <div class="fs-list" id="fs-list" role="listbox"></div>
-      <div class="fs-actions" data-admin>
+      <div class="fs-actions" data-write>
         <button type="button" class="fs-add" id="fs-new">＋ New facility <small>policy pack first</small></button>
-        <button type="button" class="fs-add sub" id="btn-add-facility">＋ Add with an existing Excel register</button>
+        <button type="button" class="fs-add sub" id="btn-add-facility" data-admin>＋ Add with an existing Excel register</button>
       </div>
     </div>
     <select id="facility-select" hidden></select>
@@ -104,9 +104,9 @@
       <h1 id="nofac-title">Create your first facility</h1>
       <p class="muted" id="nofac-text">Facilities you add appear here. Start with the policy pack: the 33 ADHICS policies are prepared for the new facility from the master template, then its LEGAL REGISTER is created.</p>
       <ol class="nofac-steps"><li><i>1</i>Facility details &amp; policy pack</li><li><i>2</i>HR &amp; onboarding documents</li><li><i>3</i>LEGAL REGISTER</li></ol>
-      <div class="btn-row center" data-admin>
+      <div class="btn-row center" data-write>
         <button type="button" class="btn primary big" id="nofac-new">＋ New facility</button>
-        <button type="button" class="btn" id="nofac-excel">Add with an existing Excel register</button>
+        <button type="button" class="btn" id="nofac-excel" data-admin>Add with an existing Excel register</button>
       </div>
     </div>
   </section>
@@ -711,6 +711,8 @@
             <label>3rd-party documents<input name="thirdparty" type="number" min="0" max="999" required></label>
             <label>Facilities<input name="facilities" type="number" min="1" max="999" required></label>
           </div>
+          <label>Upgrade page (optional)<input name="upgradeUrl" type="url" placeholder="https://… your subscription / payment page" autocomplete="off"></label>
+          <p class="muted small">When set, <b>Get Premium</b> opens this page in a new tab (and the administrators are still told). Empty: Get Premium sends the request to the administrators.</p>
           <div class="actions"><button class="btn primary" type="submit">Save limits</button><span id="limits-msg" class="muted"></span></div>
         </form>
       </div>
@@ -1155,9 +1157,9 @@
       <li>Every HR, training and 3rd-party document</li>
       <li>A live LEGAL REGISTER – edits, renewals and weekly DoH updates</li>
       <li>The full facility pack and compliance reports</li>
-      <li>More than one facility</li>
+      <li>Unlimited facilities and bulk generation</li>
     </ul>
-    <div class="btn-row"><button class="btn" value="close">Not now</button><button type="button" class="btn primary" id="up-request">Request Premium</button></div>
+    <div class="btn-row"><button class="btn" value="close">Not now</button><button type="button" class="btn premium-btn" id="up-request">★ Get Premium</button></div>
     <p class="small muted" id="up-msg" role="status"></p>
   </form>
 </dialog>

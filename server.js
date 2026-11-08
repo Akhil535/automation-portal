@@ -19,7 +19,7 @@ import { applyReview, currentRun, runAll, runMonitor } from './src/monitor.js';
 import { startScheduler } from './src/scheduler.js';
 import { formKind, installedForms } from './src/hrforms.js';
 import { MODULE_KEYS, buildPackage, packageTree } from './src/package.js';
-import { allowedSet, claim, isTrial, planInfo, setTrialLimits, trialLimits, upgradeError } from './src/plans.js';
+import { allowedSet, claim, createdFacilities, isTrial, planInfo, setTrialLimits, trialLimits, upgradeError, upgradeUrl } from './src/plans.js';
 import { addForms, addItem, checklistXlsx, crossCheck, formFile, formsStatus, formsZip, generateForms, getChecklist, pdfState, prewarmPdfs, saveDocSettings, GROUPS, importMasterChecklist, listForms, masterChecklist, removeForm, removeItem, resetChecklist, updateItem } from './src/hrforms.js';
 import { documentHeader, sendMail } from './src/mailer.js';
 import { lockReason, readLogo, readRegister } from './src/xlsx.js';
@@ -205,8 +205,11 @@ app.post('/api/plan/request', wrap(async (req, res) => {
   }
   res.json({ ok: true });
 }));
-app.get('/api/plans', wrap(async (req, res) => res.json({ trial: trialLimits() })));
-app.put('/api/plans', wrap(async (req, res) => res.json({ trial: setTrialLimits(req.body?.trial || req.body || {}) })));
+app.get('/api/plans', wrap(async (req, res) => res.json({ trial: trialLimits(), upgradeUrl: upgradeUrl() })));
+app.put('/api/plans', wrap(async (req, res) => {
+  const b = req.body || {};
+  res.json({ trial: setTrialLimits({ ...(b.trial || {}), ...(b.upgradeUrl !== undefined ? { upgradeUrl: b.upgradeUrl } : {}) }), upgradeUrl: upgradeUrl() });
+}));
 app.post('/api/account/password', wrap(async (req, res) => {
   changeOwnPassword(req.user.id, req.body?.current, req.body?.next);
   res.json({ ok: true });
@@ -532,7 +535,7 @@ app.post('/api/facilities', wrap(async (req, res) => {
   // Managers: a new facility is copied from the master template or from a facility they can open – never from
   // someone else's facility, and never from a file path on this PC (attaching an existing register is for admins).
   if (isTrial(req.user)) {
-    const lim = trialLimits().facilities, have = (req.user.facilities || []).filter(x => x !== '*').length;
+    const lim = trialLimits().facilities, have = createdFacilities(req.user.username).length; // facilities this user created
     if (have >= lim) throw upgradeError(`The free trial includes ${lim} facilit${lim === 1 ? 'y' : 'ies'}`, { kind: 'facilities', limit: lim });
   }
   if (req.user.role !== 'admin') {

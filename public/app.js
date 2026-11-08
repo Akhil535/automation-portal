@@ -55,7 +55,7 @@ async function loadFacilities() {
   $('#tpl-banner').hidden = !onTemplate();
   if (onTemplate()) $('#tpl-name').textContent = 'the baseline for every new facility';
   if (!facility) {
-    $('#side-fac-name').textContent = 'No facility yet'; $('#side-fac-code').textContent = me?.role === 'admin' ? 'Create one to start' : 'Ask an administrator';
+    $('#side-fac-name').textContent = 'No facility yet'; $('#side-fac-code').textContent = me?.role !== 'viewer' ? 'Create one to start' : 'Ask an administrator';
     $('#nofac-title').textContent = me?.role !== 'viewer' ? 'Create your first facility' : 'No facility assigned yet';
     $('#nofac-text').textContent = me?.role !== 'viewer'
       ? 'Facilities you add appear here – only you (and the administrators) can see them. Start with the policy pack: the ADHICS policies are prepared for the new facility from the master template, then its LEGAL REGISTER is created.'
@@ -130,7 +130,7 @@ $('#fs-btn').onclick = e => { e.stopPropagation(); fsOpen(); };
 $('#fs-search').oninput = renderSwitcher;
 document.addEventListener('click', e => { if (!$('#fs-pop').hidden && !e.target.closest('#fs')) fsOpen(false); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#fs-pop').hidden) fsOpen(false); });
-const newFacilityPack = async () => { fsOpen(false); if (!pp) await loadPolicies().catch(() => {}); npOpen(); };
+const newFacilityPack = async () => { fsOpen(false); if (window.canAddFacility && !(await canAddFacility())) return; if (!pp) await loadPolicies().catch(() => {}); npOpen(); };
 $('#fs-new').onclick = newFacilityPack;
 $('#nofac-new').onclick = newFacilityPack;
 $('#nofac-excel').onclick = () => $('#btn-add-facility').click();
@@ -2848,7 +2848,8 @@ var planState = null; // var: may be read before this line runs
     const res = await realFetch(...args);
     if (res.status === 402) res.clone().json().then(d => { if (d?.upgrade) showUpgrade(d); }).catch(() => {});
     else if (res.ok && res.headers.get('content-type')?.includes('json')) res.clone().json().then(d => {
-      if (d?.limited) toast(`Free trial: ${d.limited.count}${d.limited.of ? ` of ${d.limited.of}` : ''} document${d.limited.count === 1 ? '' : 's'} included – <b>Get Premium</b> for the full pack`);
+      // bulk generation on the trial makes only the included documents – say so in the upgrade gateway
+      if (d?.limited) showUpgrade({ error: `Free trial: only ${d.limited.count}${d.limited.of ? ` of ${d.limited.of}` : ''} document${d.limited.count === 1 ? ' is' : 's are'} being created. Unlimited bulk generation is part of Premium.` });
     }).catch(() => {});
     return res;
   };
@@ -2879,22 +2880,42 @@ var planState = null; // var: may be read before this line runs
     const dlg = $('#upgrade-dlg');
     if (!dlg) return;
     $('#up-why').textContent = d.error || 'You are on the free trial. Premium unlocks every document, the live LEGAL REGISTER and full downloads.';
-    const p = planState;
-    $('#up-meters').innerHTML = p?.limits ? Object.keys(KIND).map(k => {
-      const used = Array.isArray(p.usage[k]) ? p.usage[k].length : p.usage[k] || 0, lim = p.limits[k];
-      return `<div class="up-meter"><span>${KIND[k]}</span><b>${Math.min(used, lim)} / ${lim}</b><i style="--w:${lim ? Math.min(100, (used / lim) * 100) : 100}%"></i></div>`;
-    }).join('') + '<div class="up-meter up-locked"><span>LEGAL REGISTER</span><b>🔒 Preview</b><i style="--w:100%"></i></div>' : '';
-    $('#up-msg').textContent = me?.premiumRequest ? 'Premium requested – an administrator will upgrade your account.' : '';
-    $('#up-request').disabled = !!me?.premiumRequest;
+    const meters = () => {
+      const p = planState;
+      $('#up-meters').innerHTML = p?.limits ? Object.keys(KIND).map(k => {
+        const used = Array.isArray(p.usage[k]) ? p.usage[k].length : p.usage[k] || 0, lim = p.limits[k];
+        return `<div class="up-meter${used >= lim ? ' full' : ''}"><span>${KIND[k]}</span><b>${Math.min(used, lim)} / ${lim}</b><i style="--w:${lim ? Math.min(100, (used / lim) * 100) : 100}%"></i></div>`;
+      }).join('') + '<div class="up-meter up-locked"><span>LEGAL REGISTER</span><b>🔒 Preview</b><i style="--w:100%"></i></div>' : '';
+      const sent = !!me?.premiumRequest, url = planState?.upgradeUrl;
+      $('#up-msg').textContent = sent && !url ? 'Premium requested – an administrator will upgrade your account.' : '';
+      $('#up-request').textContent = url ? '★ Get Premium ↗' : sent ? '✓ Premium requested' : '★ Get Premium';
+      $('#up-request').disabled = sent && !url;
+    };
+    meters();
     if (!dlg.open) dlg.showModal();
-    refreshPlan();
+    refreshPlan().then(meters);
   };
+  // Get Premium: the subscription page when the administrator set one (new tab), and the administrators are told
   $('#up-request').onclick = async () => {
+    const url = planState?.upgradeUrl;
+    if (url) window.open(url, '_blank', 'noopener');
     try {
       await apiGlobal('/api/plan/request', { method: 'POST', body: '{}' });
       if (me) me.premiumRequest = { at: new Date().toISOString() };
-      $('#up-msg').textContent = 'Request sent – an administrator will upgrade your account to Premium.'; $('#up-request').disabled = true;
+      $('#up-msg').textContent = url ? 'The upgrade page opened in a new tab. Your account switches to Premium as soon as the administrator confirms it.' : 'Request sent – an administrator will upgrade your account to Premium.';
+      if (!url) { $('#up-request').disabled = true; $('#up-request').textContent = '✓ Premium requested'; }
     } catch (e) { $('#up-msg').textContent = e.message; }
+  };
+  /** Free trial: a new facility only while the trial allows one more – otherwise the upgrade gateway. */
+  window.canAddFacility = async function canAddFacility() {
+    if (!document.body.classList.contains('trial')) return true;
+    await refreshPlan();
+    const p = planState;
+    if (p?.limits && p.usage.facilities >= p.limits.facilities) {
+      showUpgrade({ error: `The free trial includes ${p.limits.facilities} facilit${p.limits.facilities === 1 ? 'y' : 'ies'} – you have created ${p.usage.facilities}. Get Premium to add more facilities and unlock full compliance packs.` });
+      return false;
+    }
+    return true;
   };
   $('#plan-chip').onclick = () => showUpgrade();
 
@@ -2950,12 +2971,12 @@ var planState = null; // var: may be read before this line runs
   window.loadLimits = async function loadLimits() {
     const f = $('#limits-form');
     if (!f || me?.role !== 'admin') return;
-    try { const { trial } = await apiGlobal('/api/plans'); for (const [k, v] of Object.entries(trial)) if (f.elements[k]) f.elements[k].value = v; } catch { /* shown on save */ }
+    try { const { trial, upgradeUrl } = await apiGlobal('/api/plans'); for (const [k, v] of Object.entries(trial)) if (f.elements[k]) f.elements[k].value = v; f.elements.upgradeUrl.value = upgradeUrl || ''; } catch { /* shown on save */ }
   };
   $('#limits-form').onsubmit = async e => {
     e.preventDefault();
     const f = e.target, body = Object.fromEntries(['policies', 'hr', 'thirdparty', 'facilities'].map(k => [k, Number(f.elements[k].value)]));
-    try { await apiGlobal('/api/plans', { method: 'PUT', body: JSON.stringify({ trial: body }) }); $('#limits-msg').textContent = 'Saved.'; }
+    try { await apiGlobal('/api/plans', { method: 'PUT', body: JSON.stringify({ trial: body, upgradeUrl: f.elements.upgradeUrl.value.trim() }) }); $('#limits-msg').textContent = 'Saved.'; }
     catch (err) { $('#limits-msg').textContent = err.message; }
   };
 })();
