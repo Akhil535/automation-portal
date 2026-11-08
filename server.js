@@ -89,7 +89,10 @@ function requiredRole(req) {
   if (p.startsWith('/api/users')) return 'admin';
   if (p === '/api/settings' && m !== 'GET') return 'admin';
   if (p === '/api/settings' || p === '/api/email/test') return p === '/api/email/test' ? 'admin' : 'manager';
-  if ((p === '/api/facilities' && m === 'POST') || (m === 'DELETE' && /^\/api\/facilities\/[^/]+$/.test(p))) return 'admin';
+  if (p === '/api/facilities' && m === 'POST') return 'manager'; // managers create their own facilities (they get access to them)
+  if (m === 'DELETE' && /^\/api\/facilities\/[^/]+$/.test(p)) return 'admin';
+  // portal-wide: the activity log of every facility, the masters (they show the template facility's documents)
+  if (p === '/api/log' || p === '/api/hr/templates' || /^\/api\/policies\/templates\/[^/]+\/(view|paragraphs)$/.test(p)) return 'admin';
   if (p.startsWith('/api/policies/templates') && m !== 'GET') return 'admin'; // master policy templates are locked
   if ((p.startsWith('/api/hr/templates') && m !== 'GET') || p === '/api/hr/checklist-master') return 'admin'; // HR master forms belong to the master template
   if (m === 'GET') return 'viewer';
@@ -102,7 +105,7 @@ app.use((req, res, next) => {
   // Requests that are not about one facility (pages, own account, the facility list, users) need no facility.
   const p = req.path;
   if (!(p.startsWith('/api/') || p.startsWith('/reports/')) || p === '/api/me' || p.startsWith('/api/account/') || p.startsWith('/api/users')
-    || (p === '/api/facilities' && req.method === 'GET')) return next();
+    || (p === '/api/facilities' && (req.method === 'GET' || req.method === 'POST'))) return next(); // listing / creating: no facility needed (the creator gets access)
   const facs = loadFacilities();
   // The master template facility (the baseline every new facility is copied from) is for administrators only.
   const allowed = fid => canFacility(req.user, fid) && (fid !== facs.templateId || req.user.role === 'admin');
@@ -184,7 +187,7 @@ function facilitySummary(f, def) {
   const store = new Store(cfg);
   const last = store.data.runs[0];
   return {
-    id: f.id, code: f.code, name: f.name, title: f.title, isDefault: f.id === def, registerPath: cfg.register.path,
+    id: f.id, code: f.code, name: f.name, title: f.title, isDefault: f.id === def, registerPath: cfg.register.path, createdBy: f.createdBy || null, createdAt: f.createdAt || null,
     lastSuccess: store.meta.lastSuccess || null, lastStatus: last?.statusLabel || null, lastStatusCode: last?.status || null,
     lock: cfg.register.path ? lockReason(cfg.register.path) : 'No master register linked',
   };
@@ -466,7 +469,20 @@ app.post('/api/facilities/:id/register', wrap(async (req, res) => {
 /** Create a facility: from another facility's workbook (template), an upload, or a linked path. */
 app.post('/api/facilities', wrap(async (req, res) => {
   notWhileRunning();
-  const id = await createFacility(req.body || {}, m => console.log(m));
+  const b = { ...(req.body || {}) };
+  // Managers: a new facility is copied from the master template or from a facility they can open – never from
+  // someone else's facility, and never from a file path on this PC (attaching an existing register is for admins).
+  if (req.user.role !== 'admin') {
+    const facs0 = loadFacilities();
+    if (b.source && b.source !== 'template') throw Object.assign(new Error('Only an administrator can add a facility from an existing register'), { status: 403 });
+    if (b.policyPath) throw Object.assign(new Error('Only an administrator can read documents from a path on this PC'), { status: 403 });
+    if (!b.templateFrom) b.templateFrom = facs0.templateId || facs0.default;
+    if (b.templateFrom !== facs0.templateId && !canFacility(req.user, b.templateFrom)) throw Object.assign(new Error('You do not have access to that facility'), { status: 403 });
+  }
+  const id = await createFacility(b, m => console.log(m));
+  // the creator owns it: recorded on the facility, and a manager limited to some facilities gets access to it
+  updateFacility(id, { createdBy: req.user.username, createdAt: new Date().toISOString() });
+  if (req.user.role !== 'admin' && !req.user.facilities?.includes('*')) updateUser(req.user.id, { facilities: [...(req.user.facilities || []), id] });
   const { default: def, list } = loadFacilities();
   res.json({ id, facility: facilitySummary(list.find(f => f.id === id), def) });
 }));
@@ -538,6 +554,7 @@ function nextDailyRun(schedule) {
 app.post('/api/run', wrap(async (req, res) => {
   if (currentRun()) return res.status(409).json({ error: 'A run is already in progress' });
   const { mode = 'update', force = false, all = false } = req.body || {};
+  if (all && req.user.role !== 'admin') return res.status(403).json({ error: 'Only an administrator can check all facilities at once' });
   const m = mode === 'check' ? 'check' : 'update';
   (all ? runAll(m, { force: !!force, trigger: 'portal' }) : runMonitor(m, { force: !!force, trigger: 'portal', facility: fac(req) })).catch(() => {});
   res.status(202).json({ started: true });

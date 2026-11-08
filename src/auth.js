@@ -60,7 +60,7 @@ export function createUser({ username, password, role = 'viewer', facilities = [
   if (findUser(data, username)) throw new Error(`User "${username}" already exists`);
   const u = {
     id: crypto.randomUUID(), username: username.trim(), hash: bcrypt.hashSync(password, BCRYPT_COST), role,
-    facilities: role === 'admin' ? ['*'] : (facilities?.length ? facilities : ['*']), email: String(email || '').trim(),
+    facilities: role === 'admin' ? ['*'] : facilityScope(facilities), email: String(email || '').trim(),
     totp: null, mustChangePassword, failed: 0, lockedUntil: 0, createdAt: new Date().toISOString(),
   };
   data.users.push(u);
@@ -94,6 +94,15 @@ export function registerUser({ username, password, email, fullName, note } = {})
   return publicUser(u);
 }
 
+/**
+ * The facilities an account may open: '*' (all) only when chosen explicitly; otherwise exactly the ones listed –
+ * an empty list means none (the user sees "no facility assigned" until an administrator gives access).
+ */
+export function facilityScope(list) {
+  const ids = [...new Set((Array.isArray(list) ? list : []).map(String).filter(v => v === '*' || /^[a-z0-9-]{1,40}$/.test(v)))];
+  return ids.includes('*') ? ['*'] : ids;
+}
+
 export function updateUser(id, fields) {
   const data = loadUsers();
   const u = data.users.find(x => x.id === id);
@@ -104,7 +113,7 @@ export function updateUser(id, fields) {
     if (u.role === 'admin' && fields.role !== 'admin' && data.users.filter(x => x.role === 'admin').length === 1) throw new Error('The last administrator cannot be demoted');
     u.role = fields.role;
   }
-  if (fields.facilities !== undefined) u.facilities = u.role === 'admin' ? ['*'] : (fields.facilities.length ? fields.facilities : ['*']);
+  if (fields.facilities !== undefined || fields.role !== undefined) u.facilities = u.role === 'admin' ? ['*'] : facilityScope(fields.facilities ?? u.facilities);
   if (fields.email !== undefined) u.email = String(fields.email).trim();
   if (fields.password !== undefined) {
     const bad = checkPassword(fields.password);

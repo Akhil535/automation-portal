@@ -598,6 +598,10 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
     assert.equal((await fetch(`${base}/api/master?f=br2`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Cookie: viewerCookie }, body: '{"items":[]}' })).status, 403, 'viewer cannot edit');
     assert.equal((await fetch(`${base}/api/users`, { headers: { Cookie: viewerCookie } })).status, 403, 'viewer cannot manage users');
     assert.equal((await fetch(`${base}/api/export/pdf?f=br2`, { headers: { Cookie: viewerCookie } })).status !== 403, true, 'viewer may export');
+    // nothing of another facility, whatever the route: documents, HR, downloads, logo, portal-wide log and masters
+    for (const p of ['/api/hr?f=mhmc', '/api/hr/zip?f=mhmc', '/api/policies?f=mhmc', '/api/policies/zip?f=mhmc', '/api/register/download?f=mhmc', '/api/facility-logo?f=mhmc',
+      '/api/master?f=mhmc', '/api/hr/checklist.xlsx?f=mhmc', '/api/facility-document?f=mhmc&entry=x', '/api/log', '/api/hr/templates', '/api/policies/templates/1/paragraphs'])
+      assert.equal((await fetch(base + p, { headers: { Cookie: viewerCookie } })).status, 403, `viewer refused: ${p}`);
 
     // self sign-up: the account waits for approval, then the administrator chooses role and facilities
     const put = (p, body, cookie) => fetch(base + p, { method: 'PUT', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify(body) });
@@ -624,6 +628,35 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
     assert.equal((await fetch(`${base}/api/status?f=mhmc`, { headers: { Cookie: newbieCookie } })).status, 403, 'template closed to users');
     assert.equal((await (await fetch(`${base}/api/status`, { headers: { Cookie: newbieCookie } })).json()).facility.id, asUser.list[0].id, 'no facility named: first real facility');
     assert.equal((await fetch(`${base}/api/status?f=mhmc`, { headers: { Cookie: adminCookie } })).status, 200, 'admins can open the template');
+    assert.equal((await put('/api/facilities-template', { id: null }, adminCookie)).status, 200);
+
+    // facility isolation between users: nothing ticked = no facility (never "all")
+    assert.equal((await put(`/api/users/${pend.id}`, { facilities: [] }, adminCookie)).status, 200);
+    const none = await (await fetch(`${base}/api/facilities`, { headers: { Cookie: newbieCookie } })).json();
+    assert.deepEqual(none.list, [], 'no facility ticked: sees no facility');
+    assert.equal((await fetch(`${base}/api/status`, { headers: { Cookie: newbieCookie } })).status, 403, 'and cannot open any');
+    // a manager may create a facility (from the master template) and it becomes theirs – only theirs
+    assert.equal((await put('/api/facilities-template', { id: 'mhmc' }, adminCookie)).status, 200);
+    assert.equal((await post('/api/facilities', { source: 'excel', path: 'C:/Windows/win.ini', code: 'XX', name: 'X' }, newbieCookie)).status, 403, 'no registers from a path on the PC');
+    assert.equal((await post('/api/facilities', { code: 'MGR', name: 'Manager Clinic', templateFrom: 'br2' }, newbieCookie)).status, 403, 'cannot copy a facility they cannot open');
+    const made = await post('/api/facilities', { source: 'template', code: 'MGR', name: 'Manager Clinic', title: 'MANAGER CLINIC - LEGAL REGISTER', approver: 'Dr. Test', authors: 'Mr. Test', responsible: 'Dr. Test' }, newbieCookie);
+    assert.equal(made.status, 200, await made.clone().text());
+    const mgrId = (await made.json()).id;
+    const mine = await (await fetch(`${base}/api/facilities`, { headers: { Cookie: newbieCookie } })).json();
+    assert.deepEqual(mine.list.map(f => f.id), [mgrId], 'the manager sees only the facility they created');
+    assert.equal(mine.list[0].createdBy, 'newbie');
+    assert.equal((await fetch(`${base}/api/status?f=br2`, { headers: { Cookie: newbieCookie } })).status, 403, 'and not the others');
+    assert.equal((await fetch(`${base}/api/facilities?f=${mgrId}`, { headers: { Cookie: viewerCookie } })).status !== 403 &&
+      !(await (await fetch(`${base}/api/facilities`, { headers: { Cookie: viewerCookie } })).json()).list.some(f => f.id === mgrId), true, 'another user does not see it');
+    assert.equal((await fetch(`${base}/api/status?f=${mgrId}`, { headers: { Cookie: viewerCookie } })).status, 403, 'another user cannot open it');
+    assert.equal((await post('/api/run', { all: true }, newbieCookie)).status, 403, 'only admins check all facilities at once');
+    assert.equal((await fetch(`${base}/api/facilities/${mgrId}`, { method: 'DELETE', headers: { Cookie: newbieCookie } })).status, 403, 'managers cannot delete facilities');
+    // the administrator sees and manages everything – including what other users created
+    const adminList = await (await fetch(`${base}/api/facilities`, { headers: { Cookie: adminCookie } })).json();
+    assert.ok(adminList.list.some(f => f.id === mgrId) && adminList.list.some(f => f.id === 'br2'), 'admin sees every facility');
+    assert.equal((await fetch(`${base}/api/status?f=${mgrId}`, { headers: { Cookie: adminCookie } })).status, 200);
+    assert.equal((await fetch(`${base}/api/log`, { headers: { Cookie: adminCookie } })).status, 200);
+    assert.equal((await fetch(`${base}/api/facilities/${mgrId}`, { method: 'DELETE', headers: { Cookie: adminCookie } })).status, 200, 'admin removes it');
     assert.equal((await put('/api/facilities-template', { id: null }, adminCookie)).status, 200);
 
     // 5 wrong passwords lock the account

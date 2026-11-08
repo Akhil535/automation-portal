@@ -56,16 +56,16 @@ async function loadFacilities() {
   if (onTemplate()) $('#tpl-name').textContent = 'the baseline for every new facility';
   if (!facility) {
     $('#side-fac-name').textContent = 'No facility yet'; $('#side-fac-code').textContent = me?.role === 'admin' ? 'Create one to start' : 'Ask an administrator';
-    $('#nofac-title').textContent = me?.role === 'admin' ? 'Create your first facility' : 'No facility assigned yet';
-    $('#nofac-text').textContent = me?.role === 'admin'
-      ? 'Facilities you add appear here. Start with the policy pack: the ADHICS policies are prepared for the new facility from the master template, then its LEGAL REGISTER is created.'
+    $('#nofac-title').textContent = me?.role !== 'viewer' ? 'Create your first facility' : 'No facility assigned yet';
+    $('#nofac-text').textContent = me?.role !== 'viewer'
+      ? 'Facilities you add appear here – only you (and the administrators) can see them. Start with the policy pack: the ADHICS policies are prepared for the new facility from the master template, then its LEGAL REGISTER is created.'
       : 'Your account is active, but no facility has been assigned to it yet. Ask an administrator to give you access to your facility.';
     const cur = $('#tabs button.active')?.dataset.tab;
     if (cur !== 'admin') showTab('nofac');
   } else if ($('#nofac').classList.contains('active')) showTab('overview');
   $('#fac-tbl tbody').innerHTML = facilities.map(f => `<tr>
     <td><img class="fac-mini" src="/api/facility-logo?f=${encodeURIComponent(f.id)}" alt="" onerror="this.style.visibility='hidden'"></td>
-    <td><b>${esc(f.name)}</b><br><span class="muted small">${esc(f.code)}${f.isDefault ? ' · default' : ''}${f.id === facility ? ' · selected' : ''}</span></td>
+    <td><b>${esc(f.name)}</b><br><span class="muted small">${esc(f.code)}${f.isDefault ? ' · default' : ''}${f.id === facility ? ' · selected' : ''}${f.createdBy ? ` · created by ${esc(f.createdBy)}` : ''}</span></td>
     <td>${healthBar(f.health)}</td>
     <td class="small">${f.lock ? `<span class="tag warn">${esc(f.lock)}</span>` : '<span class="tag ok">Ready</span>'}</td>
     <td class="num">${f.lastSuccess ? fmt(f.lastSuccess) : 'Never'}</td><td>${f.lastStatus ? tagFor(f.lastStatusCode, f.lastStatus) : '–'}</td>
@@ -1429,7 +1429,7 @@ function renderPending(all) {
       <div class="pend-who"><b>${esc(x.fullName || x.username)}</b><small>${esc(x.username)} · ${esc(x.email)} · asked ${fmt(x.createdAt)}</small>${x.requestNote ? `<p>“${esc(x.requestNote)}”</p>` : ''}</div>
       <div class="pend-set">
         <label>Role<select data-f="role"><option value="viewer">Viewer – read only</option><option value="manager">Manager – can edit</option></select></label>
-        <div class="pend-facs"><span>Facilities</span>${facilities.length ? facBoxes(x.id) : '<em class="muted small">No facility yet – approve with all facilities, or add one first</em>'}</div>
+        <div class="pend-facs"><span>Facilities</span>${facilities.length ? facBoxes(x.id) : '<em class="muted small">No facility yet – approve now and give access later (Change access)</em>'}</div>
       </div>
       <div class="pend-act"><button type="button" class="btn primary small" data-act="approve">✓ Approve</button><button type="button" class="btn small danger-txt" data-act="decline">Decline</button></div>
     </article>`).join('');
@@ -1442,7 +1442,7 @@ function renderPending(all) {
       } else {
         const facs = [...card.querySelectorAll('.pend-facs input:checked')].map(i => i.value);
         if (facilities.length && !facs.length) { alert('Choose at least one facility (or All facilities).'); return; }
-        await apiGlobal(`/api/users/${x.id}`, { method: 'PUT', body: JSON.stringify({ approve: true, role: card.querySelector('[data-f=role]').value, facilities: facs.includes('*') || !facs.length ? ['*'] : facs }) });
+        await apiGlobal(`/api/users/${x.id}`, { method: 'PUT', body: JSON.stringify({ approve: true, role: card.querySelector('[data-f=role]').value, facilities: facs.includes('*') ? ['*'] : facs }) });
       }
       loadUsersPanel();
     } catch (e) { alert(e.message); }
@@ -1458,11 +1458,15 @@ async function loadUsersPanel() {
   const { users: all } = await apiGlobal('/api/users');
   renderPending(all);
   const users = all.filter(x => x.status !== 'pending');
-  const facName = id => id === '*' ? 'All facilities' : (facilities.find(f => f.id === id)?.code || id);
+  const facName = id => { const f = facilities.find(x => x.id === id); return f ? `${f.code} – ${f.name}` : `${id} (removed)`; };
+  const scope = x => x.role === 'admin' ? '<span class="scope all" title="Administrators see and manage every facility">All facilities · full control</span>'
+    : x.facilities.includes('*') ? '<span class="scope all">All facilities</span>'
+    : x.facilities.length ? `<div class="scope-list">${x.facilities.map(id => `<span class="scope">${esc(facName(id))}</span>`).join('')}</div>`
+    : '<span class="scope none">No facility – sees nothing</span>';
   $('#users-tbl tbody').innerHTML = users.map(x => `<tr>
     <td><b>${esc(x.username)}</b>${x.id === me.id ? ' <span class="muted small">(you)</span>' : ''}<br><span class="muted small">${esc(x.email || 'no e-mail')}</span></td>
     <td><select data-uid="${x.id}" data-f="role">${['admin', 'manager', 'viewer'].map(r => `<option value="${r}"${r === x.role ? ' selected' : ''}>${ROLE_LABEL[r]}</option>`).join('')}</select></td>
-    <td class="small">${x.facilities.map(facName).map(esc).join(', ')}</td>
+    <td class="small">${scope(x)}${x.role === 'admin' ? '' : `<button type="button" class="link-btn small scope-edit" data-act="access" data-uid="${x.id}">Change access</button>`}</td>
     <td>${x.twoFactor ? '<span class="tag ok">On</span>' : '<span class="tag warn">At next sign-in</span>'}${x.locked ? ' <span class="tag bad">Locked</span>' : ''}${x.mustChangePassword ? ' <span class="tag na">Temp. password</span>' : ''}</td>
     <td class="num">${x.lastLogin ? fmt(x.lastLogin) : 'Never'}</td>
     <td><div class="row-actions">
@@ -1480,6 +1484,7 @@ async function loadUsersPanel() {
     try {
       if (act === 'delete') { if (!confirm(`Delete the account "${u.username}"?`)) return; await apiGlobal(`/api/users/${u.id}`, { method: 'DELETE' }); }
       if (act === 'unlock') await apiGlobal(`/api/users/${u.id}`, { method: 'PUT', body: JSON.stringify({ unlock: true }) });
+      if (act === 'access') { await editAccess(u); return; }
       if (act === 'reset-2fa') { if (!confirm(`Reset two-factor authentication for "${u.username}"? They will scan a new QR code at their next sign-in.`)) return; await apiGlobal(`/api/users/${u.id}`, { method: 'PUT', body: JSON.stringify({ resetTwoFactor: true }) }); }
       if (act === 'reset-pw') {
         const pw = genPassword();
@@ -1489,8 +1494,36 @@ async function loadUsersPanel() {
       loadUsersPanel();
     } catch (e) { alert(e.message); }
   });
-  $('#user-facs').innerHTML = `<label class="check"><input type="checkbox" value="*" checked> All facilities</label>` +
+  $('#user-facs').innerHTML = `<label class="check"><input type="checkbox" value="*"> All facilities</label>` +
     facilities.map(f => `<label class="check"><input type="checkbox" value="${esc(f.id)}"> ${esc(f.code)} – ${esc(f.name)}</label>`).join('');
+}
+/** Which facilities a user may open: tick them; nothing ticked = no access at all. Saved at once. */
+function editAccess(u) {
+  return new Promise(resolve => {
+    const dlg = document.createElement('dialog');
+    dlg.className = 'access-dlg';
+    const all = u.facilities.includes('*');
+    dlg.innerHTML = `<form method="dialog">
+      <h2>Facility access – ${esc(u.username)}</h2>
+      <p class="muted small">${esc(ROLE_LABEL[u.role] || u.role)}. They see and work on only the facilities ticked here – nothing else is shown to them. Nothing ticked = no access.</p>
+      <label class="check access-all"><input type="checkbox" value="*"${all ? ' checked' : ''}> All facilities (also every new one)</label>
+      <div class="access-list">${facilities.map(f => `<label class="check"><input type="checkbox" value="${esc(f.id)}"${!all && u.facilities.includes(f.id) ? ' checked' : ''}${all ? ' disabled' : ''}> <b>${esc(f.code)}</b> ${esc(f.name)}${f.createdBy ? ` <span class="muted small">· created by ${esc(f.createdBy)}</span>` : ''}</label>`).join('') || '<p class="muted small">No facilities yet.</p>'}</div>
+      <div class="btn-row"><button type="button" class="btn" value="cancel">Cancel</button><button type="submit" class="btn primary" value="save">Save access</button></div>
+    </form>`;
+    document.body.append(dlg);
+    const allBox = dlg.querySelector('.access-all input');
+    allBox.onchange = () => dlg.querySelectorAll('.access-list input').forEach(i => { i.disabled = allBox.checked; });
+    dlg.querySelector('[value=cancel]').onclick = () => dlg.close();
+    dlg.addEventListener('close', async () => {
+      if (dlg.returnValue === 'save') {
+        const facs = allBox.checked ? ['*'] : [...dlg.querySelectorAll('.access-list input:checked')].map(i => i.value);
+        try { await apiGlobal(`/api/users/${u.id}`, { method: 'PUT', body: JSON.stringify({ facilities: facs }) }); toast(`Access saved – ${esc(u.username)} now sees ${facs[0] === '*' ? 'all facilities' : facs.length ? `${facs.length} facilit${facs.length > 1 ? 'ies' : 'y'}` : 'no facility'}`); }
+        catch (e) { toast(`⚠ ${esc(e.message)}`); }
+      }
+      dlg.remove(); loadUsersPanel(); resolve();
+    });
+    dlg.showModal();
+  });
 }
 const genPassword = () => { const a = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'; const r = crypto.getRandomValues(new Uint32Array(14)); return [...r].map(n => a[n % a.length]).join('') + (r[0] % 10); };
 $('#gen-pw').onclick = () => { $('#user-form').elements.password.value = genPassword(); };
@@ -1572,7 +1605,7 @@ function renderPolicies() {
   const L = pp.lock || {}, base = L.baseline || {};
   const isBase = base.name && base.name.toUpperCase() === String(s.facilityName).toUpperCase();
   $('#pp-for').innerHTML = isBase
-    ? '<span>You are looking at</span><b>the master template</b><span class="muted small">· nothing is replaced here – create a facility to prepare its own policies.</span><button type="button" class="btn primary small" data-admin onclick="npOpen()">＋ New facility</button>'
+    ? '<span>You are looking at</span><b>the master template</b><span class="muted small">· nothing is replaced here – create a facility to prepare its own policies.</span><button type="button" class="btn primary small" data-write onclick="npOpen()">＋ New facility</button>'
     : `<span>Preparing policies for</span><b>${esc(s.facilityName)}</b><span class="pp-code">${esc(s.code)}</span>` + (base.name ? '<span class="muted small">· the master template\'s name, code, e-mail and phone are replaced with this facility\'s details</span>' : '');
   // lock
   $('#pp-lockbar').hidden = !L.locked && !L.unlockedAt;
