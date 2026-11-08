@@ -1499,18 +1499,18 @@ async function loadUsersPanel() {
     : x.facilities.length ? `<div class="scope-list">${x.facilities.map(id => `<span class="scope">${esc(facName(id))}</span>`).join('')}</div>`
     : '<span class="scope none">No facility – sees nothing</span>';
   $('#users-tbl tbody').innerHTML = users.map(x => `<tr>
-    <td><b>${esc(x.username)}</b>${x.id === me.id ? ' <span class="muted small">(you)</span>' : ''}<br><span class="muted small">${esc(x.email || 'no e-mail')}</span></td>
+    <td><b>${esc(x.username)}${x.id === me.id ? '<span class="users-me">you</span>' : ''}</b><span class="muted small" title="${esc(x.email || '')}">${esc(x.email || 'no e-mail')}</span></td>
     <td><select data-uid="${x.id}" data-f="role">${['admin', 'manager', 'viewer'].map(r => `<option value="${r}"${r === x.role ? ' selected' : ''}>${ROLE_LABEL[r]}</option>`).join('')}</select></td>
-    <td>${x.role === 'admin' ? '<span class="tag ok">Premium</span>' : `<select data-uid="${x.id}" data-f="plan" aria-label="Plan"><option value="trial"${x.plan === 'trial' ? ' selected' : ''}>Free trial</option><option value="premium"${x.plan === 'premium' ? ' selected' : ''}>Premium</option></select>${x.plan === 'trial' ? `<br><span class="muted small">used ${x.usage.policies} pol. · ${x.usage.hr} HR · ${x.usage.thirdparty} 3rd-party</span>` : ''}${x.premiumRequest ? '<br><span class="tag warn">Asked for Premium</span>' : ''}`}</td>
+    <td>${x.role === 'admin' ? '<span class="tag ok">Premium</span>' : `<select data-uid="${x.id}" data-f="plan" aria-label="Plan"><option value="trial"${x.plan === 'trial' ? ' selected' : ''}>Free trial</option><option value="premium"${x.plan === 'premium' ? ' selected' : ''}>Premium</option></select>${x.plan === 'trial' ? `<br><span class="muted small">Used: ${x.usage.policies} policies · ${x.usage.hr} HR · ${x.usage.thirdparty} vendor</span>` : ''}${x.premiumRequest ? '<br><span class="tag warn">Asked for Premium</span>' : ''}`}</td>
     <td class="small">${scope(x)}${x.role === 'admin' ? '' : `<button type="button" class="link-btn small scope-edit" data-act="access" data-uid="${x.id}">Change access</button>`}</td>
     <td>${x.twoFactor ? '<span class="tag ok">On</span>' : '<span class="tag warn">At next sign-in</span>'}${x.locked ? ' <span class="tag bad">Locked</span>' : ''}${x.mustChangePassword ? ' <span class="tag na">Temp. password</span>' : ''}</td>
     <td class="num">${x.lastLogin ? fmt(x.lastLogin) : 'Never'}</td>
-    <td><div class="row-actions">
+    <td><details class="menu user-manage"><summary class="btn small">Manage ▾</summary><div class="menu-pop right">
       ${x.locked ? `<button class="icon-btn" data-act="unlock" data-uid="${x.id}">Unlock</button>` : ''}
       <button class="icon-btn" data-act="reset-pw" data-uid="${x.id}">Reset password</button>
       <button class="icon-btn" data-act="reset-2fa" data-uid="${x.id}">Reset 2FA</button>
-      ${x.id === me.id ? '' : `<button class="icon-btn del" data-act="delete" data-uid="${x.id}">Delete</button>`}
-    </div></td></tr>`).join('');
+      ${x.id === me.id ? '' : `<button class="icon-btn del" data-act="delete" data-uid="${x.id}">Delete account</button>`}
+    </div></details></td></tr>`).join('');
   $$('#users-tbl [data-f=role]').forEach(sel => sel.onchange = async () => {
     try { await apiGlobal(`/api/users/${sel.dataset.uid}`, { method: 'PUT', body: JSON.stringify({ role: sel.value }) }); loadUsersPanel(); }
     catch (e) { alert(e.message); loadUsersPanel(); }
@@ -2801,12 +2801,21 @@ $('#pp-to-hr').onclick = () => showTab('hr');
     if (!(d instanceof HTMLDetailsElement) || !d.open || !d.classList.contains('menu')) return;
     const pop = d.querySelector('.menu-pop');
     if (!pop) return;
-    pop.style.left = pop.style.right = pop.style.maxWidth = '';
+    pop.style.left = pop.style.right = pop.style.maxWidth = pop.style.position = pop.style.top = pop.style.bottom = '';
+    if (d.closest('.table-wrap')) { // inside a scrolling table: float above the page so the menu is never cut off
+      const s = d.querySelector('summary').getBoundingClientRect(), Wd = document.documentElement.clientWidth;
+      Object.assign(pop.style, { position: 'fixed', top: `${s.bottom + 6}px`, bottom: 'auto', left: 'auto', right: `${Math.max(8, Wd - s.right)}px`, zIndex: 60 });
+      const h = pop.getBoundingClientRect().height;
+      if (s.bottom + 6 + h > innerHeight - 8) pop.style.top = `${Math.max(8, s.top - 6 - h)}px`;
+      return;
+    }
     const W = document.documentElement.clientWidth, r = pop.getBoundingClientRect();
     pop.style.maxWidth = `${W - 16}px`;
     if (r.left < 8) { pop.style.right = 'auto'; pop.style.left = `${8 - d.getBoundingClientRect().left}px`; }
     else if (r.right > W - 8) { pop.style.left = 'auto'; pop.style.right = `${d.getBoundingClientRect().right - (W - 8)}px`; }
   }, true);
+  // a floating table menu closes when the page scrolls (it would otherwise drift away from its button)
+  window.addEventListener('scroll', () => $$('.table-wrap details.menu[open]').forEach(d => { d.open = false; }), { passive: true });
 
   function label(root = document) {
     root.querySelectorAll('table:not(.no-cards)').forEach(t => {
