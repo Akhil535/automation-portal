@@ -1803,7 +1803,7 @@ function renderPolicies() {
     const pdf = files.pdf.find(p => p.replace(/\.pdf$/, '') === w.replace(/\.docx$/, ''));
     const filled = r ? r.report.filled.map(k => PP_FIELD[k] || k) : null;
     if (trialLocked('policies', no)) { // free trial: only the first policies open – the rest are locked
-      return `<tr class="trial-locked"><td class="name"><span class="lock-ic" aria-hidden="true">🔒</span>${esc(w.replace(/\.docx$/, ''))}</td><td>${esc(r?.version || '')}</td>
+      return `<tr class="trial-locked"><td class="name"><span class="lock-ic" aria-hidden="true">🔒</span><span class="blur-txt" aria-hidden="true">${esc(w.replace(/\.docx$/, ''))}</span><span class="sr-only">Locked policy – part of Premium</span></td><td>${esc(r?.version || '')}</td>
         <td class="small"><span class="muted">Part of Premium</span></td>
         <td><div class="row-actions"><button type="button" class="icon-btn premium-mini" data-up>🔒 Get Premium</button></div></td></tr>`;
     }
@@ -1821,7 +1821,7 @@ function renderPolicies() {
     $('#pp-out-body').innerHTML = tpls.map(t => {
       const w = files.word.find(x => Number(x.match(/PO(\d+)/)?.[1]) === t.no);
       if (!trialLocked('policies', t.no)) return w ? rowFor(w) : `<tr><td class="name">${esc(title(t))}</td><td></td><td class="small muted">Not created yet – press “Create policies”</td><td></td></tr>`;
-      return `<tr class="trial-locked"><td class="name"><span class="lock-ic" aria-hidden="true">🔒</span>${esc(title(t))}</td><td></td>
+      return `<tr class="trial-locked"><td class="name"><span class="lock-ic" aria-hidden="true">🔒</span><span class="blur-txt" aria-hidden="true">${esc(title(t))}</span><span class="sr-only">PO${String(t.no).padStart(2, '0')} – locked, part of Premium</span></td><td></td>
         <td class="small"><span class="tag lock-tag">Premium</span></td>
         <td><div class="row-actions"><button type="button" class="icon-btn premium-mini" data-up>🔒 Get Premium</button></div></td></tr>`;
     }).join('');
@@ -2680,8 +2680,8 @@ function renderDocCards(sel, forms) {
     const ok = f.installed && !f.need.length;
     if (f.installed && trialLocked(f.group === 'thirdparty' ? 'thirdparty' : 'hr', f.key)) { // free trial: locked
       return `<div class="hr-form trial-locked">
-      <div class="hr-form-top"><span class="hr-no">Ref. No. ${esc(hrData.facility.code)}/${f.series}/FORM-${nn}</span><span class="tag lock-tag">🔒 Premium</span></div>
-      <b>${esc(f.title)}</b>
+      <div class="hr-form-top"><span class="hr-no blur-txt" aria-hidden="true">Ref. No. ${esc(hrData.facility.code)}/${f.series}/FORM-${nn}</span><span class="tag lock-tag">🔒 Premium</span></div>
+      <b class="blur-txt" aria-hidden="true">${esc(f.title)}</b><span class="sr-only">Locked document – part of Premium</span>
       <small class="muted">Part of Premium – the free trial includes the first ${planState.limits[f.group === 'thirdparty' ? 'thirdparty' : 'hr']} documents.</small>
       <div class="btn-row"><button type="button" class="btn small premium-btn" data-up>🔒 Get Premium</button></div>
     </div>`;

@@ -3740,3 +3740,11 @@ body.trial .ex-card:has(#ex-reg-xlsx), body.trial .ex-card:has(#ex-doh-xlsx) { d
 .docs-table tr.trial-locked td[colspan] { white-space: normal; }
 .docs-table tr.trial-locked .lock-msg { margin: 0 10px 0 6px; color: var(--muted); font-size: 13.5px; }
 .docs-table tr.trial-locked td:first-child { font-size: 16px; }
+
+/* Free trial: locked policy names are blurred (the lock, the Premium tag and Get Premium stay sharp) */
+tr.trial-locked .blur-txt { filter: blur(5px); user-select: none; pointer-events: none; opacity: .9; }
+tr.trial-locked .name { opacity: 1 !important; }
+.sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+@media print { tr.trial-locked .blur-txt { visibility: hidden; } }
+.hr-form.trial-locked .blur-txt { filter: blur(5px); user-select: none; pointer-events: none; opacity: .9 !important; }
+@media print { .hr-form.trial-locked .blur-txt { visibility: hidden; } }
