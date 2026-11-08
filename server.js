@@ -561,6 +561,32 @@ app.post('/api/run', wrap(async (req, res) => {
 }));
 
 app.get('/api/circulars', wrap(async (req, res) => res.json(new Store(cfgOf(req)).circulars().map(({ text, ...c }) => c))));
+/** Brief for the dashboard: the newest circulars in the register and this year's totals (read-only). */
+const briefCache = new Map();
+app.get('/api/circulars/brief', wrap(async (req, res) => {
+  const cfg = cfgOf(req);
+  const file = cfg.register.path;
+  if (!file || !fs.existsSync(file)) return res.json({ total: 0, latest: [], year: null });
+  const key = `${file}|${fs.statSync(file).mtimeMs}`;
+  if (!briefCache.has(key)) {
+    const { records } = await readRegister(file, cfg.register);
+    const iso = r => (typeof r.dateRaw === 'number' ? new Date(Date.UTC(1899, 11, 30) + r.dateRaw * 86400000).toISOString().slice(0, 10) : /^\d{4}-\d{2}-\d{2}$/.test(r.dateRaw || '') ? r.dateRaw : '');
+    const rows = records.map(r => ({ number: r.number || '', name: r.name || '', date: iso(r), category: r.category || '', url: /^https:\/\/(www\.)?doh\.gov\.ae\//i.test(r.url || '') ? r.url : '',
+      compliance: r.meta?.compliance || '', responsible: r.meta?.responsible || '', target: r.meta?.targetDate || '' }));
+    const year = new Date().getUTCFullYear();
+    const thisYear = rows.filter(r => r.date.startsWith(String(year)));
+    const na = cfg.compliance?.labels?.notApplicable || 'Not Applicable';
+    const brief = {
+      total: rows.length,
+      year: { year, count: thisYear.length, applicable: thisYear.filter(r => r.compliance && r.compliance !== na).length,
+        notApplicable: thisYear.filter(r => r.compliance === na).length, it: thisYear.filter(r => /IT Department/i.test(r.responsible)).length,
+        recalls: thisYear.filter(r => /recall|withdraw|suspension/i.test(r.name)).length },
+      latest: rows.slice(-4).reverse(),
+    };
+    briefCache.clear(); briefCache.set(key, brief);
+  }
+  res.json(briefCache.get(key));
+}));
 
 app.post('/api/circulars/:key/review', wrap(async (req, res) => {
   const { values, reviewer, note } = req.body || {};

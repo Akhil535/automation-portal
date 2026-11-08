@@ -484,6 +484,10 @@ function renderHome(s = status) {
   }
   $('#hx-health').className = `hx-strip tone-${tone}`;
   $('#hx-ring').style.setProperty('--p', c ? pct : 0);
+  if (c && c.total) { // donut: valid · expiring · expired · no dates, in proportion
+    let at = 0; const stop = (k, col) => { const a = at; at += (c[k] || 0) / c.total * 100; return `${col} ${a}% ${at}%`; };
+    $('#hx-ring').style.setProperty('--donut', `conic-gradient(${[stop('valid', 'var(--ok)'), stop('expiring', 'var(--warn)'), stop('expired', 'var(--bad)'), stop('missing', 'var(--muted)')].join(', ')}, var(--panel-2) ${at}% 100%)`);
+  } else $('#hx-ring').style.setProperty('--donut', 'conic-gradient(var(--panel-2) 0 100%)');
   $('#hx-pct').textContent = c ? pct : '–';
   $('#hx-verdict').textContent = title;
   $('#hx-hint').textContent = hint;
@@ -515,12 +519,13 @@ function renderHome(s = status) {
     : [...items].sort((a, b) => order[a.status] - order[b.status] || String(a.expiry).localeCompare(String(b.expiry))).map(i => {
       const d = ISO.test(i.expiry || '') ? daysTo(i.expiry) : null;
       const fill = i.status === 'lifetime' ? 100 : d === null ? 0 : Math.max(4, Math.min(100, (d / 365) * 100));
-      return `<button type="button" class="tile ${cls[i.status]}" data-hc="entry" data-row="${i.row}" data-open="${i.row}">
-        <span class="tile-top"><i></i><small>${esc(STATUS[i.status]?.[0] || i.status)}</small></span>
-        <b>${esc(i.name)}</b>
-        <span class="tile-meta">${esc(i.status === 'lifetime' ? '∞ Lifetime' : ISO.test(i.expiry || '') ? `Expires ${fmtDay(i.expiry)}` : 'No expiry date')}</span>
-        <span class="tile-bar"><i style="width:${fill}%"></i></span>
-        <span class="tile-days">${esc(daysText(i))}</span></button>`;
+      const big = i.status === 'lifetime' ? '∞' : d === null ? '?' : String(Math.abs(d));
+      const unit = i.status === 'lifetime' ? 'lifetime' : d === null ? 'no date' : d < 0 ? (Math.abs(d) === 1 ? 'day late' : 'days late') : (d === 1 ? 'day left' : 'days left');
+      return `<button type="button" class="tile t2 ${cls[i.status]}" data-hc="entry" data-row="${i.row}" data-open="${i.row}">
+        <span class="t2-top"><span class="t2-chip"><i></i>${esc(STATUS[i.status]?.[0] || i.status)}</span><span class="t2-ring" style="--f:${i.status === 'expired' ? 100 : fill}"><b>${esc(big)}</b><small>${esc(unit)}</small></span></span>
+        <b class="t2-name" title="${esc(i.name)}">${esc(i.name)}</b>
+        <span class="t2-date">${esc(i.status === 'lifetime' ? 'Never expires' : ISO.test(i.expiry || '') ? `Expires ${fmtDay(i.expiry)}` : 'No expiry date yet')}</span>
+        <span class="t2-foot"><span>${esc(i.responsible ? `👤 ${i.responsible}` : '')}</span><span class="t2-go">${i.status === 'expired' || i.status === 'expiring' ? 'Renew' : 'Update'} →</span></span></button>`;
     }).join('');
   $$('#overview [data-open]').forEach(el => {
     const go = () => (me?.role === 'viewer' ? (statusFilter = 'all', showTab('master')) : openEntry(Number(el.dataset.open)));
@@ -551,8 +556,31 @@ function renderHome(s = status) {
     homePoliciesAt = Date.now();
     api('/api/policies').then(p => { homePolicies = p; renderHomePolicies(); renderHomeActivity(); renderJourney(); }).catch(() => {});
     api('/api/hr').then(h => { homeHr = h; renderHomeHr(); renderJourney(); }).catch(() => {});
+    api('/api/circulars/brief').then(b => { dohBrief = b; renderDohBrief(); }).catch(() => {});
   }
   renderHomePolicies(); renderHomeHr(); renderHomeActivity(); renderJourney();
+}
+
+/** DoH card: this year's circulars in brief and the four newest ones (from the LEGAL REGISTER's Circular sheet). */
+var dohBrief = null;
+function renderDohBrief() {
+  const b = dohBrief, box = $('#doh-brief'), list = $('#doh-latest');
+  if (!b || !box) return;
+  const y = b.year;
+  box.innerHTML = y ? `<div class="db-stat"><b>${y.count}</b><span>circulars in ${y.year}</span></div>
+    <div class="db-stat ok"><b>${y.applicable}</b><span>apply to you</span></div>
+    <div class="db-stat na"><b>${y.notApplicable}</b><span>not applicable</span></div>
+    <div class="db-stat warn"><b>${y.recalls}</b><span>recalls &amp; alerts</span></div>` : '';
+  const day = iso => (iso ? new Date(iso + 'T00:00:00Z').toLocaleDateString('en-GB', { timeZone: 'UTC', day: '2-digit', month: 'short' }) : '–');
+  list.innerHTML = b.latest.length ? b.latest.map(c => {
+    const applies = c.compliance && !/not applicable/i.test(c.compliance);
+    return `<li class="dl-item">
+      <span class="dl-date"><b>${day(c.date).split(' ')[0]}</b><small>${day(c.date).split(' ')[1] || ''}</small></span>
+      <span class="dl-body"><span class="dl-no">${esc(c.number)}</span><b title="${esc(c.name)}">${esc(c.name)}</b>
+        <span class="dl-meta"><span class="dl-chip ${applies ? 'ok' : 'na'}">${applies ? 'Applies' : 'Not applicable'}</span>${c.responsible ? `<span>👤 ${esc(c.responsible)}</span>` : ''}${c.target && c.target !== '_' ? `<span>⏱ ${esc(c.target)}</span>` : ''}</span></span>
+      ${c.url ? `<a class="dl-open" href="${esc(c.url)}" target="_blank" rel="noopener noreferrer" title="Open the circular on doh.gov.ae">PDF ↗</a>` : ''}
+    </li>`;
+  }).join('') : '<li class="muted small">No circulars in the register yet.</li>';
 }
 
 /** Step 2 card on the dashboard: the HR & onboarding documents of this facility (live while they are created). */
