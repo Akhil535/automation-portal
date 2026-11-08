@@ -544,7 +544,14 @@ app.get('/api/hr/forms/:key', wrap(async (req, res) => {
 /** Step 2 of the sequence: all HR & onboarding documents as Word + PDF in the facility folder (background job). */
 app.post('/api/hr/generate', wrap(async (req, res) => { const g = GROUPS[req.body?.group] ? req.body.group : null; const only = hrAllowed(req.user, g); const job = generateForms(facId(req), { pdf: req.body?.pdf !== false, group: g, only }); res.json({ started: true, total: job.total, limited: only ? { count: only.size } : null }); }));
 /** Dates in the training / 3rd-party documents: one date for all (default) or own dates per document; editable details. */
-app.put('/api/hr/documents', wrap(async (req, res) => { const id = facId(req); const r = saveDocSettings(id, req.body || {}); prewarmPdfs(id); res.json(r); }));
+app.put('/api/hr/documents', wrap(async (req, res) => {
+  const b = req.body || {};
+  if (isTrial(req.user)) { // free trial: 3rd-party dates / details, and settings of locked documents, are Premium
+    if (b.group === 'thirdparty' || (b.key && formKind(b.key) === 'thirdparty')) throw upgradeError('Own dates and details for 3rd-party documents are part of Premium – on the free trial they follow PO11 and the policy review date', { kind: 'thirdparty' });
+    if (b.key) claim(req.user, formKind(b.key), [b.key]);
+  }
+  const id = facId(req); const r = saveDocSettings(id, b); prewarmPdfs(id); res.json(r);
+}));
 app.get('/api/hr/zip', wrap(async (req, res) => {
   const type = ['word', 'pdf'].includes(req.query.type) ? req.query.type : 'all';
   const g = GROUPS[req.query.group] ? req.query.group : null;

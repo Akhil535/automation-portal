@@ -3725,3 +3725,7 @@ body.fac-locked :is(#pp-form, #pp-assets, #doc-form, #profile-form) { opacity: .
 @media (prefers-reduced-motion: reduce) { .lock-dlg[open], .lock-warn.shake { animation: none !important; } }
 .access-allow { display: grid; gap: 6px; margin-top: 12px; font-weight: 600; }
 .access-allow input { max-width: 120px; }
+
+.dd-lock { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; padding: 10px 12px; border-radius: 12px; border: 1px dashed rgba(245, 158, 11, .6); background: rgba(251, 191, 36, .1); font-size: 13px; }
+.dd-lock > span:nth-child(2) { flex: 1 1 260px; }
+.trial-locked-box .dd-global, .trial-locked-box .dd-list, .trial-locked-box .dd-details { opacity: .6; }

@@ -1253,6 +1253,21 @@ test('10q. free trial end to end: the first 2 items open as Word + PDF, everythi
     const zp = await JSZip.loadAsync(Buffer.from(await (await fetch(`${base}/api/policies/zip${q}&type=word`, opt())).arrayBuffer()));
     assert.ok(Object.keys(zp.files).filter(f => !zp.files[f].dir).every(f => firstNos.includes(PP.policyNoOf(f))), 'the ZIP holds only the free policies');
 
+    // 3rd-party documents: the first 2 vendor forms open; any further vendor form, and own dates / details, are Premium
+    const tpAll = H.installedForms('thirdparty').map(d => d.key);
+    assert.ok(plan.included.thirdparty.length <= 2 && plan.included.thirdparty.every(k => H.HR_FORMS.find(f => f.key === k)?.group === 'thirdparty'));
+    assert.deepEqual(plan.included.thirdparty, (tpAll.length ? tpAll : H.HR_FORMS.filter(f => f.group === 'thirdparty').map(f => f.key)).slice(0, 2), 'the first two vendor forms');
+    if (tpAll.length) {
+      const tw = await fetch(`${base}/api/hr/forms/${tpAll[0]}${q}&format=docx`, opt());
+      assert.equal(tw.status, 200, 'the first vendor form downloads as Word');
+      if (tpAll[2]) assert.equal((await fetch(`${base}/api/hr/forms/${tpAll[2]}${q}&format=docx`, opt())).status, 402, 'a third vendor form is locked');
+    }
+    for (const body of [{ group: 'thirdparty', date: '2026-01-01' }, { key: H.HR_FORMS.find(f => f.group === 'thirdparty').key, date: '2026-01-01' }]) {
+      const r = await fetch(`${base}/api/hr/documents${q}`, opt({ method: 'PUT', body: JSON.stringify(body) }));
+      assert.equal(r.status, 402, `3rd-party settings are Premium: ${JSON.stringify(body)}`); assert.equal((await r.json()).upgrade, true);
+    }
+    assert.notEqual((await fetch(`${base}/api/hr/documents${q}`, opt({ method: 'PUT', body: '{"group":"training","date":""}' }))).status, 402, 'the training date stays open (the New facility wizard sets it)');
+
     // HR forms: the first 2 open as Word (PDF too where Word is installed); the next one is the gateway
     if (H.installedForms('hr').length > 2) {
       const [k1] = plan.included.hr;
