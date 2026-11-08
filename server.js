@@ -621,7 +621,7 @@ app.post('/api/facilities/:id/documents/analyze', express.raw({ type: () => true
   const counted = claimUpload(req.user, req.body); // free trial: the first 2 different documents are previewed, then Premium
   const token = crypto.randomUUID();
   const r = await analyzeDocument(req.params.id, req.body, String(req.query.name || 'document.pdf'), token);
-  counted(r?.token || token);
+  counted(r?.token || token, r?.row ?? null, r?.confidence);
   res.json(r);
 }));
 

@@ -111,25 +111,31 @@ export function claimUpload(user, buffer) {
   const seen0 = new Set(loadUsers().users.find(x => x.id === user.id)?.usage?.uploads || []);
   if (!seen0.has(hash) && seen0.size >= TRIAL_UPLOADS) throw upgradeError(`The free trial previews ${TRIAL_UPLOADS} uploaded documents – further documents are part of Premium`, { kind: 'uploads', limit: TRIAL_UPLOADS });
   // token: the id of this reading – only documents read this way can be applied to the register on the trial
-  return token => {
+  // token: the id of this reading; row / confidence: the entry it was recognised as – a trial user can apply the
+  // document only to that entry (a confident match is never moved to another row)
+  return (token, row = null, confidence = 'none') => {
     const data = loadUsers();
     const u = data.users.find(x => x.id === user.id);
     if (!u) return;
     const seen = new Set(u.usage?.uploads || []);
     if (seen.size >= TRIAL_UPLOADS && !seen.has(hash)) return; // (another upload took the last preview meanwhile)
     seen.add(hash);
-    const tokens = [...(u.usage?.uploadTokens || []), ...(token ? [token] : [])].slice(-50);
+    const old = (u.usage?.uploadTokens || []).map(t => (typeof t === 'string' ? { t } : t));
+    const tokens = [...old, ...(token ? [{ t: token, row: row ?? null, sure: ['high', 'medium'].includes(confidence) }] : [])].slice(-50);
     u.usage = { ...(u.usage || {}), uploads: [...seen], uploadTokens: tokens };
     saveUsers(data);
   };
 }
-/** Free trial: may these documents be applied to the LEGAL REGISTER? At most 2, and only free previews of this user. */
+/** Free trial: may these documents be applied to the LEGAL REGISTER? At most 2, only free previews of this user,
+ *  and each one to the entry it was recognised as (only a reading without a sure match may be placed by hand). */
 export function checkTrialApply(user, items) {
   if (!isTrial(user)) return;
-  const tokens = new Set(loadUsers().users.find(x => x.id === user.id)?.usage?.uploadTokens || []);
-  if (items.length > TRIAL_UPLOADS || items.some(i => !tokens.has(String(i.token || '')))) {
+  const recs = new Map((loadUsers().users.find(x => x.id === user.id)?.usage?.uploadTokens || []).map(t => (typeof t === 'string' ? [t, { t }] : [t.t, t])));
+  if (items.length > TRIAL_UPLOADS || items.some(i => !recs.has(String(i.token || '')))) {
     throw upgradeError(`The free trial applies ${TRIAL_UPLOADS} documents to the LEGAL REGISTER – applying all documents is part of Premium`, { kind: 'uploads', limit: TRIAL_UPLOADS });
   }
+  const moved = items.find(i => { const r = recs.get(String(i.token)); return r.sure && r.row != null && Number(i.row) !== Number(r.row); });
+  if (moved) throw Object.assign(new Error(`${moved.file || 'This document'} was recognised as another LEGAL REGISTER entry – it can only be applied to that entry.`), { status: 400 });
 }
 export const uploadsUsed = user => (loadUsers().users.find(x => x.id === user?.id)?.usage?.uploads || []).length;
 

@@ -1091,10 +1091,13 @@ async function analyzeFiles(files, forRow = null) {
       const d = await res.json();
       if (res.status === 402 && d.upgrade) { Object.assign(slot, { pending: false, locked: true, include: false }); trialFull = true; } // free trial: beyond the first 2
       else if (!res.ok) throw new Error(d.error);
-      else Object.assign(slot, d, { pending: false, include: !!d.row });
-      if (slot.row && master?.items?.find(x => x.row === slot.row)?.locked) { // free trial: matched to a locked entry
-        Object.assign(slot, { row: null, include: false, warnings: [...(slot.warnings || []), 'This matches a LEGAL REGISTER entry that is part of Premium – choose one of your free entries, or Get Premium.'] });
+      else {
+        const sure = ['high', 'medium'].includes(d.confidence);
+        // a low-confidence reading is never ticked by itself: the best guess is only suggested in the list
+        Object.assign(slot, d, { pending: false, include: !!d.row && sure, row: sure ? d.row : null, suggest: sure ? null : d.row || null, sure });
       }
+      // free trial: recognised as an entry that is part of Premium – it stays with that entry (never moved to another row)
+      if (slot.sure && slot.row && master?.items?.find(x => x.row === slot.row)?.locked) Object.assign(slot, { lockedMatch: true, include: false });
       if (forRow) Object.assign(slot, { row: forRow, include: true }); // added from that entry: it belongs there
     } catch (e) { Object.assign(slot, { pending: false, error: e.message, include: false }); }
     parsing = Math.max(0, parsing - 1); renderHome();
@@ -1104,18 +1107,20 @@ async function analyzeFiles(files, forRow = null) {
 
 const docLife = r => r.lifetime || isLifetimeName((master?.items || []).find(i => i.row === r.row)?.name);
 function renderDocs() {
-  const options = r => `<option value="">— skip —</option>` + (master?.items || []).filter(i => !i.fixed && !i.locked)
-    .map(i => `<option value="${i.row}"${i.row === r.row ? ' selected' : ''}>${esc(i.name)}</option>`).join('');
+  const options = r => `<option value="">${r.suggest ? '— choose the entry —' : '— skip —'}</option>` + (master?.items || []).filter(i => !i.fixed && !i.locked)
+    .sort((a, b) => (b.row === r.suggest) - (a.row === r.suggest)) // the suggestion first
+    .map(i => `<option value="${i.row}"${i.row === r.row ? ' selected' : ''}>${esc(i.name)}${i.row === r.suggest ? '  (suggested)' : ''}</option>`).join('');
   $('#docs-result').innerHTML = docResults.length ? `<div class="table-wrap flat"><table class="docs-table"><thead><tr>
       <th></th><th>Document</th><th>Recognised as</th><th>Register entry</th><th>Issued</th><th>Expiry</th><th>Due</th><th>Notes</th></tr></thead><tbody>
     ${docResults.map((r, k) => r.pending ? `<tr><td></td><td class="file">${esc(r.file)}</td><td colspan="6"><span class="spin"></span> Reading…</td></tr>`
+      : r.lockedMatch ? `<tr class="trial-locked"><td>🔒</td><td class="file">${esc(r.file)}</td><td>${esc(r.typeLabel)}<br><span class="conf ${r.confidence}">${r.confidence} confidence</span></td><td colspan="5"><span class="tag lock-tag">Premium</span> <span class="lock-msg">Recognised as <b>${esc(r.entryName || r.typeLabel)}</b> – that LEGAL REGISTER entry is part of Premium, so this document cannot be applied to another entry.</span> <button type="button" class="icon-btn premium-mini" data-up>🔒 Get Premium</button></td></tr>`
       : r.locked ? `<tr class="trial-locked"><td>🔒</td><td class="file"><span class="blur-txt" aria-hidden="true">${esc(r.file)}</span><span class="sr-only">Locked document – part of Premium</span></td><td colspan="6"><span class="tag lock-tag">Premium</span> <span class="lock-msg">The free trial previews ${planState?.limits?.uploads || 2} uploaded documents – this one is part of Premium</span> <button type="button" class="icon-btn premium-mini" data-up>🔒 Get Premium</button></td></tr>`
       : r.error ? `<tr><td></td><td class="file">${esc(r.file)}</td><td colspan="6" class="notes">${esc(r.error)}</td></tr>`
       : `<tr data-k="${k}">
         <td><input type="checkbox" data-f="include" ${r.include ? 'checked' : ''}></td>
         <td class="file">${esc(r.file)}${r.ocr ? '<br><span class="tag na">scanned – OCR</span>' : ''}</td>
         <td>${esc(r.typeLabel)}<br><span class="conf ${r.confidence}">${r.confidence} confidence</span></td>
-        <td><select data-f="row">${options(r)}</select>${r.current ? `<div class="ev">now: ${esc(fmtDay(r.current.issued) || '—')} → ${esc(fmtDay(r.current.expiry) || '—')}</div>` : ''}</td>
+        <td><select data-f="row"${planState?.included && r.sure ? ' disabled title="Recognised for this entry"' : ''}>${options(r)}</select>${r.suggest && !r.row ? '<div class="ev warn-txt">Not sure – choose the entry (best guess marked “suggested”)</div>' : ''}${r.current ? `<div class="ev">now: ${esc(fmtDay(r.current.issued) || '—')} → ${esc(fmtDay(r.current.expiry) || '—')}</div>` : ''}</td>
         <td><input type="date" data-f="issued" value="${esc(r.issued)}"></td>
         ${docLife(r) ? `<td>${LIFETIME_CELL}</td><td><span class="date empty">—</span></td>` : `<td><input type="date" data-f="expiry" value="${esc(r.expiry)}"></td>
         <td><input type="date" data-f="due" value="${esc(r.due)}"></td>`}

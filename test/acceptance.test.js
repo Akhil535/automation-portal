@@ -1317,7 +1317,7 @@ test('10q. free trial end to end: the first 2 items open as Word + PDF, everythi
     const d1 = await docx('Trade Licence. Issue date 01/01/2026. Expiry date 31/12/2026.'), d2 = await docx('Civil Defence certificate. Issued 05/02/2026. Valid until 04/02/2027.'), d3 = await docx('Medical waste contract from 01/03/2026 to 28/02/2027.');
     const r1 = await upload(d1, 'licence.docx'), r2 = await upload(d2, 'civil-defence.docx');
     assert.notEqual(r1.status, 402, 'first document previewed'); assert.notEqual(r2.status, 402, 'second document previewed');
-    const t1 = (await r1.json()).token, t2 = (await r2.json()).token;
+    const j1 = await r1.json(), j2 = await r2.json(), t1 = j1.token, t2 = j2.token;
     const u3 = await upload(d3, 'waste.docx');
     assert.equal(u3.status, 402, 'a third document is Premium'); assert.equal((await u3.json()).info?.kind, 'uploads');
     assert.notEqual((await upload(d1, 'licence-again.docx')).status, 402, 'the same document again is fine');
@@ -1328,6 +1328,14 @@ test('10q. free trial end to end: the first 2 items open as Word + PDF, everythi
     const it = (token, k) => ({ token, file: 'x.docx', row: reg[k]?.row, issued: '2026-01-01', expiry: '2026-12-31', due: '2027-01-01' });
     assert.equal((await apply([it('not-my-upload', 0)])).status, 402, 'a document that was not a free preview');
     assert.equal((await apply([it(t1, 0), it(t2, 1), it(t1, 2)])).status, 402, 'more than 2 documents');
+    // a document recognised for one entry is never applied to another (the DED → MCC / MCC → DoH mix-up)
+    for (const [j, t] of [[j1, t1], [j2, t2]]) {
+      if (!['high', 'medium'].includes(j.confidence) || !j.row) continue;
+      const other = reg.find(x => x.row !== j.row && !x.locked);
+      if (!other) continue;
+      const rr = await apply([{ token: t, file: 'x.docx', row: other.row, issued: '2026-01-01', expiry: '2026-12-31', due: '2027-01-01' }]);
+      assert.equal(rr.status, 400, 'moved to another entry: refused'); assert.match((await rr.json()).error, /recognised as another LEGAL REGISTER entry/);
+    }
     // the register table: the first 2 entries are shown and can be edited; SL 3 onwards is masked and locked
     const full = await (await import('../src/master.js')).readMaster(loadConfig(id));
     const mm = await (await fetch(`${base}/api/master${q}`, opt())).json();
