@@ -3734,3 +3734,9 @@ body.fac-locked :is(#pp-form, #pp-assets, #doc-form, #profile-form) { opacity: .
    Downloads page). Viewing the register and its documents stays. */
 body.trial :is(#qa-excel, #qa-pdf, #lnk-download, #btn-export-more, #lnk-export, #ex-reg-xlsx, #ex-reg-pdf, #ex-reg-print, #ex-doh-xlsx, #ex-doh-report) { display: none !important; }
 body.trial .ex-card:has(#ex-reg-xlsx), body.trial .ex-card:has(#ex-doh-xlsx) { display: none !important; }
+
+/* upload window: file names on a readable width; the locked-row message beside its button */
+.docs-table td.file { min-width: 190px; word-break: normal; overflow-wrap: break-word; }
+.docs-table tr.trial-locked td[colspan] { white-space: normal; }
+.docs-table tr.trial-locked .lock-msg { margin: 0 10px 0 6px; color: var(--muted); font-size: 13.5px; }
+.docs-table tr.trial-locked td:first-child { font-size: 16px; }

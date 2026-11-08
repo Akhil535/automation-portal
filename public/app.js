@@ -1087,7 +1087,7 @@ function renderDocs() {
   $('#docs-result').innerHTML = docResults.length ? `<div class="table-wrap flat"><table class="docs-table"><thead><tr>
       <th></th><th>Document</th><th>Recognised as</th><th>Register entry</th><th>Issued</th><th>Expiry</th><th>Due</th><th>Notes</th></tr></thead><tbody>
     ${docResults.map((r, k) => r.pending ? `<tr><td></td><td class="file">${esc(r.file)}</td><td colspan="6"><span class="spin"></span> Reading…</td></tr>`
-      : r.locked ? `<tr class="trial-locked"><td>🔒</td><td class="file">${esc(r.file)}</td><td colspan="6"><span class="tag lock-tag">Premium</span> <span class="muted small">The free trial previews ${planState?.limits?.uploads || 2} uploaded documents – this one is part of Premium.</span> <button type="button" class="icon-btn premium-mini" data-up>🔒 Get Premium</button></td></tr>`
+      : r.locked ? `<tr class="trial-locked"><td>🔒</td><td class="file">${esc(r.file)}</td><td colspan="6"><span class="tag lock-tag">Premium</span> <span class="lock-msg">The free trial previews ${planState?.limits?.uploads || 2} uploaded documents – this one is part of Premium</span> <button type="button" class="icon-btn premium-mini" data-up>🔒 Get Premium</button></td></tr>`
       : r.error ? `<tr><td></td><td class="file">${esc(r.file)}</td><td colspan="6" class="notes">${esc(r.error)}</td></tr>`
       : `<tr data-k="${k}">
         <td><input type="checkbox" data-f="include" ${r.include ? 'checked' : ''}></td>
