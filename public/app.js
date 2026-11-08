@@ -1501,7 +1501,7 @@ async function loadUsersPanel() {
   $('#users-tbl tbody').innerHTML = users.map(x => `<tr>
     <td><b>${esc(x.username)}${x.id === me.id ? '<span class="users-me">you</span>' : ''}</b><span class="muted small" title="${esc(x.email || '')}">${esc(x.email || 'no e-mail')}</span></td>
     <td><select data-uid="${x.id}" data-f="role">${['admin', 'manager', 'viewer'].map(r => `<option value="${r}"${r === x.role ? ' selected' : ''}>${ROLE_LABEL[r]}</option>`).join('')}</select></td>
-    <td>${x.role === 'admin' ? '<span class="tag ok">Premium</span>' : `<select data-uid="${x.id}" data-f="plan" aria-label="Plan"><option value="trial"${x.plan === 'trial' ? ' selected' : ''}>Free trial</option><option value="premium"${x.plan === 'premium' ? ' selected' : ''}>Premium</option></select>${x.plan === 'trial' ? `<br><span class="muted small">Used: ${x.usage.policies} policies · ${x.usage.hr} HR · ${x.usage.thirdparty} vendor</span>` : ''}${x.premiumRequest ? '<br><span class="tag warn">Asked for Premium</span>' : ''}`}</td>
+    <td>${x.role === 'admin' ? '<span class="tag ok">Premium</span>' : `<select data-uid="${x.id}" data-f="plan" aria-label="Plan"><option value="trial"${x.plan === 'trial' ? ' selected' : ''}>Free trial</option><option value="premium"${x.plan === 'premium' ? ' selected' : ''}>Premium</option></select>${x.plan === 'trial' ? '<br><span class="muted small">Trial limits apply</span>' : ''}${x.premiumRequest ? '<br><span class="tag warn">Asked for Premium</span>' : ''}`}</td>
     <td class="small">${scope(x)}${x.role === 'admin' ? '' : `<button type="button" class="link-btn small scope-edit" data-act="access" data-uid="${x.id}">Change access</button>`}</td>
     <td>${x.twoFactor ? '<span class="tag ok">On</span>' : '<span class="tag warn">At next sign-in</span>'}${x.locked ? ' <span class="tag bad">Locked</span>' : ''}${x.mustChangePassword ? ' <span class="tag na">Temp. password</span>' : ''}</td>
     <td class="num">${x.lastLogin ? fmt(x.lastLogin) : 'Never'}</td>
@@ -1727,6 +1727,11 @@ function renderPolicies() {
     const r = results.find(x => x.no === no);
     const pdf = files.pdf.find(p => p.replace(/\.pdf$/, '') === w.replace(/\.docx$/, ''));
     const filled = r ? r.report.filled.map(k => PP_FIELD[k] || k) : null;
+    if (trialLocked('policies', no)) { // free trial: only the first policies open – the rest are locked
+      return `<tr class="trial-locked"><td class="name"><span class="lock-ic" aria-hidden="true">🔒</span>${esc(w.replace(/\.docx$/, ''))}</td><td>${esc(r?.version || '')}</td>
+        <td class="small"><span class="muted">Part of Premium</span></td>
+        <td><div class="row-actions"><button type="button" class="icon-btn premium-mini" data-up>🔒 Get Premium</button></div></td></tr>`;
+    }
     return `<tr><td class="name">${esc(w.replace(/\.docx$/, ''))}</td><td>${esc(r?.version || '')}</td>
       <td class="small">${filled ? `${filled.length} items${r.report.missing.length ? ` · <span class="warn-txt">not found: ${r.report.missing.map(k => PP_FIELD[k] || k).join(', ')}</span>` : ''}${r.report.nameReplaced ? ` · name replaced ${r.report.nameReplaced}×` : ''}` : '<span class="muted">–</span>'}</td>
       <td><div class="row-actions"><a class="icon-btn" href="${u(`/api/policies/file?type=word&name=${encodeURIComponent(w)}`)}">Word</a>${pdf ? `<a class="icon-btn" target="_blank" data-view="${esc(pdf.replace(/\.pdf$/, ''))}" href="${u(`/api/policies/file?type=pdf&inline=1&name=${encodeURIComponent(pdf)}`)}">⤢ PDF</a>` : ''}</div></td></tr>`;
@@ -2570,6 +2575,14 @@ function renderDocCards(sel, forms) {
   box.innerHTML = forms.map(f => {
     const nn = String(f.no).padStart(2, '0');
     const ok = f.installed && !f.need.length;
+    if (f.installed && trialLocked(f.group === 'thirdparty' ? 'thirdparty' : 'hr', f.key)) { // free trial: locked
+      return `<div class="hr-form trial-locked">
+      <div class="hr-form-top"><span class="hr-no">Ref. No. ${esc(hrData.facility.code)}/${f.series}/FORM-${nn}</span><span class="tag lock-tag">🔒 Premium</span></div>
+      <b>${esc(f.title)}</b>
+      <small class="muted">Part of Premium – the free trial includes the first ${planState.limits[f.group === 'thirdparty' ? 'thirdparty' : 'hr']} documents.</small>
+      <div class="btn-row"><button type="button" class="btn small premium-btn" data-up>🔒 Get Premium</button></div>
+    </div>`;
+    }
     return `<div class="hr-form${ok ? '' : ' off'}">
       <div class="hr-form-top"><span class="hr-no" title="Reference number printed in the header of this document">Ref. No. ${esc(hrData.facility.code)}/${f.series}/FORM-${nn}</span>${f.policy ? `<span class="tag na" title="Same Policy ID, dates, people and version as the Acceptable Usage Policy">Follows PO${String(f.policy).padStart(2, '0')}</span>` : ''}</div>
       <b>${esc(f.title)}</b>
@@ -2847,6 +2860,15 @@ $('#pp-to-hr').onclick = () => showTab('hr');
 // Trial users see a plan chip, a lock on the LEGAL REGISTER, and locked files on the Downloads page.
 // ===================================================================================================
 var planState = null; // var: may be read before this line runs
+/** Free trial: is this document locked? (kind: policies | hr | thirdparty; id: policy number or form key) */
+function trialLocked(kind, id) { const inc = planState?.included?.[kind]; return !!inc && !inc.includes(String(id)); }
+// every lock / Get Premium button opens the upgrade gateway – and nothing else happens
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-up]');
+  if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  showUpgrade();
+}, true);
 (() => {
   const realFetch = window.fetch.bind(window);
   window.fetch = async (...args) => {
@@ -2889,8 +2911,10 @@ var planState = null; // var: may be read before this line runs
     const meters = () => {
       const p = planState;
       $('#up-meters').innerHTML = p?.limits ? Object.keys(KIND).map(k => {
-        const used = Array.isArray(p.usage[k]) ? p.usage[k].length : p.usage[k] || 0, lim = p.limits[k];
-        return `<div class="up-meter${used >= lim ? ' full' : ''}"><span>${KIND[k]}</span><b>${Math.min(used, lim)} / ${lim}</b><i style="--w:${lim ? Math.min(100, (used / lim) * 100) : 100}%"></i></div>`;
+        const lim = p.limits[k];
+        if (k !== 'facilities') return `<div class="up-meter"><span>${KIND[k]}</span><b>First ${lim} included · rest 🔒</b><i style="--w:100%"></i></div>`;
+        const used = p.usage.facilities || 0;
+        return `<div class="up-meter${used >= lim ? ' full' : ''}"><span>${KIND[k]}</span><b>${Math.min(used, lim)} / ${lim} created</b><i style="--w:${lim ? Math.min(100, (used / lim) * 100) : 100}%"></i></div>`;
       }).join('') + '<div class="up-meter up-locked"><span>LEGAL REGISTER</span><b>🔒 Preview</b><i style="--w:100%"></i></div>' : '';
       const sent = !!me?.premiumRequest, url = planState?.upgradeUrl;
       $('#up-msg').textContent = sent && !url ? 'Premium requested – an administrator will upgrade your account.' : '';
@@ -2926,13 +2950,18 @@ var planState = null; // var: may be read before this line runs
   $('#plan-chip').onclick = () => showUpgrade();
 
   window.refreshPlan = async function refreshPlan() {
+    const before = JSON.stringify(planState?.included || null);
     try { planState = await apiGlobal('/api/plan'); } catch { return; }
     const trial = planState.plan === 'trial';
+    if (JSON.stringify(planState.included || null) !== before) { // locks changed (first load, or upgraded): draw the pages again
+      try { if (pp && !pp.newPackOnly) renderPolicies(); } catch { /* page not loaded */ }
+      try { if (hrData) { renderHr(); renderThirdParty(); } } catch { /* page not loaded */ }
+    }
     document.body.classList.toggle('trial', trial);
     $('#plan-chip').hidden = !trial;
     if (trial) {
       const l = planState.limits, us = planState.usage;
-      $('#plan-chip').title = `Free trial: ${us.policies.length}/${l.policies} policies · ${us.hr.length}/${l.hr} HR documents · ${us.thirdparty.length}/${l.thirdparty} 3rd-party documents · LEGAL REGISTER preview`;
+      $('#plan-chip').title = `Free trial: the first ${l.policies} policies, ${l.hr} HR and ${l.thirdparty} 3rd-party documents · ${us.facilities}/${l.facilities} facilities · LEGAL REGISTER preview`;
       if (!$('#trial-reg')) $('#master')?.insertAdjacentHTML('afterbegin', '<div class="trial-lock" id="trial-reg"><span class="tl-ic" aria-hidden="true">🔒</span><div><b>Preview – locked on the free trial</b><span>You can look around the LEGAL REGISTER. Editing, renewals, weekly DoH updates and register downloads are part of Premium.</span></div><button type="button" class="btn primary small" data-up>Get Premium</button></div>');
       $$('[data-up]').forEach(b => { b.onclick = () => showUpgrade(); });
     } else $('#trial-reg')?.remove();

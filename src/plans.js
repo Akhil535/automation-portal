@@ -4,8 +4,10 @@
 //   premium – everything. Administrators are always premium.
 // A trial user "claims" a document the first time they create, view or download it; the same documents can be
 // opened again and again, new ones only while slots remain. Then the portal asks them to upgrade (HTTP 402).
-import { loadUsers, saveUsers } from './auth.js';
+import { loadUsers } from './auth.js';
 import { loadFacilities, loadGlobalConfig, saveConfig } from './config.js';
+import { HR_FORMS, installedForms } from './hrforms.js';
+import { listTemplates } from './policyprep.js';
 
 export const DEFAULT_LIMITS = Object.freeze({ policies: 2, hr: 2, thirdparty: 2, facilities: 2 });
 export const KIND_LABEL = { policies: 'policies', hr: 'HR documents', thirdparty: '3rd-party documents', facilities: 'facility' };
@@ -45,17 +47,30 @@ export const isTrial = u => planOf(u) === 'trial';
 export function upgradeError(message, info = {}) {
   return Object.assign(new Error(`${message} – ${UPGRADE_TEXT}.`), { status: 402, upgrade: true, info });
 }
-const usedOf = (u, kind) => new Set((u?.usage?.[kind] || []).map(String));
+/**
+ * The documents a trial includes: the FIRST items of each module, always the same ones – policies PO01, PO02 (by
+ * policy number), the first HR / training forms and the first vendor forms in the order the portal lists them.
+ * Everything after them is locked (shown with a lock; opening or downloading it opens the upgrade gateway).
+ */
+export function includedIds(kind, limit = trialLimits()[kind]) {
+  if (kind === 'policies') {
+    const nos = listTemplates().map(t => t.no).sort((a, b) => a - b);
+    return (nos.length ? nos : Array.from({ length: limit }, (_, i) => i + 1)).slice(0, limit).map(String);
+  }
+  const group = kind === 'thirdparty' ? 'thirdparty' : 'hr';
+  const inGroup = d => (group === 'thirdparty' ? d.group === 'thirdparty' : d.group !== 'thirdparty');
+  const installed = installedForms().filter(inGroup);
+  return (installed.length ? installed : HR_FORMS.filter(inGroup)).slice(0, limit).map(d => d.key);
+}
 
-/** What a trial user has used so far, and the limits. */
+/** What the trial includes (the same for every trial account), and the limits. */
 export function planInfo(user) {
   const plan = planOf(user);
-  if (plan === 'premium') return { plan, limits: null, usage: null, locked: [], upgradeUrl: upgradeUrl() };
-  const u = loadUsers().users.find(x => x.id === user.id);
+  if (plan === 'premium') return { plan, limits: null, usage: null, included: null, locked: [], upgradeUrl: upgradeUrl() };
   const limits = trialLimits();
-  const usage = Object.fromEntries(['policies', 'hr', 'thirdparty'].map(k => [k, [...usedOf(u, k)]]));
-  usage.facilities = createdFacilities(user.username).length;
-  return { plan, limits, usage, locked: ['register', 'doh', 'registerDownloads'], upgradeText: UPGRADE_TEXT, upgradeUrl: upgradeUrl() };
+  const included = Object.fromEntries(['policies', 'hr', 'thirdparty'].map(k => [k, includedIds(k, limits[k])]));
+  const usage = { ...included, facilities: createdFacilities(user.username).length };
+  return { plan, limits, usage, included, locked: ['register', 'doh', 'registerDownloads'], upgradeText: UPGRADE_TEXT, upgradeUrl: upgradeUrl() };
 }
 
 /** Facilities this user created (the master template never counts). */
@@ -64,29 +79,23 @@ export function createdFacilities(username) {
   return list.filter(f => f.id !== templateId && f.createdBy && f.createdBy === username);
 }
 
-/** Documents a trial user may get now: those already claimed, plus new ones (in the order given) while slots remain.
- *  Premium: everything (null). Throws the upgrade error when nothing is left. */
+const label = (kind, id) => (kind === 'policies' ? `PO${String(id).padStart(2, '0')}` : HR_FORMS.find(f => f.key === id)?.title || id);
+
+/** Of the documents asked for, those the trial includes (premium: null = all). None included → the upgrade error. */
 export function claim(user, kind, ids, { quiet = false } = {}) {
   if (!isTrial(user)) return null;
-  const data = loadUsers();
-  const u = data.users.find(x => x.id === user.id);
-  if (!u) throw upgradeError('Unknown account');
-  const used = usedOf(u, kind), limit = trialLimits()[kind];
-  const ok = [];
-  for (const id of ids.map(String)) {
-    if (used.has(id)) ok.push(id);
-    else if (used.size < limit) { used.add(id); ok.push(id); }
+  const inc = new Set(includedIds(kind));
+  const ok = new Set(ids.map(String).filter(id => inc.has(id)));
+  if (!ok.size && !quiet) {
+    const what = ids.length === 1 ? `${label(kind, String(ids[0]))} is part of Premium` : `These ${KIND_LABEL[kind]} are part of Premium`;
+    throw upgradeError(`${what}. The free trial includes ${[...inc].map(i => label(kind, i)).join(' and ') || `${inc.size} ${KIND_LABEL[kind]}`}`, { kind, included: [...inc] });
   }
-  u.usage = { ...(u.usage || {}), [kind]: [...used] };
-  saveUsers(data);
-  if (!ok.length && !quiet) throw upgradeError(`The free trial includes ${limit} ${KIND_LABEL[kind]} (${[...used].join(', ') || 'none'} used)`, { kind, limit, used: [...used] });
-  return new Set(ok);
+  return ok;
 }
 
-/** Documents a trial user already has (no new claims): null = premium (all). */
+/** The documents of a module the trial includes: null = premium (all). */
 export function allowedSet(user, kind) {
-  if (!isTrial(user)) return null;
-  return usedOf(loadUsers().users.find(x => x.id === user.id), kind);
+  return isTrial(user) ? new Set(includedIds(kind)) : null;
 }
 
 /** A facility whose owner is on the trial is not monitored (its LEGAL REGISTER is a preview that is not updated). */

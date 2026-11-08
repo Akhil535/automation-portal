@@ -3672,3 +3672,14 @@ body.trial #master .register, body.trial #master table { filter: saturate(.75); 
 #welcome-form .row3 { margin-top: 10px; }
 .welcome-dlg { overflow-x: hidden !important; overflow-y: auto !important; }
 .welcome-dlg form { overflow: hidden; }
+
+/* Free trial: locked items (beyond the first ones of each module) */
+tr.trial-locked td { color: var(--muted); }
+tr.trial-locked .name { opacity: .8; }
+.lock-ic { margin-right: 6px; }
+.icon-btn.premium-mini { background: rgba(251, 191, 36, .16) !important; border-color: rgba(245, 158, 11, .5) !important; color: #b45309 !important; font-weight: 800; white-space: nowrap; }
+:root[data-theme="dark"] .icon-btn.premium-mini { color: #fcd34d !important; }
+.hr-form.trial-locked { position: relative; border-style: dashed !important; background: repeating-linear-gradient(135deg, transparent 0 14px, rgba(148, 163, 184, .06) 14px 28px), var(--panel) !important; }
+.hr-form.trial-locked b { opacity: .75; }
+.hr-form.trial-locked .lock-tag { background: rgba(251, 191, 36, .18) !important; color: #b45309 !important; border: 1px solid rgba(245, 158, 11, .45); }
+:root[data-theme="dark"] .hr-form.trial-locked .lock-tag { color: #fcd34d !important; }

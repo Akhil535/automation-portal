@@ -540,7 +540,7 @@ test('10f. weekly runs read recent circulars only; full sweep when forced; PDF s
 test('10g. security: sign-in with password + 2FA, lockout, roles and facility access (separate test server)', async () => {
   const A = await import('../src/auth.js');
   const port = 18000 + Math.floor(Math.random() * 1000);
-  const srv = spawn(process.execPath, ['--use-system-ca', path.join(APP, 'server.js'), '--no-scheduler'],
+  let srv = spawn(process.execPath, ['--use-system-ca', path.join(APP, 'server.js'), '--no-scheduler'],
     { env: { ...process.env, DOH_PORTAL_CONFIG: cfgPath, DOH_PORTAL_PORT: String(port), DOH_PORTAL_HOST: '127.0.0.1' }, stdio: process.env.SHOW_SRV ? 'inherit' : 'ignore' });
   const base = `http://127.0.0.1:${port}`;
   try {
@@ -720,7 +720,12 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
     // asking for Premium, and the administrator upgrades: no limits, the register opens, the pack holds it
     assert.equal((await post('/api/plan/request', { note: 'please' }, newbieCookie)).status, 200);
     const asked = (await (await fetch(`${base}/api/users`, { headers: { Cookie: adminCookie } })).json()).users.find(x => x.username === 'newbie');
-    assert.ok(asked.premiumRequest?.at); assert.equal(asked.usage.policies, 2);
+    assert.ok(asked.premiumRequest?.at);
+    // the trial includes the FIRST items of each module – always the same ones
+    const inc = (await (await fetch(`${base}/api/plan`, nb)).json()).included;
+    assert.deepEqual(inc.policies, ['1', '2'], 'PO01 and PO02');
+    assert.equal(inc.hr.length, 2); assert.equal(inc.thirdparty.length, 2);
+    assert.deepEqual([...P.claim(nbUser, 'policies', [5, 1, 9])], ['1'], 'only the included ones of a request');
     assert.equal((await put('/api/plans', { trial: { policies: -1 } }, newbieCookie)).status, 403, 'only admins set the limits');
     assert.equal((await put('/api/plans', { trial: { policies: -1 } }, adminCookie)).status, 400);
     assert.equal((await put(`/api/users/${asked.id}`, { plan: 'premium' }, adminCookie)).status, 200);
@@ -740,6 +745,16 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
     assert.equal((await fetch(`${base}/api/facilities/${mgrId}`, { method: 'DELETE', headers: { Cookie: adminCookie } })).status, 200, 'admin removes it');
     assert.equal((await fetch(`${base}/api/facilities/${secondId}`, { method: 'DELETE', headers: { Cookie: adminCookie } })).status, 200);
     assert.equal((await put('/api/facilities-template', { id: null }, adminCookie)).status, 200);
+
+    // restarting the portal does not sign anyone out (sessions are kept on disk – only a hash of each id)
+    srv.kill(); await new Promise(r => (srv.exitCode !== null ? r() : srv.once('exit', r)));
+    srv = spawn(process.execPath, ['--use-system-ca', path.join(APP, 'server.js'), '--no-scheduler'],
+      { env: { ...process.env, DOH_PORTAL_CONFIG: cfgPath, DOH_PORTAL_PORT: String(port), DOH_PORTAL_HOST: '127.0.0.1' }, stdio: 'ignore' });
+    for (let i = 0; i < 60; i++) { try { await fetch(`${base}/api/auth/state`); break; } catch { await new Promise(r => setTimeout(r, 250)); } }
+    assert.equal((await fetch(`${base}/api/me`, { headers: { Cookie: adminCookie } })).status, 200, 'still signed in after a restart');
+    const { dir: cdir, loadGlobalConfig: lgc } = await import('../src/config.js');
+    const sessFile = fs.readFileSync(path.join(cdir(lgc(), 'data'), 'sessions.json'), 'utf8');
+    assert.ok(!sessFile.includes(adminCookie.split('=')[1]), 'the session id itself is not stored');
 
     // 5 wrong passwords lock the account
     for (let i = 0; i < 5; i++) await post('/api/auth/login', { username: 'viewer1', password: 'wrong-password-1' });

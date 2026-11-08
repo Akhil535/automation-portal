@@ -194,7 +194,39 @@ export function verifyTotp(secret, code, t = Date.now()) {
 // Login flow: password -> (change password) -> (enrol authenticator) -> one-time code -> session
 // ---------------------------------------------------------------------------------------------------
 const pending = new Map();   // token -> { userId, stage, expires, enrolSecret?, emailOtp? }
-const sessions = new Map();  // sid -> { userId, expires }
+/**
+ * Signed-in sessions, kept on disk (data/sessions.json) so a portal restart – an update, or Windows restarting the
+ * service – does not sign everyone out. Only a SHA-256 of each session id is stored: the file cannot be used to
+ * sign in. Expired sessions are dropped when the file is read and written.
+ */
+const sessions = (() => {
+  const file = () => path.join(dir(loadGlobalConfig(), 'data'), 'sessions.json');
+  const h = sid => crypto.createHash('sha256').update(String(sid)).digest('hex');
+  let map = null, timer = null;
+  const load = () => {
+    if (map) return map;
+    map = new Map();
+    try { for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(file(), 'utf8')))) if (v?.expires > Date.now()) map.set(k, v); } catch { /* none yet */ }
+    return map;
+  };
+  const save = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      try {
+        const now = Date.now(), f = file(), tmp = `${f}.tmp`;
+        fs.writeFileSync(tmp, JSON.stringify(Object.fromEntries([...load()].filter(([, v]) => v.expires > now))));
+        replaceFile(tmp, f);
+      } catch (e) { console.log(`sessions not saved: ${e.message}`); }
+    }, 50);
+  };
+  return {
+    get: sid => load().get(h(sid)),
+    set: (sid, v) => { load().set(h(sid), v); save(); },
+    delete: sid => { const r = load().delete(h(sid)); if (r) save(); return r; },
+    revokeUser: userId => { let n = 0; for (const [k, s] of load()) if (s.userId === userId) { load().delete(k); n++; } if (n) save(); },
+    flush: () => { clearTimeout(timer); timer = null; },
+  };
+})();
 const newToken = () => crypto.randomBytes(32).toString('base64url');
 
 function nextStage(u) {
@@ -315,7 +347,7 @@ export function sessionUser(sid) {
   return u && u.status !== 'pending' ? publicUser(u) : null;
 }
 export const endSession = sid => sessions.delete(sid);
-export function revokeSessions(userId) { for (const [k, s] of sessions) if (s.userId === userId) sessions.delete(k); }
+export function revokeSessions(userId) { sessions.revokeUser(userId); }
 export const roleAtLeast = (user, role) => (RANK[user?.role] || 0) >= RANK[role];
 export const canFacility = (user, id) => !!user && (user.role === 'admin' || user.facilities?.includes('*') || user.facilities?.includes(id));
 
