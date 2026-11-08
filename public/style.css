@@ -4005,3 +4005,7 @@ i[class^="i-"], i[class*=" i-"] { width: 1.05em !important; height: 1.05em !impo
 /* v28c · free trial: the training / 3rd-party dates and details are Premium – values blurred and read-only */
 .trial-locked-box :is(.dd-global input, .dd-own, .dd-what small, .dd-global small, .dd-grid input, .link-btn) { filter: blur(4px); user-select: none; pointer-events: none; }
 .trial-locked-box .dd-lock { filter: none; opacity: 1; }
+
+/* v28d · active sidebar step number: a clear teal pill in both themes (dark mode had dark digits on a dark disc) */
+.sb-nav button.active .sb-step:not(.sb-live) { background: #0f766e !important; border-color: #0f766e !important; color: #fff !important; box-shadow: 0 0 0 2px rgba(255, 255, 255, .18); transition: background-color .2s, color .2s; }
+:root[data-theme="dark"] .sb-nav button.active .sb-step:not(.sb-live) { background: #2dd4bf !important; border-color: #2dd4bf !important; color: #042f2c !important; box-shadow: 0 0 0 2px rgba(45, 212, 191, .22); }

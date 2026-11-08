@@ -810,7 +810,7 @@ function renderFlow() {
     go = 'hr';
     const h = homeHr;
     if (h?.job?.running) { title = `Creating the HR documents – ${h.job.done || 0} of ${h.job.total} done`; sub = h.job.step || ''; }
-    else if (h && !h.forms.some(f => f.installed)) { title = 'Upload the master HR forms'; sub = 'An administrator adds them once on the HR & checklist page.'; }
+    else if (h && !h.forms.some(f => f.installed)) { title = 'Upload the master HR forms'; sub = 'An administrator adds them once on the HR documents page.'; }
     else if (h?.forms.some(f => f.installed && f.need.some(n => /logo/.test(n)))) { title = 'Add the facility logo'; sub = 'The HR documents carry this facility’s logo – add it under Prepare policies → Pictures.'; go = 'policies'; }
     else if (h?.generated?.count) { title = 'Check the HR documents'; sub = `${h.generated.total - h.generated.passed} of ${h.generated.total} documents need a look.`; }
     else { title = 'Create the HR & onboarding documents'; sub = 'NDA, orientation, background verification, IT/EMR form, disciplinary process, acceptable usage, exit clearance… with this facility’s name and logo.'; }
@@ -2306,7 +2306,7 @@ async function npMakeHr(q, btn) {
     $('#np-hr-progress').textContent = j.running ? `${j.done}/${j.total} · ${j.step}` : '';
     btn.innerHTML = `<span class="spin light"></span> ${j.running ? `HR document ${Math.min((j.done || 0) + 1, j.total || 1)} of ${j.total}…` : 'Finishing…'}`;
     if (!j.running) return j;
-    if (Date.now() > until) return { skipped: 'taking unusually long – check the HR & checklist page' };
+    if (Date.now() > until) return { skipped: 'taking unusually long – check the HR documents page' };
   }
 }
 /**
@@ -2435,7 +2435,7 @@ np().onsubmit = async e => {
       ${trialPack ? `<br><span class="np-trial">★ Free trial: ${st.files.word.length} of ${pp?.templates?.length || 33} policies and ${hv.count ?? 0} HR documents are included. <button type="button" class="btn small premium-btn" id="np-premium">Get Premium for the full pack</button></span>` : ''}
       ${[...(j.problems || []), ...(hr.problems || [])].length ? `<br>${[...(j.problems || []), ...(hr.problems || [])].map(esc).join('<br>')}` : ''}</div>
       <div class="btn-row"><a class="btn primary" href="/api/policies/zip?type=all&f=${encodeURIComponent(id)}"><i class=i-download></i> Policies Word + PDF (.zip)</a>${hr.skipped ? '' : `<a class="btn" href="/api/hr/zip?f=${encodeURIComponent(id)}"><i class=i-download></i> HR documents (.zip)</a>`}
-      <button type="button" class="btn" id="np-open">Open the policies</button><button type="button" class="btn" id="np-hr">Open HR &amp; checklist</button><button type="button" class="btn" id="np-register">Open the LEGAL REGISTER</button></div>`;
+      <button type="button" class="btn" id="np-open">Open the policies</button><button type="button" class="btn" id="np-hr">Open HR documents</button><button type="button" class="btn" id="np-register">Open the LEGAL REGISTER</button></div>`;
     $('#pp-new-create').hidden = true;
     await loadFacilities();
     $('#np-open').onclick = () => { $('#pp-new-dlg').close(); selectFacility(id); showTab('policies'); };
@@ -2675,8 +2675,8 @@ iso.init();
 var hrData = null, hrSection = 'hr', hrStatus = '';
 const HR_ST_CLASS = { Completed: 'ok', Pending: 'warn', 'Not applicable': 'na' };
 async function loadHr() {
-  $('#hr-xlsx').href = u('/api/hr/checklist.xlsx'); $('#hr-zip').href = u('/api/hr/zip');
-  try { hrData = await api('/api/hr'); } catch (e) { $('#hr-sum').innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
+  $('#hr-zip').href = u('/api/hr/zip');
+  try { hrData = await api('/api/hr'); } catch (e) { $('#hr-form-grid').innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
   if (!hrData.checklist.sections.some(s => s.id === hrSection)) hrSection = hrData.checklist.sections[0]?.id;
   renderHr();
   if (me?.role === 'admin') loadHrCross();
@@ -2689,11 +2689,13 @@ function renderHr() {
   if (d.facility.logo) logo.src = u(`/api/policies/assets/logo?v=${Date.now() % 1e6}`);
   $('#hr-fac').innerHTML = onTemplate() ? 'Master template' : `${esc(d.facility.name)} <span class="pp-code">${esc(d.facility.code)}</span>`;
   const pct = c.total ? Math.round((c.completed / c.total) * 100) : 0;
-  $('#hr-sum').innerHTML = `<div class="hr-sum-main"><b>${c.completed}</b><span>of ${c.total} documents completed</span></div>
+  if ($('#hr-sum')) $('#hr-sum').innerHTML = `<div class="hr-sum-main"><b>${c.completed}</b><span>of ${c.total} documents completed</span></div>
     <div class="hr-bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i class="ok" style="width:${pct}%"></i><i class="na" style="width:${c.total ? (c.na / c.total) * 100 : 0}%"></i></div>
     <div class="hr-sum-legend"><span class="ok">● ${c.completed} completed</span><span class="warn">● ${c.pending} pending</span>${c.na ? `<span class="na">● ${c.na} not applicable</span>` : ''}</div>`;
   homeHr = d; renderJourney(); // the process guide follows the HR step live
   renderHrGen(); renderHrForms(); renderHrTabs(); renderHrRows();
+  // the checklist lives on Step 5 – keep its overview in step after an edit there
+  if (master && $('#checklist').classList.contains('active')) renderChecklistPage();
 }
 /** Per form: PDF ready to open at once (made ahead in the background) and the measured logo position. */
 function hrPdfLine(key) {
@@ -3301,11 +3303,15 @@ async function loadChecklistPage() {
   const fac = facilities.find(f => f.id === facility);
   $('#ck-fac').innerHTML = fac ? `${esc(fac.name)} <span class="pp-code">${esc(fac.code)}</span>` : '–';
   $('#ck-xlsx').href = u('/api/hr/checklist.xlsx');
-  if (!hrData || !master) { $('#ck-hr').innerHTML = $('#ck-reg').innerHTML = '<p class="muted small"><span class="spin"></span> Loading…</p>'; }
+  if (!hrData || !master) { $('#ck-reg').innerHTML = '<p class="muted small"><span class="spin"></span> Loading…</p>'; }
   const [h, m] = await Promise.all([api('/api/hr').catch(e => ({ error: e.message })), api('/api/master').catch(e => ({ error: e.message }))]);
   if (!h.error) hrData = h;
   if (!m.error) master = m;
   renderChecklistPage(h.error, m.error);
+  if (!h.error) { // the editable ADHICS checklist (moved here from the HR page)
+    if (!hrData.checklist.sections.some(x => x.id === hrSection)) hrSection = hrData.checklist.sections[0]?.id;
+    renderHrTabs(); renderHrRows();
+  } else $('#hr-rows').innerHTML = `<tr><td colspan="5" class="bad">${esc(h.error)}</td></tr>`;
 }
 function renderChecklistPage(hrErr, regErr) {
   const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
@@ -3334,17 +3340,6 @@ function renderChecklistPage(hrErr, regErr) {
 
   // --- HR sections
   $('#ck-hr-sub').textContent = hrErr ? hrErr : `${hc.done} completed · ${hc.pending} pending · ${hc.na} not applicable${hc.locked ? ` · ${hc.locked} locked (Premium)` : ''}`;
-  const pill = st => `<span class="tag ${{ Completed: 'ok', Pending: 'warn', 'Not applicable': 'na' }[st] || 'warn'}">${esc(st || 'Pending')}</span>`;
-  $('#ck-hr').innerHTML = hrErr ? '' : secs.map((sec, n) => {
-    const op = sec.items.filter(i => !i.locked), d = op.filter(i => i.status === 'Completed').length;
-    return `<details class="ck-group"${n === 0 ? ' open' : ''}>
-      <summary><b>${esc(sec.title)}</b><span class="muted small">${d} of ${sec.items.length} completed</span>${bar(pct(d, sec.items.length), 'ok')}</summary>
-      <div class="table-wrap flat"><table class="ck-table"><thead><tr><th>#</th><th>Document</th><th>Status</th><th>Remarks</th><th>Updated</th></tr></thead><tbody>
-      ${sec.items.map((it, k) => (it.locked
-        ? `<tr class="reg-locked" data-up title="Part of Premium"><td class="num">${k + 1}</td><td colspan="3"><span class="blur-txt" aria-hidden="true">XXXXXXXX XXXXXXXXXX XXXXX</span><span class="sr-only">Locked – part of Premium</span></td><td><span class="tag lock-tag"><i class=i-lock></i> Premium</span></td></tr>`
-        : `<tr><td class="num">${k + 1}</td><td>${esc(it.name)}</td><td>${pill(it.status)}</td><td class="muted small">${esc(it.remarks || '—')}</td><td class="muted small">${it.updatedAt ? `${esc(it.updatedBy || '')} · ${fmtDay(String(it.updatedAt).slice(0, 10))}` : '—'}</td></tr>`)).join('')}
-      </tbody></table></div></details>`;
-  }).join('') || '<p class="muted small">No checklist yet.</p>';
 
   // --- register entries
   $('#ck-reg-sub').textContent = regErr ? regErr : `${rc.ok} in date · ${rc.expiring} expiring · ${rc.expired} expired · ${rc.missing} without dates${rc.locked ? ` · ${rc.locked} locked (Premium)` : ''} · ${rc.laws} federal laws`;

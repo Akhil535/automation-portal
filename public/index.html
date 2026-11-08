@@ -44,7 +44,7 @@
   <nav id="tabs" class="sb-nav" aria-label="Main menu">
       <button data-tab="overview" class="active"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Dashboard</button>
       <button data-tab="policies"><svg class="ico" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>Prepare policies<span class="sb-step">1</span></button>
-      <button data-tab="hr"><svg class="ico" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 11l2 2 4-4M9 17h6"/></svg>HR &amp; checklist<span class="sb-step">2</span></button>
+      <button data-tab="hr"><svg class="ico" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 11l2 2 4-4M9 17h6"/></svg>HR documents<span class="sb-step">2</span></button>
       <button data-tab="thirdparty"><svg class="ico" viewBox="0 0 24 24"><path d="M11 17l2 2a1.4 1.4 0 0 0 2-2"/><path d="M14 14l2.5 2.5a1.4 1.4 0 0 0 2-2L15 11l-1-1-3 3a1.4 1.4 0 0 1-2-2l3.3-3.3a3 3 0 0 1 3.4-.6L18 8l3-1v8l-2 1"/><path d="M3 7l3-1 4 1M3 7v8l5 4a1.4 1.4 0 0 0 2-2"/></svg>3rd-party documents<span class="sb-step">3</span></button>
       <button data-tab="master"><svg class="ico" viewBox="0 0 24 24"><path d="M12 3v18M5 7h14M5 7l-3 7a3.5 3.5 0 0 0 6 0zM19 7l-3 7a3.5 3.5 0 0 0 6 0zM8 21h8"/></svg>LEGAL REGISTER<span class="sb-step">4</span></button>
       <button data-tab="checklist"><svg class="ico" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M3.5 6l1.5 1.5L7.5 5M3.5 12l1.5 1.5 2.5-2.5M3.5 18l1.5 1.5 2.5-2.5"/></svg>Checklist<span class="sb-step">5</span></button>
@@ -174,7 +174,7 @@
         <header class="jr-head"><span class="jr-num">2</span><div><span class="hx-eyebrow">Step 2</span><h2>HR &amp; onboarding documents</h2></div><span class="jr-state" id="jr-st2"></span></header>
         <div id="hx-hr" class="hx-pol-body"><p class="muted small">Loading…</p></div>
         <p class="small muted" id="hx-hr-checklist"></p>
-        <div class="btn-row"><button class="btn primary small" type="button" data-goto="hr" id="hx-hr-open">Open HR &amp; checklist →</button></div>
+        <div class="btn-row"><button class="btn primary small" type="button" data-goto="hr" id="hx-hr-open">Open HR documents →</button></div>
       </article>
 
       <!-- Step 3 (final): LEGAL REGISTER -->
@@ -400,19 +400,17 @@
     <header class="pw-head">
       <div>
         <span class="pw-kicker">Step 2 of 5</span>
-        <h1>HR &amp; onboarding<span class="h-dim"><mark>forms and the ADHICS checklist</mark></span></h1>
-        <p class="muted">Every HR form opens with <b>this facility's name, code and logo</b>. Track each checklist document as Completed, Pending or Not applicable, add remarks and download it as Excel.</p>
+        <h1>HR &amp; onboarding<span class="h-dim"><mark>documents and forms</mark></span></h1>
+        <p class="muted">Every HR form opens with <b>this facility's name, code and logo</b>. The ADHICS checklist (status and remarks per document) is in <b>Step 5 · Checklist</b>.</p>
       </div>
       <div class="pw-head-side">
         <button type="button" class="btn primary" id="hr-gen" data-write><i class=i-gear></i> Create all HR documents</button>
         <a class="btn" id="hr-zip" href="#"><i class=i-download></i> HR documents (.zip)</a>
-        <a class="btn" id="hr-xlsx" href="#"><i class=i-download></i> Checklist Excel</a>
       </div>
     </header>
     <div class="pp-for step-for"><img id="hr-logo" alt="" onerror="this.hidden=true"><span>Preparing HR documents for</span><b id="hr-fac">–</b></div>
 
     <div class="hr-gen card" id="hr-gen-box" hidden></div>
-    <div class="hr-sum card" id="hr-sum"></div>
 
     <article class="card hr-forms">
       <header class="hr-sec-head"><div><h2>HR &amp; onboarding forms</h2><p class="muted small" id="hr-forms-sub">Filled for this facility every time you open them</p></div></header>
@@ -424,17 +422,6 @@
       <header class="hr-sec-head"><div><h2>Employee training</h2><p class="muted small">Training report and policy acknowledgement – one training date fills every date, or give a document its own dates.</p></div></header>
       <div class="hr-form-grid" id="hr-train-grid"></div>
       <div id="hr-train-dates"></div>
-    </article>
-
-    <article class="card hr-check">
-      <header class="hr-sec-head">
-        <div><h2>ADHICS document checklist</h2><p class="muted small">Change a status or remark and it is saved straight away.</p></div>
-        <div class="btn-row"><a class="btn small" id="hr-xlsx-one" href="#"><i class=i-download></i> This section (.xlsx)</a><button type="button" class="btn small" id="hr-reset" data-write>↺ Reset to master list</button></div>
-      </header>
-      <div class="hr-tabs" id="hr-tabs" role="tablist"></div>
-      <div class="hr-filter"><input type="search" id="hr-q" placeholder="Search documents…" aria-label="Search documents"><div class="viewswitch" id="hr-st" role="group" aria-label="Show"><button type="button" data-st="" class="on">All</button><button type="button" data-st="Pending">Pending</button><button type="button" data-st="Completed">Completed</button></div></div>
-      <div class="tbl-wrap"><table class="hr-tbl"><thead><tr><th class="num">S.No</th><th>Document name</th><th>Status</th><th>Remarks</th><th></th></tr></thead><tbody id="hr-rows"></tbody></table></div>
-      <form class="hr-add" id="hr-add" data-write><input name="name" placeholder="Add a document to this section…" maxlength="300" required><button class="btn small primary">＋ Add</button></form>
     </article>
 
     <article class="card hr-admin" data-admin>
@@ -475,13 +462,20 @@
       </div>
       <div class="pw-head-side">
         <a class="btn" id="ck-xlsx" href="#"><i class=i-download></i> HR checklist (.xlsx)</a>
+        <button type="button" class="btn" data-goto="hr">Open HR documents →</button>
       </div>
     </header>
     <div class="pp-for step-for"><span>Checklist for</span><b id="ck-fac">–</b></div>
     <div class="ck-kpis" id="ck-kpis"></div>
-    <article class="card ck-sec">
-      <header class="hr-sec-head"><div><h2>HR checklist</h2><p class="muted small" id="ck-hr-sub">–</p></div><button type="button" class="btn small" data-goto="hr">Open HR &amp; checklist →</button></header>
-      <div id="ck-hr"></div>
+    <article class="card hr-check">
+      <header class="hr-sec-head">
+        <div><h2>HR checklist · ADHICS documents</h2><p class="muted small"><span id="ck-hr-sub">–</span> · change a status or remark and it is saved straight away.</p></div>
+        <div class="btn-row"><a class="btn small" id="hr-xlsx-one" href="#"><i class=i-download></i> This section (.xlsx)</a><button type="button" class="btn small" id="hr-reset" data-write>↺ Reset to master list</button></div>
+      </header>
+      <div class="hr-tabs" id="hr-tabs" role="tablist"></div>
+      <div class="hr-filter"><input type="search" id="hr-q" placeholder="Search documents…" aria-label="Search documents"><div class="viewswitch" id="hr-st" role="group" aria-label="Show"><button type="button" data-st="" class="on">All</button><button type="button" data-st="Pending">Pending</button><button type="button" data-st="Completed">Completed</button></div></div>
+      <div class="tbl-wrap"><table class="hr-tbl"><thead><tr><th class="num">S.No</th><th>Document name</th><th>Status</th><th>Remarks</th><th></th></tr></thead><tbody id="hr-rows"></tbody></table></div>
+      <form class="hr-add" id="hr-add" data-write><input name="name" placeholder="Add a document to this section…" maxlength="300" required><button class="btn small primary">＋ Add</button></form>
     </article>
     <article class="card ck-sec">
       <header class="hr-sec-head"><div><h2>LEGAL REGISTER checklist</h2><p class="muted small" id="ck-reg-sub">–</p></div><button type="button" class="btn small" data-goto="master">Open LEGAL REGISTER →</button></header>
@@ -1040,7 +1034,7 @@
         </div>
         <div class="row3">
           <label>Training date <span class="lock">optional</span><input name="trainingDate" type="date"></label>
-          <p class="muted small np-hint">Entered once, it fills every date in the training documents (training report, policy acknowledgement). A document can get its own dates later on the HR &amp; checklist page.</p>
+          <p class="muted small np-hint">Entered once, it fills every date in the training documents (training report, policy acknowledgement). A document can get its own dates later on the HR documents page.</p>
         </div>
       </fieldset>
 
