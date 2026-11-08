@@ -646,7 +646,7 @@ function renderDohBrief() {
   // free trial: the newest circulars are held back – say how many, with the way to get them
   if (b.trialHeld) list.insertAdjacentHTML('afterbegin', `<li class="dl-item dl-locked"><span class="dl-date" aria-hidden="true">🔒</span>
       <span class="dl-body"><b>${b.trialHeld} DoH circular${b.trialHeld === 1 ? '' : 's'} from the last ${b.trialDays} days</b><span class="dl-meta"><span>The live, updated register is part of Premium.</span></span></span>
-      <button type="button" class="btn small premium-btn" data-up>Get Premium</button></li>`);
+      <button type="button" class="btn small premium-btn" data-up>★ Get Premium</button></li>`);
 }
 
 /** Step 2 card on the dashboard: the HR & onboarding documents of this facility (live while they are created). */
@@ -3102,7 +3102,7 @@ document.addEventListener('click', e => {
     if (trial) {
       const l = planState.limits, us = planState.usage;
       $('#plan-chip').title = `Free trial: the first ${l.policies} policies, ${l.hr} HR and ${l.thirdparty} 3rd-party documents · ${us.facilities}/${l.facilities} facilities · LEGAL REGISTER preview`;
-      if (!$('#trial-reg')) $('#master')?.insertAdjacentHTML('afterbegin', '<div class="trial-lock" id="trial-reg"><span class="tl-ic" aria-hidden="true">🔒</span><div><b>View only – the free trial shows the basic, non-updated LEGAL REGISTER</b><span>You can look around it and apply your 2 free documents. Applying more documents, editing, renewals, weekly DoH updates and every download / export are part of Premium.</span></div><button type="button" class="btn primary small" data-up>Get Premium</button></div>');
+      if (!$('#trial-reg')) $('#master')?.insertAdjacentHTML('afterbegin', '<div class="trial-lock" id="trial-reg"><span class="tl-ic" aria-hidden="true">🔒</span><div><b>View only – the free trial shows the basic, non-updated LEGAL REGISTER</b><span>You can look around it and apply your 2 free documents. Applying more documents, editing, renewals, weekly DoH updates and every download / export are part of Premium.</span></div><button type="button" class="btn small premium-btn" data-up>★ Get Premium</button></div>');
       $$('[data-up]').forEach(b => { b.onclick = () => showUpgrade(); });
     } else $('#trial-reg')?.remove();
   };

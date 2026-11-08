@@ -3756,3 +3756,75 @@ tr.ck-locked .blur-txt { filter: blur(5px); user-select: none; pointer-events: n
 tr.ck-locked td { background: repeating-linear-gradient(135deg, transparent 0 14px, rgba(148, 163, 184, .05) 14px 28px); }
 .dl-item.dl-locked { border: 1px dashed rgba(245, 158, 11, .55); background: rgba(251, 191, 36, .08); }
 .dl-item.dl-locked .dl-date { font-size: 18px; display: grid; place-items: center; }
+
+/* =====================================================================================================
+   v24 · Premium lock UI – one look for every lock: a glowing gold → emerald lock emblem on a frosted tile, a
+   glass card with a highlight edge, and a conversion-focused Get Premium button (gold gradient, shine, glow).
+   ===================================================================================================== */
+:root { --prem-1: #fde68a; --prem-2: #fbbf24; --prem-3: #f59e0b; --prem-4: #d97706; --prem-ink: #2b1700; --prem-em: #10b981; }
+
+/* the lock emblem (replaces the 🔒 emoji in these places – the emoji text is hidden, a vector lock is drawn) */
+.lock-emblem, .trial-lock .tl-ic, .dl-item.dl-locked .dl-date, .dd-lock > span:first-child {
+  position: relative; flex: none; width: 46px !important; height: 46px; border-radius: 14px; font-size: 0 !important; line-height: 0;
+  display: grid !important; place-items: center; color: transparent;
+  background: radial-gradient(120% 120% at 28% 18%, rgba(253, 230, 138, .38), transparent 58%), linear-gradient(145deg, rgba(245, 158, 11, .22), rgba(16, 185, 129, .16));
+  border: 1px solid rgba(251, 191, 36, .45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 10px 26px -12px rgba(245, 158, 11, .75), 0 0 20px -6px rgba(251, 191, 36, .5);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.lock-emblem::after, .trial-lock .tl-ic::after, .dl-item.dl-locked .dl-date::after, .dd-lock > span:first-child::after {
+  content: ''; width: 22px; height: 22px;
+  background: linear-gradient(165deg, var(--prem-1) 0%, var(--prem-3) 55%, var(--prem-em) 100%);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M17 9V7A5 5 0 0 0 7 7v2H5v13h14V9h-2zM9 7a3 3 0 0 1 6 0v2H9V7zm3 6a2 2 0 0 1 1 3.73V19h-2v-2.27A2 2 0 0 1 12 13z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M17 9V7A5 5 0 0 0 7 7v2H5v13h14V9h-2zM9 7a3 3 0 0 1 6 0v2H9V7zm3 6a2 2 0 0 1 1 3.73V19h-2v-2.27A2 2 0 0 1 12 13z'/%3E%3C/svg%3E") center / contain no-repeat;
+  filter: drop-shadow(0 0 6px rgba(251, 191, 36, .55));
+}
+.dd-lock > span:first-child { width: 38px !important; height: 38px; border-radius: 12px; }
+.dd-lock > span:first-child::after { width: 18px; height: 18px; }
+
+/* the premium card: glass, a highlight edge along the top, clear title, muted secondary line */
+.dl-item.dl-locked, .trial-lock, .dd-lock {
+  position: relative; overflow: hidden; align-items: center; gap: 14px !important;
+  border: 1px solid rgba(251, 191, 36, .3) !important; border-radius: 18px !important;
+  background: linear-gradient(120deg, rgba(251, 191, 36, .09), rgba(16, 185, 129, .06) 60%, rgba(255, 255, 255, .02)) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 18px 40px -28px rgba(0, 0, 0, .7);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.dl-item.dl-locked::before, .trial-lock::before, .dd-lock::before {
+  content: ''; position: absolute; inset: 0 0 auto 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(253, 230, 138, .75), rgba(16, 185, 129, .55), transparent);
+}
+.dl-item.dl-locked { padding: 14px 16px !important; }
+.dl-item.dl-locked .dl-body b, .trial-lock b { font: 700 15px/1.35 var(--font); letter-spacing: -.005em; color: var(--ink) !important; }
+.dl-item.dl-locked .dl-meta, .dl-item.dl-locked .dl-meta span, .trial-lock > div > span { font-size: 13px; line-height: 1.45; color: var(--muted) !important; }
+:root[data-theme="dark"] :is(.dl-item.dl-locked .dl-body b, .trial-lock b) { color: #f4fbf9 !important; }
+:root[data-theme="dark"] :is(.dl-item.dl-locked .dl-meta, .dl-item.dl-locked .dl-meta span, .trial-lock > div > span) { color: rgba(226, 240, 236, .66) !important; }
+
+/* Get Premium – gold gradient pill, a light sweep, a soft glow; lifts on hover */
+.premium-btn, .icon-btn.premium-mini, .plan-chip b {
+  position: relative; overflow: hidden; isolation: isolate;
+  background: linear-gradient(135deg, var(--prem-1) 0%, var(--prem-2) 38%, var(--prem-3) 72%, var(--prem-4) 100%) !important;
+  color: var(--prem-ink) !important; border: 1px solid rgba(255, 255, 255, .35) !important; border-radius: 999px !important;
+  font-weight: 800 !important; letter-spacing: .01em;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), 0 10px 24px -12px rgba(245, 158, 11, .9), 0 0 0 0 rgba(251, 191, 36, .45) !important;
+  transition: transform .18s cubic-bezier(.2, .8, .2, 1), box-shadow .2s ease, filter .2s ease;
+  animation: premGlow 2.8s ease-in-out infinite;
+}
+.premium-btn::after, .icon-btn.premium-mini::after {
+  content: ''; position: absolute; z-index: -1; top: 0; bottom: 0; left: -70%; width: 45%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .6), transparent); transform: skewX(-20deg);
+  animation: premShine 3.8s ease-in-out infinite;
+}
+.premium-btn:hover:not(:disabled), .icon-btn.premium-mini:hover { transform: translateY(-1px) scale(1.04); filter: saturate(1.1) brightness(1.03);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), 0 16px 32px -12px rgba(245, 158, 11, 1), 0 0 24px -4px rgba(251, 191, 36, .65) !important; }
+.premium-btn:active:not(:disabled), .icon-btn.premium-mini:active { transform: scale(.97); }
+.premium-btn:focus-visible, .icon-btn.premium-mini:focus-visible { outline: 3px solid var(--prem-1); outline-offset: 3px; }
+.icon-btn.premium-mini { padding: 7px 13px !important; }
+@keyframes premShine { 0%, 55% { left: -70%; } 85%, 100% { left: 130%; } }
+@keyframes premGlow { 0%, 100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), 0 10px 24px -12px rgba(245, 158, 11, .9), 0 0 0 0 rgba(251, 191, 36, .4); }
+  50% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), 0 10px 24px -12px rgba(245, 158, 11, .9), 0 0 0 6px rgba(251, 191, 36, 0); } }
+@media (prefers-reduced-motion: reduce) {
+  .premium-btn, .icon-btn.premium-mini, .plan-chip b, .premium-btn::after, .icon-btn.premium-mini::after { animation: none !important; transition: none !important; }
+  .premium-btn::after, .icon-btn.premium-mini::after { display: none; }
+}
+.btn.premium-btn.premium-btn, button.premium-btn.premium-btn, .icon-btn.premium-mini.premium-mini { border-radius: 999px !important; }
