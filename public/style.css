@@ -3842,3 +3842,6 @@ tr.reg-locked:hover td { background-color: rgba(251, 191, 36, .05); }
 :root[data-theme="dark"] .reg-lock-pill b { color: #f4fbf9; }
 .reg-lock-pill .premium-btn { padding: 6px 12px !important; font-size: 12.5px; }
 .ecard.reg-locked { cursor: pointer; border-style: dashed !important; display: grid; gap: 10px; align-content: start; }
+
+/* sidebar: the free-trial count next to 3rd-party documents (gold, not a step number) */
+.sb-step.sb-free { background: linear-gradient(135deg, var(--prem-1, #fde68a), var(--prem-3, #f59e0b)) !important; color: #2b1700 !important; border: 0 !important; font-weight: 800; }

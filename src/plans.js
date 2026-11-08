@@ -10,7 +10,7 @@ import { loadFacilities, loadGlobalConfig, saveConfig } from './config.js';
 import { HR_FORMS, installedForms } from './hrforms.js';
 import { listTemplates } from './policyprep.js';
 
-export const DEFAULT_LIMITS = Object.freeze({ policies: 2, hr: 2, thirdparty: 0 });
+export const DEFAULT_LIMITS = Object.freeze({ policies: 2, hr: 2, thirdparty: 4 });
 export const KIND_LABEL = { policies: 'policies', hr: 'HR documents', thirdparty: '3rd-party documents', facilities: 'facility' };
 export const UPGRADE_TEXT = 'Get Premium to unlock full compliance packs';
 

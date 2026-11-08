@@ -269,11 +269,11 @@ $('#btn-fac-delete').onclick = () => removeFacility(facility);
 function renderHeader(s) {
   const d = s.documentControl || {};
   $('#doc-title').textContent = d.facilityTitle || 'LEGAL REGISTER';
-  document.title = d.facilityTitle || 'Compliance Portal';
+  document.title = s.facility?.name ? `${s.facility.name} – Compliance Portal` : 'Compliance Portal';
   const tplOpen = typeof onTemplate === 'function' && onTemplate();
   if (tplOpen) document.title = 'Master template – Compliance Portal';
   $('#side-fac-name').textContent = tplOpen ? 'Master template' : (s.facility?.name || '');
-  $('#side-fac-code').textContent = tplOpen ? 'Baseline for every new facility' : (s.facility?.code ? `${s.facility.code}${s.fixed?.numberSuffix || ''}` : '');
+  $('#side-fac-code').textContent = tplOpen ? 'Baseline for every new facility' : (s.facility?.code ? `${s.facility.code} · Compliance suite` : '');
   $('#doc-class').textContent = s.fixed?.classification || '';
   $('#doc-strip').innerHTML = $('#home-doc').innerHTML = [['Document Number', d.documentNumber], ['Date of Release', fmtDay(d.releaseDate)], ['Approver', d.approver],
     ['Author(s)', d.authors], ['Version', d.version]].map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v || '–')}</dd></div>`).join('');
@@ -3115,6 +3115,8 @@ document.addEventListener('click', e => {
     }
     document.body.classList.toggle('trial', trial);
     $('#plan-chip').hidden = !trial;
+    const tpFree = trial ? planState.limits?.thirdparty || 0 : 0, tpb = $('#sb-tp-free');
+    if (tpb) { tpb.hidden = !tpFree; tpb.textContent = tpFree; tpb.title = `${tpFree} free 3rd-party documents on the free trial`; }
     if (trial) {
       const l = planState.limits, us = planState.usage;
       $('#plan-chip').title = `Free trial: the first ${l.policies} policies, ${l.hr} HR and ${l.thirdparty} 3rd-party documents · ${us.facilities}/${l.facilities} facilities · LEGAL REGISTER preview`;

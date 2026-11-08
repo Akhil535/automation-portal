@@ -665,7 +665,7 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
     const P = await import('../src/plans.js');
     const nb = { headers: { Cookie: newbieCookie } }, q = `?f=${mgrId}`;
     const plan = await (await fetch(`${base}/api/plan`, nb)).json();
-    assert.equal(plan.plan, 'trial'); assert.deepEqual(plan.limits, { policies: 2, hr: 2, thirdparty: 0, facilities: 1, uploads: 2 });
+    assert.equal(plan.plan, 'trial'); assert.deepEqual(plan.limits, { policies: 2, hr: 2, thirdparty: 4, facilities: 1, uploads: 2 });
     assert.equal(plan.usage.facilities, 1, 'facilities are counted by who created them');
     for (const [m, p] of [['PUT', '/api/master'], ['POST', '/api/run'], ['GET', '/api/register/download'], ['GET', '/api/export/pdf'], ['GET', '/api/master/export'], ['POST', '/api/policies/link-register'], ['PUT', '/api/document-control']]) {
       const x = await fetch(base + p + q, { method: m, headers: { 'Content-Type': 'application/json', Cookie: newbieCookie }, body: m === 'GET' ? undefined : '{}' });
@@ -754,7 +754,7 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
     // the trial includes the FIRST items of each module – always the same ones
     const inc = (await (await fetch(`${base}/api/plan`, nb)).json()).included;
     assert.deepEqual(inc.policies, ['1', '2'], 'PO01 and PO02');
-    assert.equal(inc.hr.length, 2); assert.deepEqual(inc.thirdparty, [], '3rd-party documents are Premium only');
+    assert.equal(inc.hr.length, 2); assert.ok(inc.thirdparty.length >= 1 && inc.thirdparty.length <= 4, 'up to 4 vendor forms (as many as exist)');
     assert.deepEqual([...P.claim(nbUser, 'policies', [5, 1, 9])], ['1'], 'only the included ones of a request');
     assert.equal((await put('/api/plans', { trial: { policies: -1 } }, newbieCookie)).status, 403, 'only admins set the limits');
     assert.equal((await put('/api/plans', { trial: { policies: -1 } }, adminCookie)).status, 400);
@@ -1253,16 +1253,14 @@ test('10q. free trial end to end: the first 2 items open as Word + PDF, everythi
     const zp = await JSZip.loadAsync(Buffer.from(await (await fetch(`${base}/api/policies/zip${q}&type=word`, opt())).arrayBuffer()));
     assert.ok(Object.keys(zp.files).filter(f => !zp.files[f].dir).every(f => firstNos.includes(PP.policyNoOf(f))), 'the ZIP holds only the free policies');
 
-    // 3rd-party documents are Premium only: none is included, every vendor form (view, Word, PDF, ZIP, create) is the gateway
+    // 3rd-party documents: the first 4 vendor forms open (Word / PDF); a fifth is the gateway; own dates stay Premium
     const tpAll = H.installedForms('thirdparty').map(d => d.key);
-    assert.deepEqual(plan.included.thirdparty, [], 'no vendor form on the free trial');
+    assert.equal(plan.limits.thirdparty, 4);
+    assert.deepEqual(plan.included.thirdparty, (tpAll.length ? tpAll : H.HR_FORMS.filter(f => f.group === 'thirdparty').map(f => f.key)).slice(0, 4), 'the first four vendor forms');
     if (tpAll.length) {
-      for (const fmt of ['docx', 'pdf']) {
-        const tw = await fetch(`${base}/api/hr/forms/${tpAll[0]}${q}&format=${fmt}`, opt());
-        assert.equal(tw.status, 402, `vendor form ${fmt} is locked`); assert.equal((await tw.json()).upgrade, true);
-      }
-      assert.equal((await fetch(`${base}/api/hr/zip${q}&group=thirdparty`, opt())).status, 402, 'the vendor ZIP is locked');
-      assert.equal((await fetch(`${base}/api/hr/generate${q}`, opt({ method: 'POST', body: '{"group":"thirdparty","pdf":false}' }))).status, 402, 'creating them is locked');
+      const tw = await fetch(`${base}/api/hr/forms/${tpAll[0]}${q}&format=docx`, opt());
+      assert.equal(tw.status, 200, 'the first vendor form downloads as Word');
+      if (tpAll[4]) assert.equal((await fetch(`${base}/api/hr/forms/${tpAll[4]}${q}&format=docx`, opt())).status, 402, 'a fifth vendor form is locked');
     }
     for (const body of [{ group: 'thirdparty', date: '2026-01-01' }, { key: H.HR_FORMS.find(f => f.group === 'thirdparty').key, date: '2026-01-01' }]) {
       const r = await fetch(`${base}/api/hr/documents${q}`, opt({ method: 'PUT', body: JSON.stringify(body) }));
