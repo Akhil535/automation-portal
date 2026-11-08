@@ -43,6 +43,7 @@ export const publicUser = u => u && ({
   // plan: administrators are never limited; accounts made before plans existed stay premium (nobody is locked out)
   plan: u.role === 'admin' ? 'premium' : u.plan === 'trial' ? 'trial' : 'premium',
   premiumRequest: u.premiumRequest || null,
+  welcomeSeen: Number(u.welcomeSeen) || 0, // the version of the welcome message this user chose not to see again
   usage: { policies: u.usage?.policies?.length || 0, hr: u.usage?.hr?.length || 0, thirdparty: u.usage?.thirdparty?.length || 0 },
 });
 export const PLANS = ['trial', 'premium'];
@@ -126,6 +127,7 @@ export function updateUser(id, fields) {
   }
   if (fields.resetUsage) u.usage = {};
   if (fields.premiumRequest !== undefined) u.premiumRequest = fields.premiumRequest;
+  if (fields.welcomeSeen !== undefined) u.welcomeSeen = Math.max(0, Math.floor(Number(fields.welcomeSeen) || 0));
   if (fields.plan === 'premium') u.premiumRequest = null;
   if (fields.email !== undefined) u.email = String(fields.email).trim();
   if (fields.password !== undefined) {

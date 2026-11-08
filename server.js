@@ -88,7 +88,7 @@ function requiredRole(req) {
   const p = req.path, m = req.method;
   if (p.startsWith('/api/account/') || p === '/api/me' || p === '/api/plan' || p === '/api/plan/request') return 'viewer';
   if (m === 'DELETE') return 'admin'; // deleting (entries, items, pictures, facilities, users…) is for administrators only
-  if (p === '/api/plans') return m === 'GET' ? 'viewer' : 'admin';
+  if (p === '/api/plans' || p === '/api/welcome') return m === 'GET' ? 'viewer' : 'admin';
   if (p === '/api/assistant/ask') return 'viewer'; // everyone may ask (read-only answers)
   if (p === '/api/assistant/key') return 'admin';
   if (p.startsWith('/api/users')) return 'admin';
@@ -109,7 +109,7 @@ app.use((req, res, next) => {
   if (!roleAtLeast(req.user, need)) return res.status(403).json({ error: `Your role (${req.user.role}) cannot do this - ${need} access needed` });
   // Requests that are not about one facility (pages, own account, the facility list, users) need no facility.
   const p = req.path;
-  if (!(p.startsWith('/api/') || p.startsWith('/reports/')) || p === '/api/me' || p.startsWith('/api/plan') || p.startsWith('/api/account/') || p.startsWith('/api/users')
+  if (!(p.startsWith('/api/') || p.startsWith('/reports/')) || p === '/api/me' || p.startsWith('/api/plan') || p === '/api/welcome' || p.startsWith('/api/account/') || p.startsWith('/api/users')
     || (p === '/api/facilities' && (req.method === 'GET' || req.method === 'POST'))) return next(); // listing / creating: no facility needed (the creator gets access)
   const facs = loadFacilities();
   // The master template facility (the baseline every new facility is copied from) is for administrators only.
@@ -210,6 +210,27 @@ app.put('/api/plans', wrap(async (req, res) => {
   const b = req.body || {};
   res.json({ trial: setTrialLimits({ ...(b.trial || {}), ...(b.upgradeUrl !== undefined ? { upgradeUrl: b.upgradeUrl } : {}) }), upgradeUrl: upgradeUrl() });
 }));
+// Welcome message shown after sign-in (administrators edit it; "show again to everyone" raises its version).
+const WELCOME_DEFAULT = {
+  enabled: true, version: 1, title: 'Welcome to the Compliance Portal',
+  text: 'These documents are 99% accurate, updated dynamically as per ADHICS standards, and built directly from real audit findings and finding reports.',
+};
+const welcome = () => ({ ...WELCOME_DEFAULT, ...(loadGlobalConfig().welcome || {}) });
+app.get('/api/welcome', wrap(async (req, res) => res.json(welcome())));
+app.put('/api/welcome', wrap(async (req, res) => {
+  const b = req.body || {}, cfg = loadGlobalConfig(), cur = welcome();
+  const title = String(b.title ?? cur.title).trim().slice(0, 120), text = String(b.text ?? cur.text).trim().slice(0, 1200);
+  if (!title || !text) throw new Error('The welcome message needs a title and a text');
+  cfg.welcome = { enabled: b.enabled === undefined ? cur.enabled : !!b.enabled, title, text, version: cur.version + (b.showAgain ? 1 : 0) };
+  saveConfig(cfg);
+  res.json(cfg.welcome);
+}));
+/** "Don't show this again": remembered on the account, for this version of the message. */
+app.post('/api/account/welcome', wrap(async (req, res) => {
+  const v = Math.min(Number(req.body?.version) || 0, welcome().version);
+  res.json({ welcomeSeen: updateUser(req.user.id, { welcomeSeen: v }).welcomeSeen });
+}));
+
 app.post('/api/account/password', wrap(async (req, res) => {
   changeOwnPassword(req.user.id, req.body?.current, req.body?.next);
   res.json({ ok: true });

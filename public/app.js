@@ -1519,7 +1519,7 @@ async function loadUsersPanel() {
     try { await apiGlobal(`/api/users/${sel.dataset.uid}`, { method: 'PUT', body: JSON.stringify({ plan: sel.value }) }); toast(`Plan changed to ${sel.value === 'premium' ? 'Premium' : 'Free trial'}`); loadUsersPanel(); }
     catch (e) { alert(e.message); loadUsersPanel(); }
   });
-  loadLimits();
+  loadLimits(); loadWelcomeForm();
   $$('#users-tbl [data-act]').forEach(b => b.onclick = async () => {
     const u = users.find(x => x.id === b.dataset.uid), act = b.dataset.act;
     try {
@@ -2390,7 +2390,7 @@ async function renderAiSettings() {
 
 (async () => {
   try { me = await apiGlobal('/api/me'); } catch { return; } // redirected to sign-in
-  applyRole(); refreshPlan();
+  applyRole(); refreshPlan(); setTimeout(() => showWelcome(), 450); // after the page has drawn
   await loadFacilities();
   refresh();
   loadPendingBadge(); setInterval(loadPendingBadge, 120000);
@@ -2978,5 +2978,74 @@ var planState = null; // var: may be read before this line runs
     const f = e.target, body = Object.fromEntries(['policies', 'hr', 'thirdparty', 'facilities'].map(k => [k, Number(f.elements[k].value)]));
     try { await apiGlobal('/api/plans', { method: 'PUT', body: JSON.stringify({ trial: body, upgradeUrl: f.elements.upgradeUrl.value.trim() }) }); $('#limits-msg').textContent = 'Saved.'; }
     catch (err) { $('#limits-msg').textContent = err.message; }
+  };
+})();
+
+// ===================================================================================================
+// Welcome message after sign-in: compliance information, "Don't show this again" (saved on the account for this
+// version of the message, and in this browser as a fallback). Administrators edit it in Users & security.
+// ===================================================================================================
+(() => {
+  const dlg = $('#welcome-dlg');
+  if (!dlg) return;
+  const key = v => `welcome-seen:${me?.id || ''}:${v}`;
+  let current = null;
+  function open(w, { preview = false } = {}) {
+    current = { ...w, preview };
+    $('#wl-title').textContent = w.title;
+    $('#wl-text').textContent = w.text;
+    $('#wl-dont').checked = false;
+    $('#wl-dont').closest('label').hidden = preview;
+    dlg.classList.remove('closing');
+    if (!dlg.open) dlg.showModal();
+  }
+  // close with a short fade (Esc, the button, or a click on the backdrop)
+  function close() {
+    if (!dlg.open || dlg.classList.contains('closing')) return;
+    remember(); // saved at once – not after the fade-out
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    dlg.classList.add('closing');
+    setTimeout(() => { dlg.classList.remove('closing'); dlg.close(); }, reduce ? 0 : 220);
+  }
+  dlg.addEventListener('cancel', e => { e.preventDefault(); close(); });
+  dlg.addEventListener('click', e => { if (e.target === dlg) close(); }); // the backdrop
+  $('#wl-ok').onclick = e => { e.preventDefault(); close(); };
+  dlg.addEventListener('close', () => remember());
+  async function remember() {
+    if (!current || current.preview || current.saved || !$('#wl-dont').checked) return;
+    current.saved = true;
+    try { store.set(key(current.version), '1'); } catch { /* private window */ }
+    try { const r = await apiGlobal('/api/account/welcome', { method: 'POST', body: JSON.stringify({ version: current.version }) }); if (me) me.welcomeSeen = r.welcomeSeen; } catch { /* kept in this browser */ }
+  }
+
+  window.showWelcome = async function showWelcome() {
+    let w;
+    try { w = await apiGlobal('/api/welcome'); } catch { return; }
+    if (!w.enabled || (me?.welcomeSeen || 0) >= w.version || store.get(key(w.version)) === '1') return;
+    if (document.querySelector('dialog[open]')) return; // never on top of another window
+    open(w);
+  };
+
+  // --- Admin: edit the message ---
+  window.loadWelcomeForm = async function loadWelcomeForm() {
+    const f = $('#welcome-form');
+    if (!f || me?.role !== 'admin') return;
+    try {
+      const w = await apiGlobal('/api/welcome');
+      f.elements.enabled.checked = !!w.enabled; f.elements.title.value = w.title; f.elements.text.value = w.text; f.elements.showAgain.checked = false;
+    } catch { /* shown on save */ }
+  };
+  $('#welcome-form').onsubmit = async e => {
+    e.preventDefault();
+    const f = e.target;
+    try {
+      await apiGlobal('/api/welcome', { method: 'PUT', body: JSON.stringify({ enabled: f.elements.enabled.checked, title: f.elements.title.value, text: f.elements.text.value, showAgain: f.elements.showAgain.checked }) });
+      $('#welcome-msg').textContent = f.elements.showAgain.checked ? 'Saved – everyone sees it again at their next sign-in.' : 'Saved.';
+      f.elements.showAgain.checked = false;
+    } catch (err) { $('#welcome-msg').textContent = err.message; }
+  };
+  $('#welcome-preview').onclick = () => {
+    const f = $('#welcome-form');
+    open({ title: f.elements.title.value || 'Welcome', text: f.elements.text.value, version: 0 }, { preview: true });
   };
 })();

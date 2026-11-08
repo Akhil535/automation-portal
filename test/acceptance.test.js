@@ -697,6 +697,17 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
     // only administrators delete
     assert.equal((await fetch(`${base}/api/hr/checklist/s/i${q}`, { method: 'DELETE', headers: { Cookie: newbieCookie } })).status, 403, 'managers cannot delete');
     assert.equal((await fetch(`${base}/api/policies/assets/logo${q}`, { method: 'DELETE', headers: { Cookie: newbieCookie } })).status, 403);
+    // welcome message: shown until the user ticks "Don't show this again" (kept on the account); admins edit it
+    const wl = await (await fetch(`${base}/api/welcome`, nb)).json();
+    assert.equal(wl.enabled, true); assert.match(wl.text, /ADHICS/);
+    assert.equal((await (await fetch(`${base}/api/me`, nb)).json()).welcomeSeen, 0);
+    assert.equal((await post('/api/account/welcome', { version: wl.version }, newbieCookie)).status, 200);
+    assert.equal((await (await fetch(`${base}/api/me`, nb)).json()).welcomeSeen, wl.version, 'remembered on the account');
+    assert.equal((await put('/api/welcome', { title: 'X', text: 'Y' }, newbieCookie)).status, 403, 'only admins edit it');
+    const wl2 = await (await put('/api/welcome', { showAgain: true }, adminCookie)).json();
+    assert.equal(wl2.version, wl.version + 1, 'show again to everyone');
+    assert.ok((await (await fetch(`${base}/api/me`, nb)).json()).welcomeSeen < wl2.version, 'so it shows again');
+
     // asking for Premium, and the administrator upgrades: no limits, the register opens, the pack holds it
     assert.equal((await post('/api/plan/request', { note: 'please' }, newbieCookie)).status, 200);
     const asked = (await (await fetch(`${base}/api/users`, { headers: { Cookie: adminCookie } })).json()).users.find(x => x.username === 'newbie');
