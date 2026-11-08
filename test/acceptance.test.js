@@ -635,6 +635,15 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
     const none = await (await fetch(`${base}/api/facilities`, { headers: { Cookie: newbieCookie } })).json();
     assert.deepEqual(none.list, [], 'no facility ticked: sees no facility');
     assert.equal((await fetch(`${base}/api/status`, { headers: { Cookie: newbieCookie } })).status, 403, 'and cannot open any');
+    // …but can start the New facility wizard: the master policy list only, nothing of any facility
+    const np = await fetch(`${base}/api/policies`, { headers: { Cookie: newbieCookie } });
+    assert.equal(np.status, 200, 'the wizard opens without a facility');
+    const npd = await np.json();
+    assert.equal(npd.newPackOnly, true); assert.deepEqual(npd.settings, {}); assert.deepEqual(npd.files.word, []);
+    assert.ok(Array.isArray(npd.templates));
+    assert.equal((await fetch(`${base}/api/policies/picture-preview?kind=logo&name=x.png`, { method: 'POST', headers: { Cookie: newbieCookie, 'Content-Type': 'application/octet-stream' }, body: Buffer.from('not a picture') })).status !== 403, true, 'picture checks are not blocked');
+    assert.equal((await fetch(`${base}/api/policies/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Cookie: newbieCookie }, body: '{}' })).status, 403, 'nothing else without a facility');
+    assert.equal((await fetch(`${base}/api/hr`, { headers: { Cookie: newbieCookie } })).status, 403);
     // a manager may create a facility (from the master template) and it becomes theirs – only theirs
     assert.equal((await put('/api/facilities-template', { id: 'mhmc' }, adminCookie)).status, 200);
     assert.equal((await post('/api/facilities', { source: 'excel', path: 'C:/Windows/win.ini', code: 'XX', name: 'X' }, newbieCookie)).status, 403, 'no registers from a path on the PC');

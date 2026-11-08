@@ -2258,8 +2258,10 @@ np().onsubmit = async e => {
     step = 'hr'; npStep('hr', 'active');
     const hr = await npMakeHr(q, btn);
     npStep('hr', hr.skipped ? 'warn' : hr.problems?.length ? 'warn' : 'done');
-    // Step 3 (last): link everything to the LEGAL REGISTER
-    if ($('#np-autolink').checked) {
+    // Step 3 (last): link everything to the LEGAL REGISTER (free trial: the register is a locked preview – skipped)
+    const trialPack = document.body.classList.contains('trial');
+    if (trialPack) npStep('link', 'warn');
+    else if ($('#np-autolink').checked) {
       step = 'link'; npStep('link', 'active');
       btn.innerHTML = '<span class="spin light"></span> Linking to the LEGAL REGISTER…';
       await apiGlobal(`/api/policies/link-register${q}`, { method: 'POST', body: '{}' });
@@ -2271,7 +2273,8 @@ np().onsubmit = async e => {
     $('#np-result').innerHTML = `<div class="alert ${j.problems?.length || val.failed?.length || hr.problems?.length || hr.skipped ? 'warn' : 'ok'}"><b>${esc(name)} (${esc(code)}): ${st.files.word.length} Word + ${st.files.pdf.length} PDF policies${hr.skipped ? '' : `, ${hv.count ?? 0} HR &amp; onboarding documents`} ready${$('#np-autolink').checked ? ', linked to the LEGAL REGISTER' : ''}.</b>
       <br>1 · Policies: <b>${val.passed ?? '–'} of ${val.total ?? '–'}</b> fully reflect ${esc(name)}${val.pages ? ` (${val.pages} pages · ${val.megabytes} MB of PDF · no extra signature pages)` : ''} – nothing of the master template left, DoH contacts unchanged${val.failed?.length ? ` · <span class="warn-txt">check: ${val.failed.map(esc).join(', ')}</span>` : ''}.
       <br>2 · HR documents: ${hr.skipped ? `<span class="warn-txt">${esc(hr.skipped)}</span>` : `<b>${hv.passed ?? 0} of ${hv.total ?? 0}</b> checked – this facility's name, code and logo only; Acceptable Usage matches PO11`}.
-      <br>3 · LEGAL REGISTER: ${$('#np-autolink').checked ? 'linked ✓ (final step)' : 'not linked yet – do it on the Policies page'}.
+      <br>3 · LEGAL REGISTER: ${trialPack ? 'a locked preview on the free trial' : $('#np-autolink').checked ? 'linked ✓ (final step)' : 'not linked yet – do it on the Policies page'}.
+      ${trialPack ? `<br><span class="np-trial">★ Free trial: ${st.files.word.length} of ${pp?.templates?.length || 33} policies and ${hv.count ?? 0} HR documents are included. <button type="button" class="btn small premium-btn" id="np-premium">Get Premium for the full pack</button></span>` : ''}
       ${[...(j.problems || []), ...(hr.problems || [])].length ? `<br>${[...(j.problems || []), ...(hr.problems || [])].map(esc).join('<br>')}` : ''}<br><span class="small">Saved in ${esc(st.files.folder)}</span></div>
       <div class="btn-row"><a class="btn primary" href="/api/policies/zip?type=all&f=${encodeURIComponent(id)}">⬇ Policies Word + PDF (.zip)</a>${hr.skipped ? '' : `<a class="btn" href="/api/hr/zip?f=${encodeURIComponent(id)}">⬇ HR documents (.zip)</a>`}
       <button type="button" class="btn" id="np-open">Open the policies</button><button type="button" class="btn" id="np-hr">Open HR &amp; checklist</button><button type="button" class="btn" id="np-register">Open the LEGAL REGISTER</button></div>`;
@@ -2280,6 +2283,8 @@ np().onsubmit = async e => {
     $('#np-open').onclick = () => { $('#pp-new-dlg').close(); selectFacility(id); showTab('policies'); };
     $('#np-hr').onclick = () => { $('#pp-new-dlg').close(); selectFacility(id); showTab('hr'); };
     $('#np-register').onclick = () => { $('#pp-new-dlg').close(); selectFacility(id); showTab('master'); };
+    if ($('#np-premium')) $('#np-premium').onclick = () => { $('#pp-new-dlg').close(); showUpgrade(); };
+    refreshPlan();
   } catch (err) {
     npStep(step, 'bad');
     $('#np-result').innerHTML = `<div class="alert bad">Stopped at “${esc($(`#np-steps [data-s="${step}"]`).textContent)}”: ${esc(err.message)}${id ? '<br>The facility was created – open it on the Policies page to finish.' : ''}</div>`;
@@ -2849,7 +2854,8 @@ var planState = null; // var: may be read before this line runs
     if (res.status === 402) res.clone().json().then(d => { if (d?.upgrade) showUpgrade(d); }).catch(() => {});
     else if (res.ok && res.headers.get('content-type')?.includes('json')) res.clone().json().then(d => {
       // bulk generation on the trial makes only the included documents – say so in the upgrade gateway
-      if (d?.limited) showUpgrade({ error: `Free trial: only ${d.limited.count}${d.limited.of ? ` of ${d.limited.of}` : ''} document${d.limited.count === 1 ? ' is' : 's are'} being created. Unlimited bulk generation is part of Premium.` });
+      // (the New facility wizard says it in its summary instead)
+      if (d?.limited && !$('#pp-new-dlg')?.open) showUpgrade({ error: `Free trial: only ${d.limited.count}${d.limited.of ? ` of ${d.limited.of}` : ''} document${d.limited.count === 1 ? ' is' : 's are'} being created. Unlimited bulk generation is part of Premium.` });
     }).catch(() => {});
     return res;
   };

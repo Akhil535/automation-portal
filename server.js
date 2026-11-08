@@ -83,6 +83,9 @@ app.use((req, res, next) => {
   next();
 });
 
+// What the "New facility" wizard needs before the user has any facility (see the facility check below).
+const NEW_PACK = new Set(['/api/policies', '/api/policies/preview', '/api/policies/picture-detect', '/api/policies/picture-preview']);
+
 // Role required for each kind of request, and the facility it concerns.
 function requiredRole(req) {
   const p = req.path, m = req.method;
@@ -120,6 +123,13 @@ app.use((req, res, next) => {
   if (!id && !allowed(facs.default)) {
     // A user limited to some facilities works on the first of them when no facility is named.
     req.facOverride = facs.list.find(f => f.id !== facs.templateId && allowed(f.id))?.id;
+    if (!req.facOverride && NEW_PACK.has(p) && req.user.role !== 'viewer') {
+      // No facility yet: the "New facility" wizard still works – the master policy list, picture checks and a
+      // preview of the new facility's policies, built from the master template (no facility's own data is shown).
+      req.newPackOnly = true;
+      req.facOverride = facs.templateId || facs.default;
+      return next();
+    }
     if (!req.facOverride) return res.status(403).json({ error: 'No facility is assigned to your account yet - ask an administrator', noFacility: true });
   }
   next();
@@ -342,6 +352,10 @@ app.post('/api/policy/parse', express.raw({ type: () => true, limit: '50mb' }), 
 // --- Policy Document Preparation (master templates -> filled Word + PDF per facility) ---
 const facId = req => loadConfig(fac(req))._facility.id;
 app.get('/api/policies', wrap(async (req, res) => {
+  if (req.newPackOnly) { // no facility yet: only the master policy list for the New facility wizard
+    return res.json({ templates: listTemplates(), settings: {}, job: null, files: { folder: '', word: [], pdf: [] }, need: [], lastGenerated: null,
+      majorRevision: MAJOR_REVISION, linked: null, lock: (({ hashes, ...l }) => l)(templateLock() || { locked: false }), newPackOnly: true });
+  }
   const cfg = loadConfig(fac(req));
   res.json({
     templates: listTemplates(), settings: prepSettings(cfg), job: jobState(cfg._facility.id), files: generatedFiles(cfg),
@@ -354,7 +368,7 @@ app.get('/api/policies', wrap(async (req, res) => {
 app.post('/api/policies/preview', express.json({ limit: '40mb' }), wrap(async (req, res) => {
   const b = req.body || {};
   claim(req.user, 'policies', [Number(b.no) || listTemplates()[0]?.no || 1]);
-  const r = await previewPolicy(fac(req), { no: b.no, form: b.form || {}, pics: b.pics || {}, newFacility: !!b.newFacility, format: b.format });
+  const r = await previewPolicy(fac(req), { no: b.no, form: b.form || {}, pics: b.pics || {}, newFacility: !!b.newFacility || !!req.newPackOnly, format: b.format });
   res.set({
     'Content-Type': r.type === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'Content-Disposition': `inline; filename="${r.file}"`, 'Cache-Control': 'no-store',

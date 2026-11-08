@@ -3644,3 +3644,5 @@ body.trial #master .register, body.trial #master table { filter: saturate(.75); 
 #welcome-form > label:not(.check) { display: grid; gap: 6px; margin-top: 10px; }
 #welcome-form textarea { width: 100%; resize: vertical; }
 #welcome-form .actions { margin-top: 12px; }
+
+.np-trial { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; font-weight: 700; }
