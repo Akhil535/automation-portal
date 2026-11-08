@@ -1324,6 +1324,14 @@ test('10q. free trial end to end: the first 2 items open as Word + PDF, everythi
     assert.notEqual((await upload(d1, 'licence-again.docx')).status, 402, 'the same document again is fine');
     assert.equal((await (await fetch(`${base}/api/plan`, opt())).json()).usage.uploads, 2);
 
+    // DoH circulars: the basic, non-updated view – nothing from the last 90 days
+    const cut = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
+    const br = await (await fetch(`${base}/api/circulars/brief${q}`, opt())).json();
+    assert.equal(typeof br.trialHeld, 'number'); assert.equal(br.trialDays, 90);
+    assert.ok(br.latest.every(c => !c.date || c.date <= cut), 'no recent circular in the brief');
+    const cl = await (await fetch(`${base}/api/circulars${q}`, opt())).json();
+    assert.ok(cl.every(c => { const d = String(c.date || c.firstSeen || '').slice(0, 10); return !d || d <= cut; }), 'no recent circular in the list');
+
     // the LEGAL REGISTER: a preview that can be read, not updated
     assert.notEqual((await fetch(`${base}/api/master${q}`, opt())).status, 402, 'the register preview opens');
     for (const [m, p] of [['PUT', '/api/master'], ['POST', '/api/run'], ['POST', `/api/facilities/${id}/documents/apply`], ['GET', '/api/register/download'], ['GET', '/api/export/pdf']]) {

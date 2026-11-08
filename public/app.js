@@ -643,6 +643,10 @@ function renderDohBrief() {
       ${c.url ? `<a class="dl-open" href="${esc(c.url)}" target="_blank" rel="noopener noreferrer" title="Open the circular on doh.gov.ae">PDF ↗</a>` : ''}
     </li>`;
   }).join('') : '<li class="muted small">No circulars in the register yet.</li>';
+  // free trial: the newest circulars are held back – say how many, with the way to get them
+  if (b.trialHeld) list.insertAdjacentHTML('afterbegin', `<li class="dl-item dl-locked"><span class="dl-date" aria-hidden="true">🔒</span>
+      <span class="dl-body"><b>${b.trialHeld} DoH circular${b.trialHeld === 1 ? '' : 's'} from the last ${b.trialDays} days</b><span class="dl-meta"><span>The live, updated register is part of Premium.</span></span></span>
+      <button type="button" class="btn small premium-btn" data-up>Get Premium</button></li>`);
 }
 
 /** Step 2 card on the dashboard: the HR & onboarding documents of this facility (live while they are created). */
@@ -1087,7 +1091,7 @@ function renderDocs() {
   $('#docs-result').innerHTML = docResults.length ? `<div class="table-wrap flat"><table class="docs-table"><thead><tr>
       <th></th><th>Document</th><th>Recognised as</th><th>Register entry</th><th>Issued</th><th>Expiry</th><th>Due</th><th>Notes</th></tr></thead><tbody>
     ${docResults.map((r, k) => r.pending ? `<tr><td></td><td class="file">${esc(r.file)}</td><td colspan="6"><span class="spin"></span> Reading…</td></tr>`
-      : r.locked ? `<tr class="trial-locked"><td>🔒</td><td class="file">${esc(r.file)}</td><td colspan="6"><span class="tag lock-tag">Premium</span> <span class="lock-msg">The free trial previews ${planState?.limits?.uploads || 2} uploaded documents – this one is part of Premium</span> <button type="button" class="icon-btn premium-mini" data-up>🔒 Get Premium</button></td></tr>`
+      : r.locked ? `<tr class="trial-locked"><td>🔒</td><td class="file"><span class="blur-txt" aria-hidden="true">${esc(r.file)}</span><span class="sr-only">Locked document – part of Premium</span></td><td colspan="6"><span class="tag lock-tag">Premium</span> <span class="lock-msg">The free trial previews ${planState?.limits?.uploads || 2} uploaded documents – this one is part of Premium</span> <button type="button" class="icon-btn premium-mini" data-up>🔒 Get Premium</button></td></tr>`
       : r.error ? `<tr><td></td><td class="file">${esc(r.file)}</td><td colspan="6" class="notes">${esc(r.error)}</td></tr>`
       : `<tr data-k="${k}">
         <td><input type="checkbox" data-f="include" ${r.include ? 'checked' : ''}></td>

@@ -3754,3 +3754,5 @@ tr.ck-locked .blur-txt { filter: blur(5px); user-select: none; pointer-events: n
 .ck-lock { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .ck-lock .icon-btn { margin-left: auto; }
 tr.ck-locked td { background: repeating-linear-gradient(135deg, transparent 0 14px, rgba(148, 163, 184, .05) 14px 28px); }
+.dl-item.dl-locked { border: 1px dashed rgba(245, 158, 11, .55); background: rgba(251, 191, 36, .08); }
+.dl-item.dl-locked .dl-date { font-size: 18px; display: grid; place-items: center; }

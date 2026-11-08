@@ -741,7 +741,14 @@ app.post('/api/run', wrap(async (req, res) => {
   res.status(202).json({ started: true });
 }));
 
-app.get('/api/circulars', wrap(async (req, res) => res.json(new Store(cfgOf(req)).circulars().map(({ text, ...c }) => c))));
+// free trial: DoH circulars released in the last TRIAL_DOH_DAYS days are held back (the non-updated, basic view)
+const TRIAL_DOH_DAYS = 90;
+const trialDohCutoff = () => new Date(Date.now() - TRIAL_DOH_DAYS * 864e5).toISOString().slice(0, 10);
+app.get('/api/circulars', wrap(async (req, res) => {
+  let list = new Store(cfgOf(req)).circulars().map(({ text, ...c }) => c);
+  if (isTrial(req.user)) { const cut = trialDohCutoff(); const n = list.length; list = list.filter(c => { const d = String(c.date || c.firstSeen || '').slice(0, 10); return !d || d <= cut; }); res.set('X-Trial-Held', String(n - list.length)); }
+  res.json(list);
+}));
 /** Brief for the dashboard: the newest circulars in the register and this year's totals (read-only). */
 const briefCache = new Map();
 app.get('/api/circulars/brief', wrap(async (req, res) => {
@@ -754,19 +761,22 @@ app.get('/api/circulars/brief', wrap(async (req, res) => {
     const iso = r => (typeof r.dateRaw === 'number' ? new Date(Date.UTC(1899, 11, 30) + r.dateRaw * 86400000).toISOString().slice(0, 10) : /^\d{4}-\d{2}-\d{2}$/.test(r.dateRaw || '') ? r.dateRaw : '');
     const rows = records.map(r => ({ number: r.number || '', name: r.name || '', date: iso(r), category: r.category || '', url: /^https:\/\/(www\.)?doh\.gov\.ae\//i.test(r.url || '') ? r.url : '',
       compliance: r.meta?.compliance || '', responsible: r.meta?.responsible || '', target: r.meta?.targetDate || '' }));
-    const year = new Date().getUTCFullYear();
-    const thisYear = rows.filter(r => r.date.startsWith(String(year)));
-    const na = cfg.compliance?.labels?.notApplicable || 'Not Applicable';
-    const brief = {
-      total: rows.length,
-      year: { year, count: thisYear.length, applicable: thisYear.filter(r => r.compliance && r.compliance !== na).length,
-        notApplicable: thisYear.filter(r => r.compliance === na).length, it: thisYear.filter(r => /IT Department/i.test(r.responsible)).length,
-        recalls: thisYear.filter(r => /recall|withdraw|suspension/i.test(r.name)).length },
-      latest: rows.slice(-4).reverse(),
-    };
-    briefCache.clear(); briefCache.set(key, brief);
+    briefCache.clear(); briefCache.set(key, rows);
   }
-  res.json(briefCache.get(key));
+  // free trial: the basic, non-updated view – circulars of the last TRIAL_DOH_DAYS days are held back
+  let rows = briefCache.get(key), held = 0;
+  if (isTrial(req.user)) { const cut = trialDohCutoff(); const all = rows.length; rows = rows.filter(r => !r.date || r.date <= cut); held = all - rows.length; }
+  const year = new Date().getUTCFullYear();
+  const thisYear = rows.filter(r => r.date.startsWith(String(year)));
+  const na = cfg.compliance?.labels?.notApplicable || 'Not Applicable';
+  res.json({
+    total: rows.length,
+    year: { year, count: thisYear.length, applicable: thisYear.filter(r => r.compliance && r.compliance !== na).length,
+      notApplicable: thisYear.filter(r => r.compliance === na).length, it: thisYear.filter(r => /IT Department/i.test(r.responsible)).length,
+      recalls: thisYear.filter(r => /recall|withdraw|suspension/i.test(r.name)).length },
+    latest: rows.slice(-4).reverse(),
+    ...(isTrial(req.user) ? { trialHeld: held, trialDays: TRIAL_DOH_DAYS } : {}),
+  });
 }));
 
 app.post('/api/circulars/:key/review', wrap(async (req, res) => {
