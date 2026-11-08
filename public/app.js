@@ -1732,7 +1732,7 @@ function renderPolicies() {
   $('#pp-out-title').textContent = `${files.word.length} Word · ${files.pdf.length} PDF files`;
   $('#pp-zip-word').href = u('/api/policies/zip?type=word'); $('#pp-zip-pdf').href = u('/api/policies/zip?type=pdf'); $('#pp-zip-all').href = u('/api/policies/zip?type=all');
   const results = j?.results || [];
-  $('#pp-out-body').innerHTML = files.word.map(w => {
+  const rowFor = w => {
     const no = Number(w.match(/PO(\d+)/)?.[1]);
     const r = results.find(x => x.no === no);
     const pdf = files.pdf.find(p => p.replace(/\.pdf$/, '') === w.replace(/\.docx$/, ''));
@@ -1745,7 +1745,29 @@ function renderPolicies() {
     return `<tr><td class="name">${esc(w.replace(/\.docx$/, ''))}</td><td>${esc(r?.version || '')}</td>
       <td class="small">${filled ? `${filled.length} items${r.report.missing.length ? ` · <span class="warn-txt">not found: ${r.report.missing.map(k => PP_FIELD[k] || k).join(', ')}</span>` : ''}${r.report.nameReplaced ? ` · name replaced ${r.report.nameReplaced}×` : ''}` : '<span class="muted">–</span>'}</td>
       <td><div class="row-actions"><a class="icon-btn" href="${u(`/api/policies/file?type=word&name=${encodeURIComponent(w)}`)}">Word</a>${pdf ? `<a class="icon-btn" target="_blank" data-view="${esc(pdf.replace(/\.pdf$/, ''))}" href="${u(`/api/policies/file?type=pdf&inline=1&name=${encodeURIComponent(pdf)}`)}">⤢ PDF</a>` : ''}</div></td></tr>`;
-  }).join('');
+  };
+  const trialPol = !!planState?.included;
+  if (trialPol) {
+    // Free trial: every master policy is listed – the first ones with Word / PDF like the full portal, the rest locked
+    const code = pp.settings?.code || '';
+    const title = t => `${code ? `${code} - ` : ''}PO${String(t.no).padStart(2, '0')} - ${String(t.title || '').replace(/^ADHICS\s*[-–]\s*/i, '')}`;
+    const tpls = [...(pp.templates || [])].sort((a, b) => a.no - b.no);
+    const free = tpls.filter(t => !trialLocked('policies', t.no));
+    $('#pp-out-body').innerHTML = tpls.map(t => {
+      const w = files.word.find(x => Number(x.match(/PO(\d+)/)?.[1]) === t.no);
+      if (!trialLocked('policies', t.no)) return w ? rowFor(w) : `<tr><td class="name">${esc(title(t))}</td><td></td><td class="small muted">Not created yet – press “Create policies”</td><td></td></tr>`;
+      return `<tr class="trial-locked"><td class="name"><span class="lock-ic" aria-hidden="true">🔒</span>${esc(title(t))}</td><td></td>
+        <td class="small"><span class="tag lock-tag">Premium</span></td>
+        <td><div class="row-actions"><button type="button" class="icon-btn premium-mini" data-up>🔒 Get Premium</button></div></td></tr>`;
+    }).join('');
+    $('#pp-out').hidden = !tpls.length;
+    $('#pp-out-title').textContent = `${free.length} of ${tpls.length} policies included in the free trial · ${tpls.length - free.length} locked`;
+    $('#pp-zip-all').textContent = `⬇ Download the ${free.length} free policies (Word + PDF)`;
+    $('#pp-out .pw-more').open = true; // the list is the point here – shown at once
+  } else {
+    $('#pp-out-body').innerHTML = files.word.map(rowFor).join('');
+    $('#pp-zip-all').textContent = '⬇ Download all (Word + PDF)';
+  }
 
   $('#pw-next-3').disabled = !files.word.length;
   // 4. link
