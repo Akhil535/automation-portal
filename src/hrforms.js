@@ -876,14 +876,15 @@ export function resetChecklist(id) {
 }
 
 /** The checklist as Excel, with the facility name, code and logo. sections: ids to include (all by default). */
-export async function checklistXlsx(id, only = null) {
+export async function checklistXlsx(id, only = null, trim = null) { // trim: sections → sections (free trial: the first items only)
   const cfg = loadConfig(id);
   const s = prepSettings(cfg);
   const c = getChecklist(id);
   const pics = await printPics(cfg).catch(() => ({}));
   let logo = pics.logo?.buffer || null;
   if (logo && !['png', 'jpg'].includes(imageSize(logo)?.ext)) logo = null;
-  const sections = c.sections.filter(sec => !only || only.includes(sec.id));
+  let sections = c.sections.filter(sec => !only || only.includes(sec.id));
+  if (trim) sections = trim(sections);
   if (!sections.length) throw new Error('Nothing to export');
   const buffer = await buildChecklistXlsx({ sections, facility: { name: s.facilityName, code: s.code }, logo });
   return { buffer, name: `${s.code} - ADHICS CHECKLIST${only?.length === 1 ? ` - ${sections[0].title.toUpperCase()}` : ''}.xlsx` };

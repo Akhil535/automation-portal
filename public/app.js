@@ -2797,7 +2797,15 @@ function renderHrRows() {
   const q = ($('#hr-q').value || '').trim().toLowerCase();
   const ro = me?.role === 'viewer';
   const rows = sec.items.map((it, k) => ({ it, k })).filter(({ it }) => (!q || it.name.toLowerCase().includes(q) || (it.remarks || '').toLowerCase().includes(q)) && (!hrStatus || it.status === hrStatus));
+  const fake = ['XXXXXXXX XXXXXX XXXXX', 'XXXXX XXXXXXXXXX XXXXXXXXX', 'XXXXXXXXXXX XXXX', 'XXXXXX XXXXXXXX XXXXXXXXXXXX XXXX', 'XXXXXXXX XXXXX XXXXXX'];
   $('#hr-rows').innerHTML = rows.map(({ it, k }) => {
+    if (it.locked) { // free trial: masked by the server – blurred, and only Get Premium
+      return `<tr class="trial-locked ck-locked">
+        <td class="num">${k + 1}</td>
+        <td><span class="hr-name blur-txt" aria-hidden="true">${fake[k % fake.length]}</span><span class="sr-only">Locked document – part of Premium</span></td>
+        <td colspan="3"><div class="ck-lock"><span class="tag lock-tag">🔒 Premium</span><span class="muted small">Shown with Premium</span><button type="button" class="icon-btn premium-mini" data-up>🔒 Get Premium</button></div></td>
+      </tr>`;
+    }
     const link = it.form ? `<button type="button" class="link-btn" data-hr-view="${it.form}">📄 Open form</button>`
       : it.formMissing ? '<span class="muted small">form not uploaded</span>'
       : it.policy ? (it.policy.pdf ? `<a class="link-btn" href="${u(`/api/policies/file?type=pdf&inline=1&name=${encodeURIComponent(it.policy.pdf)}`)}" target="_blank">📄 Policy PDF</a>` : '<span class="muted small">policy not created yet</span>') : '';

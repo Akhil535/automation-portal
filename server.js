@@ -19,7 +19,7 @@ import { applyReview, currentRun, runAll, runMonitor } from './src/monitor.js';
 import { startScheduler } from './src/scheduler.js';
 import { formKind, installedForms } from './src/hrforms.js';
 import { MODULE_KEYS, buildPackage, packageTree } from './src/package.js';
-import { allowedSet, claim, claimUpload, createdFacilities, facilityAllowance, isTrial, planInfo, setTrialLimits, trialLimits, upgradeError, upgradeUrl } from './src/plans.js';
+import { allowedSet, checkChecklistItem, checklistFree, claim, claimUpload, maskChecklist, createdFacilities, facilityAllowance, isTrial, planInfo, setTrialLimits, trialLimits, upgradeError, upgradeUrl } from './src/plans.js';
 import { addForms, addItem, checklistXlsx, crossCheck, formFile, formsStatus, formsZip, generateForms, getChecklist, pdfState, prewarmPdfs, saveDocSettings, GROUPS, importMasterChecklist, listForms, masterChecklist, removeForm, removeItem, resetChecklist, updateItem } from './src/hrforms.js';
 import { documentHeader, sendMail } from './src/mailer.js';
 import { lockReason, readLogo, readRegister } from './src/xlsx.js';
@@ -532,7 +532,7 @@ const dispo = (kind, name) => `${kind}; filename="${String(name).replace(/[^\x20
 app.get('/api/hr', wrap(async (req, res) => {
   const id = facId(req);
   prewarmPdfs(id); // PDFs are made ahead in the background, so View / PDF open at once
-  res.json({ ...(await formsStatus(id)), checklist: getChecklist(id), pdf: await pdfState(id) });
+  res.json({ ...(await formsStatus(id)), checklist: maskChecklist(req.user, getChecklist(id)), pdf: await pdfState(id) });
 }));
 /** One HR form filled for the facility (name, code, logo; Acceptable Usage follows PO11) - PDF to view or Word. */
 app.get('/api/hr/forms/:key', wrap(async (req, res) => {
@@ -571,13 +571,20 @@ app.post('/api/hr/checklist-master', express.raw({ type: () => true, limit: '20m
 }));
 app.get('/api/hr/checklist.xlsx', wrap(async (req, res) => {
   const only = req.query.sections ? String(req.query.sections).split(',').filter(Boolean) : null;
-  const r = await checklistXlsx(facId(req), only);
+  const r = await checklistXlsx(facId(req), only, isTrial(req.user) ? secs => secs.map(x => ({ ...x, items: x.items.slice(0, checklistFree(x.items.length)) })) : null);
   res.set({ 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': dispo('attachment', r.name), 'Cache-Control': 'no-store' }).send(r.buffer);
 }));
-app.post('/api/hr/checklist/reset', wrap(async (req, res) => res.json(resetChecklist(facId(req)))));
-app.post('/api/hr/checklist/:section', wrap(async (req, res) => res.json(addItem(facId(req), req.params.section, req.body?.name, req.user?.username))));
-app.patch('/api/hr/checklist/:section/:item', wrap(async (req, res) => res.json(updateItem(facId(req), req.params.section, req.params.item, req.body || {}, req.user?.username))));
-app.delete('/api/hr/checklist/:section/:item', wrap(async (req, res) => res.json(removeItem(facId(req), req.params.section, req.params.item))));
+// (free trial: locked checklist items are masked in every answer, and cannot be changed)
+app.post('/api/hr/checklist/reset', wrap(async (req, res) => res.json(maskChecklist(req.user, resetChecklist(facId(req))))));
+app.post('/api/hr/checklist/:section', wrap(async (req, res) => {
+  if (isTrial(req.user)) throw upgradeError('Adding your own documents to the checklist is part of Premium', { kind: 'checklist' });
+  res.json(addItem(facId(req), req.params.section, req.body?.name, req.user?.username));
+}));
+app.patch('/api/hr/checklist/:section/:item', wrap(async (req, res) => {
+  checkChecklistItem(req.user, getChecklist(facId(req)), req.params.section, req.params.item);
+  res.json(maskChecklist(req.user, updateItem(facId(req), req.params.section, req.params.item, req.body || {}, req.user?.username)));
+}));
+app.delete('/api/hr/checklist/:section/:item', wrap(async (req, res) => res.json(maskChecklist(req.user, removeItem(facId(req), req.params.section, req.params.item)))));
 
 app.post('/api/policy/parse-path', wrap(async (req, res) => {
   const { file, parsed } = await readPolicy({ policyPath: req.body?.path }, { entryNames: await templateEntryNames(req.body?.template) });

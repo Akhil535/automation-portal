@@ -124,6 +124,29 @@ export function claimUpload(user, buffer) {
 }
 export const uploadsUsed = user => (loadUsers().users.find(x => x.id === user?.id)?.usage?.uploads || []).length;
 
+/**
+ * ADHICS document checklist on the free trial: per section the first items are shown – 2, or 1 when the section has
+ * 5 items or fewer; every other item is masked (no name, status, remark or link reaches the browser) and locked.
+ */
+export const checklistFree = n => (n <= 5 ? 1 : 2);
+export function maskChecklist(user, c) {
+  if (!isTrial(user) || !c?.sections) return c;
+  return {
+    ...c, trialMasked: true,
+    sections: c.sections.map(s => {
+      const free = checklistFree(s.items.length);
+      return { ...s, free, items: s.items.map((it, i) => (i < free ? it : { id: it.id, locked: true, name: 'Premium document', status: '', remarks: '', form: null, formMissing: false, policy: null })) };
+    }),
+  };
+}
+/** Throws the upgrade error when a trial user changes a locked checklist item. */
+export function checkChecklistItem(user, c, sectionId, itemId) {
+  if (!isTrial(user)) return;
+  const sec = c.sections.find(s => s.id === sectionId);
+  const i = sec ? sec.items.findIndex(x => x.id === itemId) : -1;
+  if (i >= checklistFree(sec?.items.length || 0)) throw upgradeError(`On the free trial the checklist shows the first ${checklistFree(sec?.items.length || 0)} document${checklistFree(sec?.items.length || 0) === 1 ? '' : 's'} of each section – this one is part of Premium`, { kind: 'checklist' });
+}
+
 /** The documents of a module the trial includes: null = premium (all). */
 export function allowedSet(user, kind) {
   return isTrial(user) ? new Set(includedIds(kind)) : null;

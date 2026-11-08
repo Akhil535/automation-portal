@@ -1281,6 +1281,32 @@ test('10q. free trial end to end: the first 2 items open as Word + PDF, everythi
       assert.equal((await fetch(`${base}/api/hr/forms/${lockedKey}${q}&format=docx`, opt())).status, 402, 'a locked HR form is not sent');
     }
 
+    // ADHICS checklist: per section the first 2 items (1 when the section has 5 or fewer); the rest is masked and locked
+    const real = H.getChecklist(id);
+    const ck = (await (await fetch(`${base}/api/hr${q}`, opt())).json()).checklist;
+    for (const sec of ck.sections) {
+      const rs = real.sections.find(s => s.id === sec.id), free = rs.items.length <= 5 ? 1 : 2;
+      assert.equal(sec.items.length, rs.items.length, 'every row is still listed');
+      sec.items.forEach((it, i) => {
+        if (i < free) assert.equal(it.name, rs.items[i].name, `${sec.id}: item ${i + 1} is shown`);
+        else { assert.equal(it.locked, true); assert.equal(it.name, 'Premium document', `${sec.id}: item ${i + 1} is masked`); assert.equal(it.policy, null); assert.equal(it.form, null); }
+      });
+    }
+    const big = real.sections.find(s => s.items.length > 2);
+    if (big) {
+      const patch = (item, body) => fetch(`${base}/api/hr/checklist/${big.id}/${item}${q}`, opt({ method: 'PATCH', body: JSON.stringify(body) }));
+      assert.equal((await patch(big.items[2].id, { remarks: 'x' })).status, 402, 'a locked item cannot be changed');
+      const okp = await patch(big.items[0].id, { remarks: 'checked' });
+      assert.equal(okp.status, 200, 'a free item can'); assert.equal((await okp.json()).sections.find(s => s.id === big.id).items[2].name, 'Premium document', 'the answer is masked too');
+      assert.equal((await fetch(`${base}/api/hr/checklist/${big.id}${q}`, opt({ method: 'POST', body: '{"name":"My own document"}' }))).status, 402, 'adding items is Premium');
+      const xb = Buffer.from(await (await fetch(`${base}/api/hr/checklist.xlsx${q}&sections=${big.id}`, opt())).arrayBuffer());
+      const xz = await JSZip.loadAsync(xb);
+      const xmlAll = (await Promise.all(Object.keys(xz.files).filter(f => f.endsWith('.xml')).map(f => xz.file(f).async('string')))).join('');
+      const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      assert.ok(xmlAll.includes(esc(big.items[0].name)), 'the Excel holds the free items');
+      assert.ok(!xmlAll.includes(esc(big.items[big.items.length - 1].name)), 'and not the locked ones');
+    }
+
     // uploaded facility documents: the first 2 different files are read (preview); a third is Premium; the same
     // file again is fine; applying any of them to the register is Premium
     const docx = async text => {
