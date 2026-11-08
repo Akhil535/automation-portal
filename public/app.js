@@ -1408,7 +1408,7 @@ function applyRole() {
   $('#me-name').textContent = me.username;
   $('#me-role').textContent = ROLE_LABEL[me.role] || me.role;
   const hour = Number(new Date().toLocaleString('en-GB', { timeZone: 'Asia/Dubai', hour: '2-digit', hour12: false }));
-  $('#home-hello').innerHTML = `Welcome back, ${esc(me.username)}<span class="h-dim">your compliance, on autopilot</span>`;
+  $('#home-hello').innerHTML = `Welcome back, ${esc(me.username)}<span class="h-dim"><mark>your compliance, on autopilot</mark></span>`;
   $('#me-avatar').textContent = me.username.slice(0, 1);
   $('#me-info').innerHTML = `Signed in as <b>${esc(me.username)}</b> · ${ROLE_LABEL[me.role]} · two-factor authentication <b>${me.twoFactor ? 'on' : 'off'}</b>${me.lastLogin ? ` · last sign-in ${fmt(me.lastLogin)}` : ''}`;
   if (me.role === 'viewer') { // viewers: settings show only their own account

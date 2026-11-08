@@ -2875,3 +2875,256 @@ input:focus, select:focus, textarea:focus { border-color: var(--brand-2) !import
   .flow-steps > li:not(:last-child)::after { top: 56px; bottom: -8px; left: 30px; right: auto; width: 4px; height: auto; }
   .flow-steps > li.here > button::before { position: static !important; transform: none; margin-left: auto !important; order: 9 !important; }
 }
+
+/* =====================================================================================================
+   Theme v16 – "Positivus" (Figma community 1230604708032389430): white page, ink #191A23, lime #B9FF66 and
+   light grey #F3F3F3; Space Grotesk; cards with a dark 1px outline and a solid dark drop line underneath; big
+   rounded corners; section labels highlighted in lime; chunky dark buttons; dark sections with lime accents;
+   black line-art with lime sparkle stars. Light by default; dark = ink page with lime outlines.
+   (Previous look: backups/ui-v18)
+   ===================================================================================================== */
+:root, :root[data-theme="light"] {
+  --ink: #191a23; --ink-2: #3a3b46; --muted: #6b6c78; --bg: #ffffff; --panel: #ffffff; --panel-solid: #ffffff; --panel-2: #f3f3f3;
+  --glass: #ffffff; --glass-line: #191a23; --line: #191a23; --line-2: #e4e4e4; --soft-line: #dcdcdc;
+  --lime: #b9ff66; --lime-2: #a6f04a; --dark: #191a23;
+  --brand: #191a23; --brand-2: #191a23; --brand-ink: #ffffff; --brand-soft: #b9ff66;
+  --grad: linear-gradient(#b9ff66, #b9ff66); --panel-grad: #b9ff66; --mesh: #f3f3f3;
+  --ok: #1f8a3b; --ok-soft: #e6f9d4; --warn: #b26b00; --warn-soft: #fff1d6; --bad: #d4342f; --bad-soft: #fde4e2;
+  --info: #191a23; --info-soft: #b9ff66; --na: #6b6c78; --na-soft: #f3f3f3; --missing: #191a23; --missing-soft: #f3f3f3;
+  --r-lg: 32px; --r: 26px; --r-sm: 12px;
+  --drop: 0 5px 0 #191a23; --drop-hover: 0 8px 0 #191a23;
+  --shadow: var(--drop); --shadow-hover: var(--drop-hover); --shadow-lg: 0 10px 0 #191a23;
+  --font: "Space Grotesk", "Segoe UI", system-ui, sans-serif; --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --sb-bg: #ffffff; --sb-ink: #191a23; --sb-ink-2: #3a3b46; --sb-muted: #6b6c78; --sb-hover: #f3f3f3; --sb-line: #191a23; --sb-card: #f3f3f3;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --ink: #ffffff; --ink-2: #dcdce4; --muted: #a2a3ae; --bg: #191a23; --panel: #23242f; --panel-solid: #23242f; --panel-2: #2d2e3a;
+  --glass: #23242f; --glass-line: #b9ff66; --line: #b9ff66; --line-2: #34353f; --soft-line: #3a3b46;
+  --lime: #b9ff66; --lime-2: #a6f04a; --dark: #191a23;
+  --brand: #b9ff66; --brand-2: #b9ff66; --brand-ink: #191a23; --brand-soft: rgba(185, 255, 102, .16);
+  --grad: linear-gradient(#b9ff66, #b9ff66); --panel-grad: #b9ff66; --mesh: #23242f;
+  --ok: #b9ff66; --ok-soft: rgba(185, 255, 102, .14); --warn: #ffc857; --warn-soft: rgba(255, 200, 87, .14); --bad: #ff7a72; --bad-soft: rgba(255, 122, 114, .14);
+  --info: #b9ff66; --info-soft: rgba(185, 255, 102, .14); --na: #a2a3ae; --na-soft: #2d2e3a;
+  --drop: 0 5px 0 #b9ff66; --drop-hover: 0 8px 0 #b9ff66; --shadow: var(--drop); --shadow-hover: var(--drop-hover);
+  --sb-bg: #191a23; --sb-ink: #ffffff; --sb-ink-2: #dcdce4; --sb-muted: #8c8d98; --sb-hover: #23242f; --sb-line: #3a3b46; --sb-card: #23242f;
+  color-scheme: dark;
+}
+body, :root[data-theme="dark"] body, :root:not([data-theme="light"]) body, :root[data-theme="light"] body { background: var(--bg) !important; font-family: var(--font) !important; font-size: 15px; color: var(--ink); }
+:root[data-theme] *, :root[data-theme] *::before, :root[data-theme] *::after { font-family: inherit; }
+body, input, select, textarea, button { font-family: var(--font) !important; }
+
+/* headings: Space Grotesk, ink; the second line is a lime marker highlight */
+h1, h2, h3, .pw-head h1, .page-title h1 { font-family: var(--font-display) !important; font-weight: 500 !important; letter-spacing: -.01em !important; color: var(--ink) !important;
+  background: none !important; -webkit-text-fill-color: currentColor !important; }
+h1 .h-dim, #home-hello .h-dim { display: inline !important; color: #191a23 !important; -webkit-text-fill-color: #191a23 !important; background: var(--lime) !important; padding: 0 .18em; border-radius: 8px;
+  box-decoration-break: clone; -webkit-box-decoration-break: clone; font-weight: 500 !important; }
+h1 .h-dim::before, #home-hello .h-dim::before { content: "\A"; white-space: pre; }
+/* section labels: lime highlight boxes */
+.pw-kicker, .adm-kicker, .hx-eyebrow { background: var(--lime) !important; color: #191a23 !important; border: 0 !important; border-radius: 7px !important; padding: 3px 9px !important;
+  font: 500 13px/1.3 var(--font) !important; }
+.pw-kicker::before, .adm-kicker::before, .hx-eyebrow::before { content: none !important; }
+.card > h2, .hr-sec-head h2, .jr-head h2 { display: inline; background: var(--lime); color: #191a23 !important; -webkit-text-fill-color: #191a23 !important; padding: 0 8px; border-radius: 7px; }
+.link-btn { color: var(--ink) !important; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+:root[data-theme="dark"] .link-btn { color: var(--lime) !important; }
+
+/* cards: outline + solid drop line, big radius, grey by default */
+.card, .panel, .pw-pane, .tile, .hr-form, dialog, .fs-pop, .menu-pop, .flow, .ex-card,
+:root:not([data-theme="light"]) .card, :root:not([data-theme="light"]) .panel, :root:not([data-theme="light"]) .pw-pane {
+  background: var(--panel) !important; border: 1px solid var(--line) !important; box-shadow: var(--drop) !important; border-radius: var(--r) !important; }
+.card, .panel, .pw-pane, .tile, .hr-form, .ex-card { transition: transform .15s, box-shadow .15s !important; }
+.card:hover, .jr-card:hover, .ex-card:hover, .tile:hover, .hr-form:hover { transform: translateY(-3px) !important; box-shadow: var(--drop-hover) !important; }
+.hr-form { background: var(--panel-2) !important; border-radius: 22px !important; }
+.tl, .hx-mini > div, .facts li, .rm-row, .pend, .pw-facts > div, .doc-dates, .hr-sync, .hr-cross-note { background: var(--panel-2) !important; border: 1px solid var(--soft-line) !important; border-radius: 16px !important; }
+input, select, textarea, :root[data-theme="dark"] input, :root[data-theme="dark"] select, :root[data-theme="dark"] textarea {
+  background: var(--panel) !important; border: 1px solid var(--line) !important; border-radius: 12px !important; color: var(--ink) !important; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--line) !important; box-shadow: 0 0 0 3px var(--lime) !important; }
+table th { background: var(--panel-2); color: var(--ink) !important; }
+.tag, .jr-state, .pp-badge, .sb-badge, .scope { border-radius: 8px !important; font-weight: 500; }
+.tag.ok, .jr-state.done { background: var(--lime) !important; color: #191a23 !important; }
+
+/* buttons: chunky dark main action (lime on dark), outline others; 14px radius like the template */
+.btn, .hx-actions .btn { font: 500 14.5px/1 var(--font) !important; border-radius: 14px !important; background: var(--panel) !important; border: 1px solid var(--line) !important; color: var(--ink) !important;
+  padding: 11px 18px; box-shadow: none !important; transform: none; }
+.btn:hover, .hx-actions .btn:hover { background: var(--panel-2) !important; transform: translateY(-1px) !important; }
+.btn.primary, :root[data-theme="dark"] .btn.primary, :root[data-theme="light"] .btn.primary, .hx-head #qa-upload, .flow-next .btn.primary,
+:root[data-theme="dark"] .flow-next .btn.primary, :root[data-theme="light"] .flow-next .btn.primary, :root[data-theme="dark"] .hx-head #qa-upload {
+  background: #191a23 !important; border-color: #191a23 !important; color: #ffffff !important; box-shadow: none !important; }
+.btn.primary:hover, .hx-head #qa-upload:hover, .flow-next .btn.primary:hover { background: #2c2d3a !important; color: #fff !important; }
+:root[data-theme="dark"] .btn.primary, :root[data-theme="dark"] .hx-head #qa-upload { background: var(--lime) !important; border-color: var(--lime) !important; color: #191a23 !important; }
+.btn.small { padding: 7px 12px; border-radius: 11px !important; font-size: 13px !important; }
+.icon-btn { border-radius: 10px !important; border: 1px solid var(--soft-line) !important; }
+
+/* sidebar: white, a dark outline on the right, lime pill for the page you are on */
+.sidebar { background: var(--sb-bg) !important; border-right: 1px solid var(--line) !important; }
+.sb-app-mark { background: #191a23 !important; box-shadow: none !important; border-radius: 10px !important; }
+.sb-app-mark svg { fill: var(--lime) !important; }
+:root[data-theme="dark"] .sb-app-mark { background: var(--lime) !important; } :root[data-theme="dark"] .sb-app-mark svg { fill: #191a23 !important; }
+.sb-app-name b { font: 700 17px/1.1 var(--font) !important; }
+.sb-nav button { border-radius: 12px !important; color: var(--sb-ink-2) !important; border: 1px solid transparent !important; }
+.sb-nav button:hover { background: var(--sb-hover) !important; color: var(--sb-ink) !important; }
+.sb-nav button.active, :root[data-theme="dark"] .sb-nav button.active { background: var(--lime) !important; color: #191a23 !important; border-color: #191a23 !important; box-shadow: 0 3px 0 #191a23 !important; font-weight: 600; }
+.sb-nav button.active svg.ico { stroke: #191a23 !important; }
+.sb-nav button.active::before { content: none !important; }
+.sb-nav button.active .sb-step { background: #191a23 !important; border-color: #191a23 !important; color: var(--lime) !important; }
+.sb-step { border-radius: 8px !important; }
+.fs-btn { background: var(--sb-card) !important; border: 1px solid var(--line) !important; border-radius: 18px !important; box-shadow: 0 4px 0 var(--line) !important; }
+.fs-text small { color: var(--ink-2) !important; }
+:root[data-theme="dark"] .fs-text small { color: var(--lime) !important; }
+.sb-foot .avatar, .fs-add, .fs-logo { background: var(--lime) !important; color: #191a23 !important; }
+.theme-switch button.active { background: #191a23 !important; color: #fff !important; }
+:root[data-theme="dark"] .theme-switch button.active { background: var(--lime) !important; color: #191a23 !important; }
+
+/* Dashboard hero: grey stage with the template's line-art – orbit rings, a black disc and lime sparkle stars */
+.hx-head { background: var(--panel-2) !important; border: 1px solid var(--line) !important; box-shadow: var(--drop) !important; border-radius: var(--r-lg) !important;
+  padding: 44px 42% 44px 44px !important; text-align: left !important; min-height: 300px; overflow: hidden; isolation: isolate; }
+:root[data-theme="dark"] .hx-head { background: var(--panel) !important; }
+.hx-head::before { content: "" !important; position: absolute; z-index: 0; top: 50% !important; right: 6% !important; left: auto !important; bottom: auto !important; width: 300px !important; height: 120px !important;
+  margin-top: -60px; transform: rotate(-24deg) !important; border-radius: 50% !important; border: 2px solid var(--ink) !important; background: none !important;
+  box-shadow: 0 0 0 22px transparent, 0 0 0 24px var(--ink) !important; opacity: .9; }
+.hx-head::after { content: "" !important; position: absolute; z-index: 1; top: 50% !important; right: calc(6% + 110px) !important; left: auto !important; bottom: auto !important;
+  width: 86px !important; height: 86px !important; margin-top: -43px; transform: none !important; border-radius: 50% !important; background: #191a23 !important; opacity: 1 !important;
+  -webkit-mask: none !important; mask: none !important; filter: none !important; animation: none !important;
+  box-shadow: 120px -70px 0 -30px var(--lime), -150px 70px 0 -34px var(--lime), 60px 90px 0 -36px var(--ink) !important; }
+:root[data-theme="dark"] .hx-head::after { background: var(--lime) !important; box-shadow: 120px -70px 0 -30px #fff, -150px 70px 0 -34px var(--lime), 60px 90px 0 -36px #fff !important; }
+.hx-head > * { position: relative; z-index: 2; }
+.hx-head h1, #home-hello { color: var(--ink) !important; -webkit-text-fill-color: var(--ink) !important; font-size: clamp(30px, 3.6vw, 50px) !important; line-height: 1.12 !important; }
+.hx-head .muted, #home-sub { color: var(--ink-2) !important; max-width: 520px; text-shadow: none !important; margin: 14px 0 0 !important; }
+.hx-head .hx-date { color: var(--ink-2) !important; font-weight: 500; }
+.hx-actions { justify-content: flex-start !important; gap: 10px !important; margin-top: 26px !important; }
+.hx-head .new-dot { background: var(--lime) !important; color: #191a23 !important; border: 1px solid #191a23; }
+@media (max-width: 860px) { .hx-head { padding: 30px 22px 170px !important; } .hx-head::before { top: auto !important; bottom: 30px !important; right: 50% !important; margin: 0 -150px 0 0; } .hx-head::after { top: auto !important; bottom: 46px !important; right: 50% !important; margin: 0 -43px 0 0; } }
+
+/* process guide: a dark block with lime – like the template's dark sections */
+.flow, :root[data-theme="dark"] .flow { background: #191a23 !important; border-color: #191a23 !important; box-shadow: var(--drop) !important; color: #fff; }
+:root[data-theme="dark"] .flow { border-color: var(--lime) !important; }
+.flow .fl-txt b { color: #ffffff !important; }
+.flow .fl-txt small { color: #b5b6c2 !important; }
+.flow-steps > li > button:hover { background: rgba(255, 255, 255, .06) !important; }
+.flow-steps > li > button:hover .fl-txt b { color: var(--lime) !important; }
+.fl-dot { background: #191a23 !important; border: 2px solid #5a5b66 !important; color: #b5b6c2 !important; box-shadow: none !important; border-radius: 50% !important; }
+.flow-steps > li.done .fl-dot { background: var(--lime) !important; border-color: var(--lime) !important; color: #191a23 !important; }
+.flow-steps > li.done .fl-txt small { color: var(--lime) !important; }
+.flow-steps > li.now:not(.done) .fl-dot { background: #191a23 !important; border: 3px solid var(--lime) !important; color: var(--lime) !important; box-shadow: 0 0 0 6px rgba(185, 255, 102, .18) !important; }
+.flow-steps > li.now:not(.done) .fl-txt small { color: var(--lime) !important; }
+.flow-steps > li:not(:last-child)::after { background: #3a3b46 !important; }
+.flow-steps > li.done:not(:last-child)::after { background: var(--lime) !important; }
+.flow-steps > li.bad .fl-dot { border-color: #ff7a72 !important; color: #ff7a72 !important; background: rgba(255, 122, 114, .12) !important; }
+.flow-steps > li.bad .fl-txt small { color: #ff7a72 !important; }
+.flow-steps > li.here > button { background: rgba(185, 255, 102, .1) !important; }
+.flow-steps > li.here > button::before { background: var(--lime) !important; color: #191a23 !important; border: 1px solid #191a23; }
+.flow-next, .flow-next.done, :root[data-theme="dark"] .flow-next { background: var(--lime) !important; border: 1px solid var(--lime) !important; border-radius: 20px !important; color: #191a23 !important; }
+.flow-next .fn-body b, :root[data-theme="dark"] .flow-next .fn-body b { color: #191a23 !important; font-weight: 600; }
+.flow-next .fn-body small, :root[data-theme="dark"] .flow-next .fn-body small { color: #2d2e3a !important; }
+.fn-badge { background: #191a23 !important; color: var(--lime) !important; border-radius: 8px !important; }
+:root[data-theme="dark"] .flow-next .btn.primary { background: #191a23 !important; border-color: #191a23 !important; color: #fff !important; }
+
+/* the four step cards on the dashboard: grey · lime · dark · grey (the template's service cards) */
+.jr-card { border-radius: 32px !important; padding: 26px !important; }
+#jr-c1, #jr-c4 { background: var(--panel-2) !important; }
+#jr-c2 { background: var(--lime) !important; --ink: #191a23; --ink-2: #2d2e3a; --muted: #3f4050; --panel-2: rgba(255, 255, 255, .55); --soft-line: rgba(25, 26, 35, .25); color: #191a23; }
+#jr-c2 h2 { background: #fff !important; }
+#jr-c3 { background: #191a23 !important; --ink: #ffffff; --ink-2: #dcdce4; --muted: #b5b6c2; --panel-2: #2d2e3a; --panel: #23242f; --soft-line: #3a3b46; color: #fff; }
+:root[data-theme="dark"] #jr-c3 { border-color: var(--lime) !important; }
+#jr-c3 .muted, #jr-c3 small { color: #b5b6c2; }
+#jr-c3 .btn:not(.primary) { background: transparent !important; color: #fff !important; border-color: #fff !important; }
+#jr-c3 .btn.primary { background: var(--lime) !important; border-color: var(--lime) !important; color: #191a23 !important; }
+.jr-num, #jr-c1 .jr-num, #jr-c2 .jr-num, #jr-c3 .jr-num, #jr-c4 .jr-num { background: #191a23 !important; color: var(--lime) !important; border-radius: 50% !important; }
+#jr-c3 .jr-num { background: var(--lime) !important; color: #191a23 !important; }
+.jr-card.current { box-shadow: 0 8px 0 #191a23, 0 0 0 3px var(--lime) !important; }
+.hx-eyebrow { background: #191a23 !important; color: var(--lime) !important; }
+#jr-c3 .hx-eyebrow { background: var(--lime) !important; color: #191a23 !important; }
+.jr-track button { border: 1px solid var(--line) !important; border-radius: 16px !important; box-shadow: 0 3px 0 var(--line) !important; background: var(--panel) !important; }
+.jr-track li.current button { background: var(--lime) !important; color: #191a23 !important; }
+
+/* HR / documents: forms as grey cards with a lime reference tag */
+.hr-no { background: var(--lime) !important; color: #191a23 !important; border-radius: 7px !important; border: 1px solid #191a23; }
+.hr-sum { background: #191a23 !important; color: #fff !important; border-color: #191a23 !important; }
+.hr-sum-main b, .hx-ring b, #hx-pct { color: var(--lime) !important; }
+.hr-sum-main span, .hr-sum-legend, .hr-sum .ok, .hr-sum .warn, .hr-sum .na { color: #dcdce4 !important; }
+.hr-bar { background: #3a3b46 !important; } .hr-bar .ok { background: var(--lime) !important; }
+.hr-tabs button { border: 1px solid var(--line) !important; border-radius: 12px !important; background: var(--panel) !important; color: var(--ink) !important; }
+.hr-tabs button.on, :root[data-theme="dark"] .hr-tabs button.on { background: #191a23 !important; color: var(--lime) !important; box-shadow: 0 3px 0 var(--lime) !important; }
+:root[data-theme="dark"] .hr-tabs button.on { background: var(--lime) !important; color: #191a23 !important; box-shadow: none !important; }
+.hr-status { border-radius: 10px !important; }
+.hr-status.ok { background: var(--lime) !important; color: #191a23 !important; }
+.ex-ic { background: var(--lime) !important; border: 1px solid #191a23; border-radius: 14px !important; filter: none !important; }
+.pp-code { background: var(--lime) !important; color: #191a23 !important; border-radius: 7px !important; }
+
+/* process wizards */
+.pw-num, .pw-steps li.on i, .jr-card.current .jr-num { background: var(--lime) !important; color: #191a23 !important; border: 1px solid #191a23; }
+.pw-steps li.on button { border-color: #191a23 !important; background: var(--panel-2) !important; box-shadow: 0 4px 0 #191a23 !important; }
+.pw-steps li.done i { background: #191a23 !important; color: var(--lime) !important; }
+
+/* AI assistant: dark button with a lime face */
+.ai-fab { background: #191a23 !important; color: #fff !important; border-radius: 14px !important; box-shadow: 0 5px 0 var(--lime) !important; }
+.ai-fab:hover { background: #2c2d3a !important; }
+.ai-fab-ic { background: var(--lime) !important; }
+.ai-fab-ic svg circle, .ai-fab:hover .ai-fab-ic svg circle { fill: #191a23 !important; }
+.ai-panel { border: 1px solid var(--line) !important; box-shadow: var(--drop) !important; border-radius: 24px !important; }
+.ai-head { background: #191a23 !important; color: #fff !important; }
+.ai-head * { color: #fff; }
+.ai-avatar, .ai-send { background: var(--lime) !important; color: #191a23 !important; }
+.ai-msg.user .ai-bubble, :root[data-theme="dark"] .ai-msg.user .ai-bubble { background: #191a23 !important; color: #fff !important; }
+.ai-msg.bot .ai-bubble { background: var(--panel-2) !important; border: 1px solid var(--soft-line); }
+
+/* isometric scene: ink and lime */
+.roof-l { fill: #191a23; } .roof-r { fill: #3a3b46; }
+.drawer .f-r, .drawer .f-t, .drawer .f-l { fill: #b9ff66; }
+.iso-isle.on .slab .f-t { fill: #b9ff66 !important; } .iso-isle.on .slab .f-l { fill: #8ccc42 !important; } .iso-isle.on .slab .f-r { fill: #a6e65a !important; }
+.iso-badge .b-num { fill: #191a23; }
+.iso-isle.now .iso-badge rect { fill: #b9ff66; stroke: #191a23; } .iso-isle.now .iso-badge text { fill: #191a23; }
+.signal circle { stroke: #191a23; }
+:root[data-theme="dark"] .signal circle { stroke: #b9ff66; }
+.iso-dots button.on { background: #191a23 !important; color: var(--lime) !important; }
+
+/* toast, dialogs */
+.toast { background: #191a23 !important; color: #fff !important; border-radius: 14px !important; border: 1px solid var(--lime) !important; }
+dialog { border-radius: 28px !important; }
+
+/* sign-in: grey artwork panel with line-art and lime, a clean outlined form */
+.auth-art { background: var(--panel-2) !important; color: var(--ink) !important; border-right: 1px solid var(--line); }
+.auth-art * { color: var(--ink); }
+.auth-art::after { content: "" !important; left: auto !important; right: 14% !important; bottom: 14% !important; top: auto !important; width: 110px !important; height: 110px !important; border-radius: 50% !important;
+  transform: none !important; background: #191a23 !important; -webkit-mask: none !important; mask: none !important; filter: none !important;
+  box-shadow: 110px -80px 0 -36px #b9ff66, -120px 60px 0 -40px #b9ff66 !important; }
+.auth-art h2 { background: none !important; -webkit-text-fill-color: var(--ink) !important; }
+.auth-art .aa-label, .auth-art .aa-steps span { background: var(--lime) !important; border: 1px solid #191a23 !important; color: #191a23 !important; }
+.auth-art .aa-blocks span { background: #fff !important; border: 1px solid #191a23 !important; box-shadow: 0 4px 0 #191a23; }
+.auth-page .auth-card .btn.primary { background: #191a23 !important; border-color: #191a23 !important; color: #fff !important; }
+.auth-page .auth-card h2 { -webkit-text-fill-color: var(--ink) !important; color: var(--ink) !important; background: none !important; }
+:root[data-theme="dark"] .auth-art { background: #23242f !important; }
+:root[data-theme="dark"] .auth-art * { color: #fff; }
+:root[data-theme="dark"] .auth-art h2 { -webkit-text-fill-color: #fff !important; }
+
+/* v16: the lime marker covers only the words of the second line */
+h1 .h-dim, #home-hello .h-dim { display: block !important; background: none !important; padding: 0 !important; margin-top: .08em; }
+h1 .h-dim::before, #home-hello .h-dim::before { content: none !important; }
+h1 .h-dim mark, #home-hello .h-dim mark { background: var(--lime); color: #191a23; -webkit-text-fill-color: #191a23; padding: 0 .16em; border-radius: 8px;
+  box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+/* v16 fixes: one outline colour on every card; card headings always on their lime label */
+.jr-card, #jr-c1, #jr-c2, #jr-c3, #jr-c4 { border: 1px solid var(--line) !important; border-top: 1px solid var(--line) !important; }
+#jr-c2, #jr-c3 { border-color: #191a23 !important; }
+:root[data-theme="dark"] #jr-c3 { border-color: var(--lime) !important; }
+.card > h2, .hr-sec-head h2, .jr-head h2, #jr-c3 .jr-head h2 { background: var(--lime) !important; color: #191a23 !important; -webkit-text-fill-color: #191a23 !important; padding: 0 8px !important; border-radius: 7px !important; display: inline !important; }
+#jr-c2 .jr-head h2 { background: #ffffff !important; }
+/* v16 fixes: the sidebar uses the theme's own colours in both modes (an older layer set them on the sidebar itself) */
+:root[data-theme="light"] .sidebar, :root:not([data-theme="dark"]) .sidebar { --sb-bg: #ffffff; --sb-ink: #191a23; --sb-ink-2: #3a3b46; --sb-muted: #6b6c78; --sb-hover: #f3f3f3; --sb-line: #191a23; --sb-card: #f3f3f3; }
+:root[data-theme="dark"] .sidebar { --sb-bg: #191a23; --sb-ink: #ffffff; --sb-ink-2: #dcdce4; --sb-muted: #8c8d98; --sb-hover: #23242f; --sb-line: #3a3b46; --sb-card: #23242f; }
+:root[data-theme="dark"] .sb-nav button:not(.active) { color: #dcdce4 !important; }
+:root[data-theme="dark"] .sb-label { color: #8c8d98 !important; }
+.logo-fallback, #logo-fallback { color: #191a23 !important; -webkit-text-fill-color: #191a23 !important; font-weight: 700; }
+.pp-pic span, .np-pic span { color: var(--ink-2) !important; }
+/* v16 contrast fixes (found by the page-wide contrast check) */
+.hr-tabs button.on small { color: inherit !important; opacity: .8; }
+.pp-pic span, .np-pic span { color: #4a4b56 !important; }
+.status-bar button.active, .status-bar button.active * { color: #191a23 !important; }
+:root[data-theme="dark"] .status-bar button.active, :root[data-theme="dark"] .status-bar button.active * { color: #191a23 !important; }
+.status-bar button.active { background: var(--lime) !important; border-color: #191a23 !important; }
+#jr-c3 .hx-strip { background: #2d2e3a !important; }
+#jr-c3 .hx-strip *, #jr-c3 #hx-verdict, #jr-c3 .hx-timeline, #jr-c3 .tl, #jr-c3 .tl * { color: #ffffff; }
+#jr-c3 .tl { background: #2d2e3a !important; border-color: #3a3b46 !important; }
+#jr-c3 .tl.bad .tl-date b, #jr-c3 .tl.bad b { color: #ff9a93 !important; }
+#jr-c3 .tl.warn b { color: #ffd27a !important; }
+#jr-c3 .tone-bad #hx-verdict { color: #ff9a93 !important; }
+#subtabs button.active, :root[data-theme="dark"] #subtabs button.active, .viewswitch button.on, :root[data-theme="dark"] .viewswitch button.on { background: var(--lime) !important; color: #191a23 !important; }
