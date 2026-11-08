@@ -2682,7 +2682,7 @@ function renderDocCards(sel, forms) {
       return `<div class="hr-form trial-locked">
       <div class="hr-form-top"><span class="hr-no blur-txt" aria-hidden="true">Ref. No. ${esc(hrData.facility.code)}/${f.series}/FORM-${nn}</span><span class="tag lock-tag">🔒 Premium</span></div>
       <b class="blur-txt" aria-hidden="true">${esc(f.title)}</b><span class="sr-only">Locked document – part of Premium</span>
-      <small class="muted">Part of Premium – the free trial includes the first ${planState.limits[f.group === 'thirdparty' ? 'thirdparty' : 'hr']} documents.</small>
+      <small class="muted">${(n => (n ? `Part of Premium – the free trial includes the first ${n} documents.` : 'Part of Premium – 3rd-party documents are not included in the free trial.'))(planState.limits[f.group === 'thirdparty' ? 'thirdparty' : 'hr'])}</small>
       <div class="btn-row"><button type="button" class="btn small premium-btn" data-up>🔒 Get Premium</button></div>
     </div>`;
     }
@@ -2757,6 +2757,14 @@ function renderThirdParty() {
   $('#tp-sub').textContent = `${forms.filter(f => f.installed && !f.need.length).length} of ${forms.length} documents ready · Ref. No. ${d.facility.code}/TP/FORM-NN`;
   renderDocCards('#tp-grid', forms);
   renderDocDates('#tp-dates', 'thirdparty');
+  // free trial with no 3rd-party documents included: creating / downloading them opens Get Premium
+  const tpNone = !!planState?.included && !planState.included.thirdparty?.length;
+  for (const [id, label] of [['#tp-gen', '⚙ Create the documents'], ['#tp-zip', '⬇ Word + PDF (.zip)']]) {
+    const b = $(id); if (!b) continue;
+    b.toggleAttribute('data-up', tpNone);
+    b.textContent = tpNone ? `🔒 ${label.slice(2)}` : label;
+  }
+  if (tpNone) $('#tp-sub').textContent = `3rd-party documents are part of Premium · Ref. No. ${d.facility.code}/TP/FORM-NN`;
 }
 $('#tp-gen').onclick = async () => {
   try { const r = await api('/api/hr/generate', { method: 'POST', body: JSON.stringify({ group: 'thirdparty' }) }); toast(`Creating ${r.total} 3rd-party documents (Word + PDF)…`); hrData = await api('/api/hr'); renderThirdParty(); }
@@ -3025,7 +3033,7 @@ document.addEventListener('click', e => {
       const p = planState;
       $('#up-meters').innerHTML = p?.limits ? Object.keys(KIND).map(k => {
         const lim = p.limits[k];
-        if (k !== 'facilities') return `<div class="up-meter"><span>${KIND[k]}</span><b>First ${lim} included · rest 🔒</b><i style="--w:100%"></i></div>`;
+        if (k !== 'facilities') return `<div class="up-meter${lim ? '' : ' up-locked'}"><span>${KIND[k]}</span><b>${lim ? `First ${lim} included · rest 🔒` : '🔒 Premium only'}</b><i style="--w:100%"></i></div>`;
         const used = p.usage.facilities || 0;
         return `<div class="up-meter${used >= lim ? ' full' : ''}"><span>${KIND[k]}</span><b>${Math.min(used, lim)} / ${lim} created</b><i style="--w:${lim ? Math.min(100, (used / lim) * 100) : 100}%"></i></div>`;
       }).join('') + '<div class="up-meter up-locked"><span>LEGAL REGISTER</span><b>🔒 Preview</b><i style="--w:100%"></i></div>' : '';
