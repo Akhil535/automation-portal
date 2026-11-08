@@ -764,12 +764,14 @@ test('10i. policy preparation: templates are filled for a facility (ID, dates, n
   P.unlockTemplates('tester', 'UNLOCK');
   assert.ok(!doc.includes('rIdOldStamp'), 'old stamp removed');
   assert.equal((doc.match(/name="Signature"|name="Stamp"/g) || []).length, 2, 'signature and stamp placed');
-  // side by side in ONE paragraph of the Approval Signature cell (never stacked, never on top of each other)
+  // side by side in ONE paragraph directly below the version table (natural size, never stacked, never squeezed
+  // into the Approval Signature cell)
   const sigPara = (doc.match(/<w:p>(?:(?!<\/w:p>)[\s\S])*?<\/w:p>/g) || []).find(p => p.includes('name="Signature"'));
   assert.ok(sigPara && sigPara.includes('name="Stamp"'), 'signature and stamp side by side in one line');
   const lastTable = doc.lastIndexOf('</w:tbl>');
-  assert.ok(doc.indexOf('name="Signature"') < lastTable && doc.indexOf('name="Stamp"') < lastTable, 'signature and stamp inside the version table (Approval Signature cell) – no extra page');
-  assert.ok(!/<w:drawing>/.test(doc.slice(lastTable)), 'nothing after the closing table');
+  assert.ok(doc.indexOf('name="Signature"') > lastTable && doc.indexOf('name="Stamp"') > lastTable, 'signature and stamp below the version table');
+  assert.equal(doc.indexOf(sigPara), lastTable + '</w:tbl>'.length, 'directly under the table – nothing in between');
+  assert.ok(!/<w:drawing>/.test(doc.slice(0, lastTable).slice(doc.lastIndexOf('<w:tbl>'))), 'the Approval Signature cell is left empty');
   assert.deepEqual(job.results[0].report.mismatches, [], 'every value read back correctly');
   const hdr = await out.file('word/header1.xml').async('string');
   assert.ok(/r:embed="rIdLrp\d+"/.test(hdr), 'logo replaced in the page header');

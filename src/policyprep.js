@@ -1012,9 +1012,11 @@ export async function fillPolicy(templateBuffer, tpl, s, pics = {}, opts = {}) {
     zip.file(relsPath, rels);
   }
 
-  // 4. Signature and stamp go INTO the "Approval Signature" cell of the latest version row, so they always sit on
-  //    the concluding page together with the table – never on an extra page of their own (DoH submissions). The
-  //    template's old signature / stamp pictures after the table, and the empty lines that held them, are removed.
+  // 4. Signature and stamp go directly BELOW the version / revision table, at their natural size (side by side,
+  //    centred), so they look signed and stamped by hand – not squeezed into the narrow Approval Signature cell.
+  //    They stay on the table's page: when they would push the document onto an extra page, the policy is made again
+  //    with them smaller (opts.signatureScale), see generatePolicies. The template's old signature / stamp pictures
+  //    after the table, and the empty lines that held them, are removed.
   const rev2 = revisionTable(xml);
   if (rev2) {
     const before = xml.slice(0, rev2.t.e);
@@ -1028,39 +1030,28 @@ export async function fillPolicy(templateBuffer, tpl, s, pics = {}, opts = {}) {
     if (!/^\s*<w:p[\s>]/.test(after)) after = tiny + after;
     xml = before + after;
 
-    // Signature and stamp side by side (never on top of each other) inside the Approval Signature cell of the
-    // latest version row. opts.signatureScale < 1: smaller (used automatically when the row would spill a page).
+    // Signature and stamp side by side (never on top of each other) under the table, natural proportions:
+    // [name, picture, max height cm, max width cm]. opts.signatureScale < 1: smaller (only to avoid an extra page).
     const k = Math.min(1, Math.max(0.3, opts.signatureScale || 1));
-    const sig = pics.combined ? [['Signature and stamp', pics.combined, 2.4 * k]]
-      : [pics.signature && ['Signature', pics.signature, 1.3 * k], pics.stamp && ['Stamp', pics.stamp, 1.9 * k]].filter(Boolean);
+    const sig = pics.combined ? [['Signature and stamp', pics.combined, 3.0 * k, 9 * k]]
+      : [pics.signature && ['Signature', pics.signature, 1.8 * k, 6 * k], pics.stamp && ['Stamp', pics.stamp, 2.8 * k, 3.4 * k]].filter(Boolean);
     if (sig.length) {
       const r3 = revisionTable(xml);
-      const data = r3.t.rows.slice(r3.header + 1);
-      const latest = data[Math.min(historyRows(version, s).length, data.length) - 1];
-      const c = r3.cols.sign >= 0 && latest ? latest.cells[r3.cols.sign] : null;
       let id = 9001;
-      const pictures = async maxW => {
-        const runs = [];
-        const sideBySide = sig.length > 1;
-        const gap = 0.12 * EMU_CM; // small space between signature and stamp
-        for (const [name, img, hCm] of sig) {
-          const rid = await addMedia(zip, 'word/_rels/document.xml.rels', img.buffer, `lrp-${name.split(' ')[0].toLowerCase()}`);
-          const [w, h] = fit(img, sideBySide ? Math.floor((maxW - gap * (sig.length - 1)) / sig.length) : maxW, hCm * EMU_CM);
-          runs.push(inlinePicture(rid, id++, name, w, h, sideBySide ? gap / 2 : 0));
-        }
-        const pPr = `<w:pPr><w:spacing w:before="${k < 1 ? 0 : 40}" w:after="${k < 1 ? 0 : 40}"/><w:jc w:val="center"/></w:pPr>`;
-        return sideBySide ? `<w:p>${pPr}${runs.join('')}</w:p>` : runs.map(r => `<w:p>${pPr}${r}</w:p>`).join('');
-      };
-      if (c) {
-        const cx = xml.slice(c.s, c.e);
-        const tcW = cx.match(/<w:tcW w:w="(\d+)" w:type="(\w+)"/);
-        const cellW = tcW && tcW[2] === 'dxa' ? Number(tcW[1]) * 635 : 3.5 * EMU_CM; // twips -> EMU
-        const usable = Math.max(1.6 * EMU_CM, cellW - 0.45 * EMU_CM);
-        const tcOpen = cx.match(/^<w:tc(?:\s[^>]*)?>/)[0];
-        const tcPr = cx.match(/<w:tcPr>[\s\S]*?<\/w:tcPr>/)?.[0] || '';
-        xml = xml.slice(0, c.s) + `${tcOpen}${tcPr}${await pictures(usable)}</w:tc>` + xml.slice(c.e);
+      // one line of pictures under the table: signature then stamp, a clear space between them, centred
+      const runs = [];
+      const gap = 1.0 * EMU_CM;
+      for (const [name, img, hCm, wCm] of sig) {
+        const rid = await addMedia(zip, 'word/_rels/document.xml.rels', img.buffer, `lrp-${name.split(' ')[0].toLowerCase()}`);
+        const [w, h] = fit(img, wCm * EMU_CM, hCm * EMU_CM);
+        runs.push(inlinePicture(rid, id++, name, w, h, sig.length > 1 ? gap / 2 : 0));
+      }
+      const para = `<w:p><w:pPr><w:keepLines/><w:spacing w:before="${k < 1 ? 40 : 160}" w:after="0" w:line="240" w:lineRule="auto"/><w:jc w:val="center"/></w:pPr>${runs.join('')}</w:p>`;
+      if (r3) {
+        // the table's last row keeps with the pictures (they never start a page of their own)
+        xml = xml.slice(0, r3.t.e) + para + xml.slice(r3.t.e);
         filled.add('signature');
-      } // no Approval Signature cell: nothing is placed outside the table - reported as "signature not found"
+      }
     }
   }
   zip.file('word/document.xml', xml);
