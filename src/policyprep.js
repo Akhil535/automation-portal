@@ -1343,13 +1343,15 @@ export function generatedFile(cfg, type, name) {
   if (!fs.existsSync(f)) throw new Error('File not found - generate the policies first');
   return f;
 }
-export async function zipGenerated(cfg, type) {
+/** The policy number in a generated file name ("CODE - PO07 - …"). */
+export const policyNoOf = name => Number(/\bPO(\d{2})\b/.exec(name)?.[1]) || null;
+export async function zipGenerated(cfg, type, keep = null) {
   const d = outputDirs(cfg);
   const zip = new JSZip();
   for (const t of type === 'all' ? ['word', 'pdf'] : [type]) {
     const folder = t === 'pdf' ? d.pdf : d.word;
     if (!fs.existsSync(folder)) continue;
-    for (const f of fs.readdirSync(folder).filter(x => !x.startsWith('~$'))) zip.file(`${t === 'pdf' ? 'PDF' : 'Word'}/${f}`, fs.readFileSync(path.join(folder, f)));
+    for (const f of fs.readdirSync(folder).filter(x => !x.startsWith('~$') && (!keep || keep(x)))) zip.file(`${t === 'pdf' ? 'PDF' : 'Word'}/${f}`, fs.readFileSync(path.join(folder, f)));
   }
   if (!Object.keys(zip.files).length) throw new Error('Nothing generated yet');
   return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });

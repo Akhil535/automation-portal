@@ -649,16 +649,25 @@ export async function formFile(id, key, format = 'pdf') {
 }
 
 /** Every installed form of the facility (Word + PDF) as one ZIP; forms that cannot be made yet are listed. */
-export async function formsZip(id, type = 'all', group = null) {
+/** Kind of a form for the plans: HR + training count as 'hr', vendor forms as 'thirdparty'. */
+export const formKind = key => (HR_FORMS.find(f => f.key === key)?.group === 'thirdparty' ? 'thirdparty' : 'hr');
+export const installedForms = (group = null) => HR_FORMS.filter(d => loadIndex()[d.key] && (!group || d.group === group || (group === 'hr' && d.group === 'training')));
+
+/** The filled forms of a facility (Word buffer, and the PDF file unless type is 'word'). only: keys to include. */
+export async function formItems(id, { type = 'all', group = null, only = null } = {}) {
   const cfg = loadConfig(id);
   const pics = await printPics(cfg);
   const items = [], problems = [];
-  for (const d of HR_FORMS.filter(f => !group || f.group === group || (group === 'hr' && f.group === 'training'))) {
-    if (!loadIndex()[d.key]) continue;
-    try { items.push(await fillForm(id, d.key, { cfg, pics })); } catch (e) { problems.push(e.message); }
+  for (const d of installedForms(group).filter(f => !only || only.has(f.key))) {
+    try { items.push({ ...(await fillForm(id, d.key, { cfg, pics })), key: d.key, group: d.group }); } catch (e) { problems.push(e.message); }
   }
+  if (items.length && type !== 'word') await toPdf(cfg, items);
+  return { cfg, items, problems };
+}
+
+export async function formsZip(id, type = 'all', group = null, only = null) {
+  const { cfg, items, problems } = await formItems(id, { type, group, only });
   if (!items.length) throw new Error(problems[0] || 'No HR forms uploaded yet');
-  if (type !== 'word') await toPdf(cfg, items);
   const zip = new JSZip();
   for (const it of items) {
     if (type !== 'pdf') zip.file(`Word/${it.file}.docx`, it.buffer);
@@ -676,10 +685,10 @@ export async function formsZip(id, type = 'all', group = null) {
  */
 const hrJobs = new Map();
 export const hrJobState = id => hrJobs.get(id) || null;
-export function generateForms(id, { pdf = true, group = null } = {}) {
+export function generateForms(id, { pdf = true, group = null, only = null } = {}) {
   if (hrJobs.get(id)?.running) throw new Error('The HR documents are already being created');
   const index = loadIndex();
-  const defs = HR_FORMS.filter(d => index[d.key] && (!group || d.group === group || (group === 'hr' && d.group === 'training')));
+  const defs = HR_FORMS.filter(d => index[d.key] && (!group || d.group === group || (group === 'hr' && d.group === 'training')) && (!only || only.has(d.key)));
   if (!defs.length) throw new Error('No master HR forms are uploaded yet – an administrator adds them on the HR & checklist page');
   const job = { running: true, started: new Date().toISOString(), total: defs.length, done: 0, step: 'Preparing…', results: [], problems: [] };
   hrJobs.set(id, job);

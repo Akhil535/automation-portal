@@ -17,6 +17,9 @@ import { Store } from './src/store.js';
 import { ASSISTANT_MODEL, ask, assistantConfigured, setAssistantKey } from './src/assistant.js';
 import { applyReview, currentRun, runAll, runMonitor } from './src/monitor.js';
 import { startScheduler } from './src/scheduler.js';
+import { formKind, installedForms } from './src/hrforms.js';
+import { MODULE_KEYS, buildPackage, packageTree } from './src/package.js';
+import { allowedSet, claim, isTrial, planInfo, setTrialLimits, trialLimits, upgradeError } from './src/plans.js';
 import { addForms, addItem, checklistXlsx, crossCheck, formFile, formsStatus, formsZip, generateForms, getChecklist, pdfState, prewarmPdfs, saveDocSettings, GROUPS, importMasterChecklist, listForms, masterChecklist, removeForm, removeItem, resetChecklist, updateItem } from './src/hrforms.js';
 import { documentHeader, sendMail } from './src/mailer.js';
 import { lockReason, readLogo, readRegister } from './src/xlsx.js';
@@ -24,7 +27,7 @@ import { imageSize } from './src/policy.js';
 import { htmlToPdf, logoDataUrl, reportHtml } from './src/report.js';
 import {
   MAJOR_REVISION, addTemplates, assetFile, generatePolicies, generatedFile, generatedFiles, jobState, listTemplates,
-  prepSettings, readiness, registerSourcePolicy, removeAsset, removeTemplate, saveAsset, saveSettings, zipGenerated,
+  prepSettings, readiness, registerSourcePolicy, removeAsset, removeTemplate, saveAsset, saveSettings, zipGenerated, policyNoOf,
   detectPictures, lockTemplates, masterFile, masterParagraphs, picturePreview, previewPolicy, saveMasterEdits, templateLock, unlockTemplates,
 } from './src/policyprep.js';
 import {
@@ -83,7 +86,9 @@ app.use((req, res, next) => {
 // Role required for each kind of request, and the facility it concerns.
 function requiredRole(req) {
   const p = req.path, m = req.method;
-  if (p.startsWith('/api/account/') || p === '/api/me') return 'viewer';
+  if (p.startsWith('/api/account/') || p === '/api/me' || p === '/api/plan' || p === '/api/plan/request') return 'viewer';
+  if (m === 'DELETE') return 'admin'; // deleting (entries, items, pictures, facilities, users…) is for administrators only
+  if (p === '/api/plans') return m === 'GET' ? 'viewer' : 'admin';
   if (p === '/api/assistant/ask') return 'viewer'; // everyone may ask (read-only answers)
   if (p === '/api/assistant/key') return 'admin';
   if (p.startsWith('/api/users')) return 'admin';
@@ -104,7 +109,7 @@ app.use((req, res, next) => {
   if (!roleAtLeast(req.user, need)) return res.status(403).json({ error: `Your role (${req.user.role}) cannot do this - ${need} access needed` });
   // Requests that are not about one facility (pages, own account, the facility list, users) need no facility.
   const p = req.path;
-  if (!(p.startsWith('/api/') || p.startsWith('/reports/')) || p === '/api/me' || p.startsWith('/api/account/') || p.startsWith('/api/users')
+  if (!(p.startsWith('/api/') || p.startsWith('/reports/')) || p === '/api/me' || p.startsWith('/api/plan') || p.startsWith('/api/account/') || p.startsWith('/api/users')
     || (p === '/api/facilities' && (req.method === 'GET' || req.method === 'POST'))) return next(); // listing / creating: no facility needed (the creator gets access)
   const facs = loadFacilities();
   // The master template facility (the baseline every new facility is copied from) is for administrators only.
@@ -120,8 +125,25 @@ app.use((req, res, next) => {
   next();
 });
 
+/** Free trial: what is locked – the LEGAL REGISTER (edits, DoH checks, reviews, register downloads and reports). */
+function trialLocked(req) {
+  const p = req.path, m = req.method;
+  if (/^\/api\/(master|document-control)(\/|$)/.test(p) && m !== 'GET') return true;
+  if (p === '/api/master/export' || p === '/api/export/pdf' || p === '/api/register/download' || p.startsWith('/reports/')) return true;
+  // ("all facilities" is not caught here: it is refused as admin-only first)
+  if ((p === '/api/run' && !(req.body?.all && req.user.role !== 'admin')) || p === '/api/policies/link-register' || /^\/api\/circulars\/[^/]+\/review$/.test(p)) return true;
+  if (/^\/api\/facilities\/[^/]+\/(register|policy|documents\/apply)$/.test(p)) return true;
+  return false;
+}
+app.use((req, res, next) => {
+  if (req.user && isTrial(req.user) && trialLocked(req)) {
+    return res.status(402).json({ error: 'The LEGAL REGISTER is a locked preview on the free trial – Get Premium to unlock full compliance packs.', upgrade: true, info: { kind: 'register' } });
+  }
+  next();
+});
+
 app.use(express.static(path.join(APP_DIR, 'public')));
-const wrap = fn => (req, res) => Promise.resolve(fn(req, res)).catch(e => res.status(e.status || 400).json({ error: e.message }));
+const wrap = fn => (req, res) => Promise.resolve(fn(req, res)).catch(e => res.status(e.status || 400).json({ error: e.message, ...(e.upgrade ? { upgrade: true, info: e.info || {} } : {}) }));
 const fac = req => req.query.f || req.facOverride || undefined;
 
 // --- sign-in API (public) ---
@@ -167,6 +189,24 @@ app.post('/api/auth/logout', wrap(async (req, res) => { endSession(cookies(req)[
 
 // --- own account ---
 app.get('/api/me', wrap(async (req, res) => res.json(req.user)));
+/** The signed-in user's plan: trial limits and what is used (premium: no limits). */
+app.get('/api/plan', wrap(async (req, res) => res.json(planInfo(req.user))));
+/** The trial limits (administrators change them). */
+/** A trial user asks for Premium: the administrators are told (e-mail when configured; shown in Users & security). */
+app.post('/api/plan/request', wrap(async (req, res) => {
+  if (!isTrial(req.user)) return res.json({ ok: true, already: true });
+  const note = String(req.body?.note || '').trim().slice(0, 300);
+  updateUser(req.user.id, { premiumRequest: { at: new Date().toISOString(), note } });
+  const admins = loadUsers().users.filter(x => x.role === 'admin' && x.email && x.status !== 'pending').map(x => x.email);
+  if (admins.length) {
+    const h = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    sendMail(loadConfig(), `Premium requested: ${req.user.username}`, `<p><b>${h(req.user.username)}</b> (${h(req.user.email || 'no e-mail')}) asked for Premium.${note ? ` Note: ${h(note)}` : ''}</p><p>Change their plan in Admin console → Users &amp; security.</p>`, admins)
+      .catch(e => console.log(`premium request notice not sent: ${e.message}`));
+  }
+  res.json({ ok: true });
+}));
+app.get('/api/plans', wrap(async (req, res) => res.json({ trial: trialLimits() })));
+app.put('/api/plans', wrap(async (req, res) => res.json({ trial: setTrialLimits(req.body?.trial || req.body || {}) })));
 app.post('/api/account/password', wrap(async (req, res) => {
   changeOwnPassword(req.user.id, req.body?.current, req.body?.next);
   res.json({ ok: true });
@@ -289,6 +329,7 @@ app.get('/api/policies', wrap(async (req, res) => {
 /** Preview one policy with the values in the form (fresh every time, nothing saved). */
 app.post('/api/policies/preview', express.json({ limit: '40mb' }), wrap(async (req, res) => {
   const b = req.body || {};
+  claim(req.user, 'policies', [Number(b.no) || listTemplates()[0]?.no || 1]);
   const r = await previewPolicy(fac(req), { no: b.no, form: b.form || {}, pics: b.pics || {}, newFacility: !!b.newFacility, format: b.format });
   res.set({
     'Content-Type': r.type === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -341,10 +382,13 @@ app.get('/api/policies/assets/:kind', wrap(async (req, res) => {
   res.sendFile(path.resolve(f));
 }));
 app.post('/api/policies/generate', wrap(async (req, res) => {
-  const job = generatePolicies(facId(req), { pdf: req.body?.pdf !== false });
-  res.json({ started: true, total: job.total });
+  const ok = claim(req.user, 'policies', listTemplates().map(t => t.no));
+  const job = generatePolicies(facId(req), { pdf: req.body?.pdf !== false, only: ok ? [...ok].map(Number) : undefined });
+  res.json({ started: true, total: job.total, limited: ok ? { count: ok.size, of: listTemplates().length } : null });
 }));
 app.get('/api/policies/file', wrap(async (req, res) => {
+  const ok = allowedSet(req.user, 'policies');
+  if (ok && !ok.has(String(policyNoOf(String(req.query.name || ''))))) throw upgradeError('This policy is not part of your free trial');
   const f = generatedFile(loadConfig(fac(req)), req.query.type, req.query.name);
   if (req.query.inline && f.endsWith('.pdf')) { res.type('application/pdf'); return res.sendFile(path.resolve(f)); }
   res.download(f);
@@ -352,7 +396,8 @@ app.get('/api/policies/file', wrap(async (req, res) => {
 app.get('/api/policies/zip', wrap(async (req, res) => {
   const cfg = loadConfig(fac(req));
   const type = ['word', 'pdf'].includes(req.query.type) ? req.query.type : 'all';
-  const buf = await zipGenerated(cfg, type);
+  const ok = allowedSet(req.user, 'policies');
+  const buf = await zipGenerated(cfg, type, ok ? n => ok.has(String(policyNoOf(n))) : null);
   res.set({ 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${cfg._facility.code} POLICIES ${type === 'all' ? 'Word + PDF' : type.toUpperCase()}.zip"` }).send(buf);
 }));
 /** Step 3: link the prepared policies to the Legal Register (facility details, approver, author from PO01). */
@@ -368,6 +413,19 @@ app.post('/api/policies/link-register', wrap(async (req, res) => {
 }));
 
 // --- HR & onboarding forms and the ADHICS document checklist ---
+/** Free trial: the HR / vendor forms this user may get (claimed in page order, per kind); null = premium (all). */
+function hrAllowed(user, group) {
+  if (!isTrial(user)) return null;
+  const keys = installedForms(group).map(d => d.key), ok = new Set();
+  let last = null;
+  for (const kind of ['hr', 'thirdparty']) {
+    const mine = keys.filter(k => formKind(k) === kind);
+    if (!mine.length) continue;
+    try { for (const k of claim(user, kind, mine)) ok.add(k); } catch (e) { last = e; }
+  }
+  if (!ok.size) throw last || upgradeError('No documents left on the free trial');
+  return ok;
+}
 const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const dispo = (kind, name) => `${kind}; filename="${String(name).replace(/[^\x20-\x7e]/g, '-').replace(/"/g, '')}"; filename*=UTF-8''${encodeURIComponent(name)}`;
 app.get('/api/hr', wrap(async (req, res) => {
@@ -377,18 +435,19 @@ app.get('/api/hr', wrap(async (req, res) => {
 }));
 /** One HR form filled for the facility (name, code, logo; Acceptable Usage follows PO11) - PDF to view or Word. */
 app.get('/api/hr/forms/:key', wrap(async (req, res) => {
+  claim(req.user, formKind(req.params.key), [req.params.key]);
   const r = await formFile(facId(req), req.params.key, req.query.format === 'docx' ? 'docx' : 'pdf');
   res.set({ 'Content-Type': r.type === 'pdf' ? 'application/pdf' : DOCX, 'Content-Disposition': dispo(req.query.inline && r.type === 'pdf' ? 'inline' : 'attachment', r.name),
     'Cache-Control': 'no-store', 'X-HR-Report': encodeURIComponent(JSON.stringify(r.report)) }).send(r.buffer);
 }));
 /** Step 2 of the sequence: all HR & onboarding documents as Word + PDF in the facility folder (background job). */
-app.post('/api/hr/generate', wrap(async (req, res) => { const g = GROUPS[req.body?.group] ? req.body.group : null; const job = generateForms(facId(req), { pdf: req.body?.pdf !== false, group: g }); res.json({ started: true, total: job.total }); }));
+app.post('/api/hr/generate', wrap(async (req, res) => { const g = GROUPS[req.body?.group] ? req.body.group : null; const only = hrAllowed(req.user, g); const job = generateForms(facId(req), { pdf: req.body?.pdf !== false, group: g, only }); res.json({ started: true, total: job.total, limited: only ? { count: only.size } : null }); }));
 /** Dates in the training / 3rd-party documents: one date for all (default) or own dates per document; editable details. */
 app.put('/api/hr/documents', wrap(async (req, res) => { const id = facId(req); const r = saveDocSettings(id, req.body || {}); prewarmPdfs(id); res.json(r); }));
 app.get('/api/hr/zip', wrap(async (req, res) => {
   const type = ['word', 'pdf'].includes(req.query.type) ? req.query.type : 'all';
   const g = GROUPS[req.query.group] ? req.query.group : null;
-  const r = await formsZip(facId(req), type, g);
+  const r = await formsZip(facId(req), type, g, hrAllowed(req.user, g));
   const what = g === 'thirdparty' ? '3RD-PARTY DOCUMENTS' : g ? 'HR & TRAINING DOCUMENTS' : 'HR DOCUMENTS';
   res.set({ 'Content-Type': 'application/zip', 'Content-Disposition': dispo('attachment', `${r.code} ${what} ${type === 'all' ? 'Word + PDF' : type.toUpperCase()}.zip`) }).send(r.buffer);
 }));
@@ -472,6 +531,10 @@ app.post('/api/facilities', wrap(async (req, res) => {
   const b = { ...(req.body || {}) };
   // Managers: a new facility is copied from the master template or from a facility they can open – never from
   // someone else's facility, and never from a file path on this PC (attaching an existing register is for admins).
+  if (isTrial(req.user)) {
+    const lim = trialLimits().facilities, have = (req.user.facilities || []).filter(x => x !== '*').length;
+    if (have >= lim) throw upgradeError(`The free trial includes ${lim} facilit${lim === 1 ? 'y' : 'ies'}`, { kind: 'facilities', limit: lim });
+  }
   if (req.user.role !== 'admin') {
     const facs0 = loadFacilities();
     if (b.source && b.source !== 'template') throw Object.assign(new Error('Only an administrator can add a facility from an existing register'), { status: 403 });
@@ -592,6 +655,16 @@ app.post('/api/circulars/:key/review', wrap(async (req, res) => {
   const { values, reviewer, note } = req.body || {};
   const { text, ...rest } = await applyReview(req.params.key, values || {}, reviewer, note, fac(req));
   res.json(rest);
+}));
+
+// The facility pack: [Facility]/Policies, HR & Onboarding Documents, 3rd-Party Vendor Documents, Legal Register & Reports
+const packAllow = user => (isTrial(user) ? { policies: allowedSet(user, 'policies'), hr: allowedSet(user, 'hr'), thirdparty: allowedSet(user, 'thirdparty'), register: false } : {});
+app.get('/api/package', wrap(async (req, res) => res.json({ ...packageTree(facId(req), packAllow(req.user)), plan: planInfo(req.user) })));
+app.get('/api/package.zip', wrap(async (req, res) => {
+  const modules = String(req.query.modules || '').split(',').filter(m => MODULE_KEYS.includes(m));
+  const type = ['word', 'pdf'].includes(req.query.type) ? req.query.type : 'all';
+  const r = await buildPackage(facId(req), { modules: modules.length ? modules : MODULE_KEYS, type, allow: packAllow(req.user), extras: { reportPdf: async () => htmlToPdf((await snapshot(req, false)).html) } });
+  res.set({ 'Content-Type': 'application/zip', 'Content-Disposition': dispo('attachment', r.name), 'Cache-Control': 'no-store' }).send(r.buffer);
 }));
 
 // Master table (LEGAL REGISTER sheet) and document-control header --------------------------------

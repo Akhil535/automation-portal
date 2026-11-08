@@ -29,7 +29,7 @@ const usersFile = () => path.join(dir(loadGlobalConfig(), 'data'), 'users.json')
 export function loadUsers() {
   try { return JSON.parse(fs.readFileSync(usersFile(), 'utf8')); } catch { return { users: [] }; }
 }
-function saveUsers(data) {
+export function saveUsers(data) {
   const f = usersFile(), tmp = f + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
   replaceFile(tmp, f);
@@ -40,7 +40,12 @@ export const publicUser = u => u && ({
   id: u.id, username: u.username, role: u.role, facilities: u.facilities, email: u.email || '', twoFactor: !!u.totp?.enabled,
   mustChangePassword: !!u.mustChangePassword, lastLogin: u.lastLogin || null, createdAt: u.createdAt, locked: !!(u.lockedUntil && u.lockedUntil > Date.now()),
   status: u.status || 'active', fullName: u.fullName || '', requestNote: u.requestNote || '',
+  // plan: administrators are never limited; accounts made before plans existed stay premium (nobody is locked out)
+  plan: u.role === 'admin' ? 'premium' : u.plan === 'trial' ? 'trial' : 'premium',
+  premiumRequest: u.premiumRequest || null,
+  usage: { policies: u.usage?.policies?.length || 0, hr: u.usage?.hr?.length || 0, thirdparty: u.usage?.thirdparty?.length || 0 },
 });
+export const PLANS = ['trial', 'premium'];
 
 export function checkPassword(pw) {
   const p = String(pw || '');
@@ -51,7 +56,8 @@ export function checkPassword(pw) {
 const USERNAME = /^[A-Za-z0-9._@-]{3,40}$/;
 
 /** Create a user. role: admin | manager | viewer; facilities: ['*'] or facility ids. */
-export function createUser({ username, password, role = 'viewer', facilities = ['*'], email = '' }, { mustChangePassword = true } = {}) {
+export function createUser({ username, password, role = 'viewer', facilities = ['*'], email = '', plan = 'trial' }, { mustChangePassword = true } = {}) {
+  if (!PLANS.includes(plan)) throw new Error('Unknown plan');
   if (!USERNAME.test(username || '')) throw new Error('Username: 3-40 letters, digits or . _ @ -');
   if (!ROLES.includes(role)) throw new Error('Unknown role');
   const bad = checkPassword(password);
@@ -61,7 +67,7 @@ export function createUser({ username, password, role = 'viewer', facilities = [
   const u = {
     id: crypto.randomUUID(), username: username.trim(), hash: bcrypt.hashSync(password, BCRYPT_COST), role,
     facilities: role === 'admin' ? ['*'] : facilityScope(facilities), email: String(email || '').trim(),
-    totp: null, mustChangePassword, failed: 0, lockedUntil: 0, createdAt: new Date().toISOString(),
+    totp: null, mustChangePassword, failed: 0, lockedUntil: 0, createdAt: new Date().toISOString(), plan: role === 'admin' ? 'premium' : plan,
   };
   data.users.push(u);
   saveUsers(data);
@@ -85,7 +91,7 @@ export function registerUser({ username, password, email, fullName, note } = {})
   if (findUser(data, username)) throw new Error(`The username "${username}" is taken - choose another`);
   if (data.users.filter(u => u.status === 'pending').length >= MAX_PENDING) throw Object.assign(new Error('Too many requests are waiting for approval - ask an administrator'), { status: 429 });
   const u = {
-    id: crypto.randomUUID(), username: username.trim(), hash: bcrypt.hashSync(password, BCRYPT_COST), role: 'viewer', facilities: [],
+    id: crypto.randomUUID(), username: username.trim(), hash: bcrypt.hashSync(password, BCRYPT_COST), role: 'viewer', facilities: [], plan: 'trial',
     email: String(email).trim(), fullName: name, requestNote: String(note || '').trim().slice(0, 300), status: 'pending',
     totp: null, mustChangePassword: false, failed: 0, lockedUntil: 0, createdAt: new Date().toISOString(),
   };
@@ -114,6 +120,13 @@ export function updateUser(id, fields) {
     u.role = fields.role;
   }
   if (fields.facilities !== undefined || fields.role !== undefined) u.facilities = u.role === 'admin' ? ['*'] : facilityScope(fields.facilities ?? u.facilities);
+  if (fields.plan !== undefined) {
+    if (!PLANS.includes(fields.plan)) throw new Error('Unknown plan');
+    u.plan = fields.plan;
+  }
+  if (fields.resetUsage) u.usage = {};
+  if (fields.premiumRequest !== undefined) u.premiumRequest = fields.premiumRequest;
+  if (fields.plan === 'premium') u.premiumRequest = null;
   if (fields.email !== undefined) u.email = String(fields.email).trim();
   if (fields.password !== undefined) {
     const bad = checkPassword(fields.password);

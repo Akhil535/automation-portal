@@ -13,6 +13,7 @@ import { Store } from './store.js';
 import { RegisterLockedError, applyChanges, readRegister } from './xlsx.js';
 import { syncReleaseDate } from './master.js';
 import { runHtml, sendMail } from './mailer.js';
+import { trialOnlyFacility } from './plans.js';
 
 const LABELS = {
   success: 'Completed – register updated',
@@ -299,6 +300,7 @@ export async function runAll(mode = 'update', opts = {}) {
     const runs = [];
     for (const f of list) {
       if (!f.register?.path) continue;
+      if (trialOnlyFacility(f)) continue; // free trial: the LEGAL REGISTER is a preview that is not updated
       runs.push(await runMonitor(mode, { ...opts, facility: f.id, listing, inBatch: true }));
     }
     return runs;

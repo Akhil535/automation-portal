@@ -541,7 +541,7 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
   const A = await import('../src/auth.js');
   const port = 18000 + Math.floor(Math.random() * 1000);
   const srv = spawn(process.execPath, ['--use-system-ca', path.join(APP, 'server.js'), '--no-scheduler'],
-    { env: { ...process.env, DOH_PORTAL_CONFIG: cfgPath, DOH_PORTAL_PORT: String(port), DOH_PORTAL_HOST: '127.0.0.1' }, stdio: 'ignore' });
+    { env: { ...process.env, DOH_PORTAL_CONFIG: cfgPath, DOH_PORTAL_PORT: String(port), DOH_PORTAL_HOST: '127.0.0.1' }, stdio: process.env.SHOW_SRV ? 'inherit' : 'ignore' });
   const base = `http://127.0.0.1:${port}`;
   try {
     for (let i = 0; i < 60; i++) { try { await fetch(`${base}/api/auth/state`); break; } catch { await new Promise(r => setTimeout(r, 250)); } }
@@ -651,6 +651,56 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
     assert.equal((await fetch(`${base}/api/status?f=${mgrId}`, { headers: { Cookie: viewerCookie } })).status, 403, 'another user cannot open it');
     assert.equal((await post('/api/run', { all: true }, newbieCookie)).status, 403, 'only admins check all facilities at once');
     assert.equal((await fetch(`${base}/api/facilities/${mgrId}`, { method: 'DELETE', headers: { Cookie: newbieCookie } })).status, 403, 'managers cannot delete facilities');
+    // free trial (self sign-ups start on it): hard limits, the upgrade gateway (402), a locked LEGAL REGISTER preview
+    const { default: JSZip } = await import('jszip');
+    const P = await import('../src/plans.js');
+    const nb = { headers: { Cookie: newbieCookie } }, q = `?f=${mgrId}`;
+    const plan = await (await fetch(`${base}/api/plan`, nb)).json();
+    assert.equal(plan.plan, 'trial'); assert.deepEqual(plan.limits, { policies: 2, hr: 2, thirdparty: 2, facilities: 1 });
+    for (const [m, p] of [['PUT', '/api/master'], ['POST', '/api/run'], ['GET', '/api/register/download'], ['GET', '/api/export/pdf'], ['GET', '/api/master/export'], ['POST', '/api/policies/link-register'], ['PUT', '/api/document-control']]) {
+      const x = await fetch(base + p + q, { method: m, headers: { 'Content-Type': 'application/json', Cookie: newbieCookie }, body: m === 'GET' ? undefined : '{}' });
+      assert.equal(x.status, 402, `trial: ${m} ${p} is locked`);
+      const d = await x.json(); assert.equal(d.upgrade, true); assert.match(d.error, /Get Premium to unlock full compliance packs/);
+    }
+    assert.notEqual((await fetch(`${base}/api/master${q}`, nb)).status, 402, 'the register can still be looked at (preview)');
+    const second = await post('/api/facilities', { source: 'template', code: 'MG2', name: 'Second Clinic', title: 'SECOND - LEGAL REGISTER', approver: 'Dr. T', authors: 'Mr. T', responsible: 'Dr. T' }, newbieCookie);
+    assert.equal(second.status, 402, 'one facility on the trial');
+    // documents are claimed: 2 policies, then the gateway; the same ones stay available
+    const nbUser = A.loadUsers().users.find(x => x.username === 'newbie');
+    assert.deepEqual([...P.claim(nbUser, 'policies', [1, 2, 3])], ['1', '2']);
+    assert.throws(() => P.claim(nbUser, 'policies', [3]), e => e.status === 402 && e.upgrade);
+    assert.deepEqual([...P.claim(nbUser, 'policies', [2])], ['2'], 'a claimed policy can be opened again');
+    assert.equal((await fetch(`${base}/api/policies/file${q}&type=word&name=${encodeURIComponent('MGR - PO05 - Access.docx')}`, nb)).status, 402, 'a third policy is refused');
+    assert.equal((await fetch(`${base}/api/policies/preview${q}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: newbieCookie }, body: '{"no":7}' })).status, 402);
+    // facility pack: [Facility]/<four folders>; the register folder is locked on the trial
+    const tree = await (await fetch(`${base}/api/package${q}`, nb)).json();
+    assert.equal(tree.root, 'Manager Clinic');
+    assert.deepEqual(tree.folders.map(f => f.name), ['Policies', 'HR & Onboarding Documents', '3rd-Party Vendor Documents', 'Legal Register & Reports']);
+    assert.ok(tree.folders[3].files.every(f => f.locked), 'register files locked');
+    const zr = await fetch(`${base}/api/package.zip${q}&modules=register`, nb);
+    assert.equal(zr.status, 200);
+    assert.match(zr.headers.get('content-disposition'), /Manager Clinic - Legal Register/);
+    const zt = await JSZip.loadAsync(Buffer.from(await zr.arrayBuffer()));
+    assert.ok(zt.file('Manager Clinic/Legal Register & Reports/LOCKED - Get Premium.txt'), Object.keys(zt.files).join(', '));
+    assert.ok(!Object.keys(zt.files).some(f => f.endsWith('.xlsx')), 'no register on the trial');
+    // only administrators delete
+    assert.equal((await fetch(`${base}/api/hr/checklist/s/i${q}`, { method: 'DELETE', headers: { Cookie: newbieCookie } })).status, 403, 'managers cannot delete');
+    assert.equal((await fetch(`${base}/api/policies/assets/logo${q}`, { method: 'DELETE', headers: { Cookie: newbieCookie } })).status, 403);
+    // asking for Premium, and the administrator upgrades: no limits, the register opens, the pack holds it
+    assert.equal((await post('/api/plan/request', { note: 'please' }, newbieCookie)).status, 200);
+    const asked = (await (await fetch(`${base}/api/users`, { headers: { Cookie: adminCookie } })).json()).users.find(x => x.username === 'newbie');
+    assert.ok(asked.premiumRequest?.at); assert.equal(asked.usage.policies, 2);
+    assert.equal((await put('/api/plans', { trial: { policies: -1 } }, newbieCookie)).status, 403, 'only admins set the limits');
+    assert.equal((await put('/api/plans', { trial: { policies: -1 } }, adminCookie)).status, 400);
+    assert.equal((await put(`/api/users/${asked.id}`, { plan: 'premium' }, adminCookie)).status, 200);
+    assert.equal((await (await fetch(`${base}/api/plan`, nb)).json()).plan, 'premium');
+    assert.equal((await fetch(`${base}/api/register/download${q}`, nb)).status, 200, 'premium: register download');
+    const zp = await JSZip.loadAsync(Buffer.from(await (await fetch(`${base}/api/package.zip${q}&modules=register,policies&type=word`, nb)).arrayBuffer()));
+    assert.ok(zp.file('Manager Clinic/Legal Register & Reports/MGR LEGAL REGISTER.xlsx'), Object.keys(zp.files).join(', '));
+    assert.ok(zp.file('Manager Clinic/READ ME.txt'), 'what is missing is explained (no policies yet)');
+    assert.ok(!(await (await fetch(`${base}/api/users`, { headers: { Cookie: adminCookie } })).json()).users.find(x => x.username === 'newbie').premiumRequest, 'request cleared on upgrade');
+    assert.equal((await fetch(`${base}/api/hr/checklist/s/i${q}`, { method: 'DELETE', headers: { Cookie: newbieCookie } })).status, 403, 'premium managers still cannot delete');
+
     // the administrator sees and manages everything – including what other users created
     const adminList = await (await fetch(`${base}/api/facilities`, { headers: { Cookie: adminCookie } })).json();
     assert.ok(adminList.list.some(f => f.id === mgrId) && adminList.list.some(f => f.id === 'br2'), 'admin sees every facility');

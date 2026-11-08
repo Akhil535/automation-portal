@@ -264,6 +264,7 @@ async function loadExports() {
     $$('#ex-pol-all, #ex-pol-word, #ex-pol-pdf').forEach(a => a.classList.toggle('disabled', !has));
     $('#ex-pol-go').hidden = has;
   } catch (e) { $('#ex-pol-sub').textContent = e.message; }
+  loadPack();
 }
 $('#ex-reg-pdf').onclick = () => openExport();
 $('#ex-pol-go').onclick = () => showTab('policies');
@@ -1500,6 +1501,7 @@ async function loadUsersPanel() {
   $('#users-tbl tbody').innerHTML = users.map(x => `<tr>
     <td><b>${esc(x.username)}</b>${x.id === me.id ? ' <span class="muted small">(you)</span>' : ''}<br><span class="muted small">${esc(x.email || 'no e-mail')}</span></td>
     <td><select data-uid="${x.id}" data-f="role">${['admin', 'manager', 'viewer'].map(r => `<option value="${r}"${r === x.role ? ' selected' : ''}>${ROLE_LABEL[r]}</option>`).join('')}</select></td>
+    <td>${x.role === 'admin' ? '<span class="tag ok">Premium</span>' : `<select data-uid="${x.id}" data-f="plan" aria-label="Plan"><option value="trial"${x.plan === 'trial' ? ' selected' : ''}>Free trial</option><option value="premium"${x.plan === 'premium' ? ' selected' : ''}>Premium</option></select>${x.plan === 'trial' ? `<br><span class="muted small">used ${x.usage.policies} pol. · ${x.usage.hr} HR · ${x.usage.thirdparty} 3rd-party</span>` : ''}${x.premiumRequest ? '<br><span class="tag warn">Asked for Premium</span>' : ''}`}</td>
     <td class="small">${scope(x)}${x.role === 'admin' ? '' : `<button type="button" class="link-btn small scope-edit" data-act="access" data-uid="${x.id}">Change access</button>`}</td>
     <td>${x.twoFactor ? '<span class="tag ok">On</span>' : '<span class="tag warn">At next sign-in</span>'}${x.locked ? ' <span class="tag bad">Locked</span>' : ''}${x.mustChangePassword ? ' <span class="tag na">Temp. password</span>' : ''}</td>
     <td class="num">${x.lastLogin ? fmt(x.lastLogin) : 'Never'}</td>
@@ -1513,6 +1515,11 @@ async function loadUsersPanel() {
     try { await apiGlobal(`/api/users/${sel.dataset.uid}`, { method: 'PUT', body: JSON.stringify({ role: sel.value }) }); loadUsersPanel(); }
     catch (e) { alert(e.message); loadUsersPanel(); }
   });
+  $$('#users-tbl [data-f=plan]').forEach(sel => sel.onchange = async () => {
+    try { await apiGlobal(`/api/users/${sel.dataset.uid}`, { method: 'PUT', body: JSON.stringify({ plan: sel.value }) }); toast(`Plan changed to ${sel.value === 'premium' ? 'Premium' : 'Free trial'}`); loadUsersPanel(); }
+    catch (e) { alert(e.message); loadUsersPanel(); }
+  });
+  loadLimits();
   $$('#users-tbl [data-act]').forEach(b => b.onclick = async () => {
     const u = users.find(x => x.id === b.dataset.uid), act = b.dataset.act;
     try {
@@ -1565,7 +1572,7 @@ $('#user-form').onsubmit = async e => {
   e.preventDefault();
   const f = e.target;
   const facs = $$('#user-facs input:checked').map(x => x.value);
-  const body = { username: f.elements.username.value, email: f.elements.email.value, role: f.elements.role.value, password: f.elements.password.value, facilities: facs.includes('*') ? ['*'] : facs };
+  const body = { username: f.elements.username.value, email: f.elements.email.value, role: f.elements.role.value, plan: f.elements.plan.value, password: f.elements.password.value, facilities: facs.includes('*') ? ['*'] : facs };
   try {
     await apiGlobal('/api/users', { method: 'POST', body: JSON.stringify(body) });
     $('#user-msg').textContent = `User "${body.username}" added – they choose their own password and set up 2FA at first sign-in.`;
@@ -2383,7 +2390,7 @@ async function renderAiSettings() {
 
 (async () => {
   try { me = await apiGlobal('/api/me'); } catch { return; } // redirected to sign-in
-  applyRole();
+  applyRole(); refreshPlan();
   await loadFacilities();
   refresh();
   loadPendingBadge(); setInterval(loadPendingBadge, 120000);
@@ -2819,4 +2826,127 @@ $('#pp-to-hr').onclick = () => showTab('hr');
   let t = 0;
   new MutationObserver(() => { clearTimeout(t); t = setTimeout(label, 60); }).observe(document.body, { childList: true, subtree: true });
   label();
+})();
+
+// ===================================================================================================
+// Plans: free trial vs premium. Any request the trial does not include answers 402 → the upgrade gateway opens.
+// Trial users see a plan chip, a lock on the LEGAL REGISTER, and locked files on the Downloads page.
+// ===================================================================================================
+var planState = null; // var: may be read before this line runs
+(() => {
+  const realFetch = window.fetch.bind(window);
+  window.fetch = async (...args) => {
+    const res = await realFetch(...args);
+    if (res.status === 402) res.clone().json().then(d => { if (d?.upgrade) showUpgrade(d); }).catch(() => {});
+    else if (res.ok && res.headers.get('content-type')?.includes('json')) res.clone().json().then(d => {
+      if (d?.limited) toast(`Free trial: ${d.limited.count}${d.limited.of ? ` of ${d.limited.of}` : ''} document${d.limited.count === 1 ? '' : 's'} included – <b>Get Premium</b> for the full pack`);
+    }).catch(() => {});
+    return res;
+  };
+  // trial: file links are fetched first, so a locked file opens the upgrade gateway instead of an error page
+  document.addEventListener('click', async e => {
+    const a = e.target.closest?.('a[href]');
+    if (!a || !document.body.classList.contains('trial') || e.defaultPrevented) return;
+    if (a.dataset.locked) { e.preventDefault(); showUpgrade(); return; }
+    const href = a.getAttribute('href');
+    if (!/^\/(api|reports)\//.test(href) || a.classList.contains('disabled') || a.hasAttribute('data-empty')) return;
+    e.preventDefault();
+    try {
+      const res = await realFetch(href);
+      if (res.status === 402) { showUpgrade(await res.json().catch(() => ({}))); return; }
+      if (!res.ok) { const d = await res.json().catch(() => ({})); toast(`⚠ ${esc(d.error || res.statusText)}`); return; }
+      const blob = await res.blob(), url = URL.createObjectURL(blob);
+      const cd = res.headers.get('content-disposition') || '';
+      const name = /filename\*=UTF-8''([^;]+)/.exec(cd)?.[1] || /filename="([^"]+)"/.exec(cd)?.[1] || '';
+      const link = Object.assign(document.createElement('a'), { href: url, target: a.target || '' });
+      if (!a.target) link.download = decodeURIComponent(name) || 'download';
+      document.body.append(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) { toast(`⚠ ${esc(err.message)}`); }
+  }, true);
+
+  const KIND = { policies: 'Policies', hr: 'HR & training documents', thirdparty: '3rd-party documents', facilities: 'Facilities' };
+  window.showUpgrade = function showUpgrade(d = {}) {
+    const dlg = $('#upgrade-dlg');
+    if (!dlg) return;
+    $('#up-why').textContent = d.error || 'You are on the free trial. Premium unlocks every document, the live LEGAL REGISTER and full downloads.';
+    const p = planState;
+    $('#up-meters').innerHTML = p?.limits ? Object.keys(KIND).map(k => {
+      const used = Array.isArray(p.usage[k]) ? p.usage[k].length : p.usage[k] || 0, lim = p.limits[k];
+      return `<div class="up-meter"><span>${KIND[k]}</span><b>${Math.min(used, lim)} / ${lim}</b><i style="--w:${lim ? Math.min(100, (used / lim) * 100) : 100}%"></i></div>`;
+    }).join('') + '<div class="up-meter up-locked"><span>LEGAL REGISTER</span><b>🔒 Preview</b><i style="--w:100%"></i></div>' : '';
+    $('#up-msg').textContent = me?.premiumRequest ? 'Premium requested – an administrator will upgrade your account.' : '';
+    $('#up-request').disabled = !!me?.premiumRequest;
+    if (!dlg.open) dlg.showModal();
+    refreshPlan();
+  };
+  $('#up-request').onclick = async () => {
+    try {
+      await apiGlobal('/api/plan/request', { method: 'POST', body: '{}' });
+      if (me) me.premiumRequest = { at: new Date().toISOString() };
+      $('#up-msg').textContent = 'Request sent – an administrator will upgrade your account to Premium.'; $('#up-request').disabled = true;
+    } catch (e) { $('#up-msg').textContent = e.message; }
+  };
+  $('#plan-chip').onclick = () => showUpgrade();
+
+  window.refreshPlan = async function refreshPlan() {
+    try { planState = await apiGlobal('/api/plan'); } catch { return; }
+    const trial = planState.plan === 'trial';
+    document.body.classList.toggle('trial', trial);
+    $('#plan-chip').hidden = !trial;
+    if (trial) {
+      const l = planState.limits, us = planState.usage;
+      $('#plan-chip').title = `Free trial: ${us.policies.length}/${l.policies} policies · ${us.hr.length}/${l.hr} HR documents · ${us.thirdparty.length}/${l.thirdparty} 3rd-party documents · LEGAL REGISTER preview`;
+      if (!$('#trial-reg')) $('#master')?.insertAdjacentHTML('afterbegin', '<div class="trial-lock" id="trial-reg"><span class="tl-ic" aria-hidden="true">🔒</span><div><b>Preview – locked on the free trial</b><span>You can look around the LEGAL REGISTER. Editing, renewals, weekly DoH updates and register downloads are part of Premium.</span></div><button type="button" class="btn primary small" data-up>Get Premium</button></div>');
+      $$('[data-up]').forEach(b => { b.onclick = () => showUpgrade(); });
+    } else $('#trial-reg')?.remove();
+  };
+
+  // --- Downloads: the facility pack (folder tree, one folder or single files) ---
+  let packType = 'all';
+  const ICON = { policies: '📄', hr: '🧑‍⚕️', thirdparty: '🤝', register: '📊' };
+  window.loadPack = async function loadPack() {
+    const tree = $('#pack-tree');
+    if (!tree || !facility) return;
+    let d;
+    try { d = await api('/api/package'); } catch (e) { tree.innerHTML = `<p class="muted small">${esc(e.message)}</p>`; return; }
+    $('#pack-root').textContent = `${d.root}/`;
+    $('#pack-all').href = u(`/api/package.zip?type=${packType}`);
+    const show = f => packType === 'all' || f.type === packType || f.type === 'xlsx';
+    tree.innerHTML = `<div class="pk-root"><span aria-hidden="true">📁</span><b>${esc(d.root)}</b></div>` + d.folders.map(fo => {
+      const files = fo.files.filter(show);
+      const open = files.filter(f => !f.locked).length;
+      return `<details class="pk-folder${fo.locked ? ' locked' : ''}">
+        <summary>
+          <span class="pk-ic" aria-hidden="true">${ICON[fo.key]}</span>
+          <span class="pk-name"><b>${esc(fo.name)}</b><small>${files.length ? `${open} file${open === 1 ? '' : 's'}${files.length > open ? ` · ${files.length - open} 🔒 Premium` : ''}` : 'Nothing yet'}</small></span>
+          ${fo.locked ? '<button type="button" class="btn small" data-up>🔒 Get Premium</button>' : `<a class="btn small" href="${u(`/api/package.zip?modules=${fo.key}&type=${packType}`)}"${open ? '' : ' data-empty'}>⬇ Folder (.zip)</a>`}
+        </summary>
+        <ul class="pk-files">${files.map(f => `<li class="${f.locked ? 'locked' : ''}"><span class="pk-sub">${esc(f.sub || '')}</span><span class="pk-file">${esc(f.name)}</span>${f.locked ? '<a href="#" class="pk-dl" data-locked="1" title="Premium" aria-label="Locked – Premium">🔒</a>' : `<a class="pk-dl" href="${esc(f.url)}" title="Download" aria-label="Download ${esc(f.name)}">⬇</a>`}</li>`).join('') || '<li class="muted small">Nothing created yet.</li>'}</ul>
+      </details>`;
+    }).join('');
+    $$('#pack-tree [data-up]').forEach(b => { b.onclick = e => { e.preventDefault(); showUpgrade(); }; });
+    $$('#pack-tree [data-empty]').forEach(a => { a.onclick = e => { e.preventDefault(); toast('Nothing to download in this folder yet'); }; });
+    $$('#pack-tree [data-locked]').forEach(a => { a.onclick = e => { e.preventDefault(); showUpgrade(); }; });
+  };
+  $$('#pack-type button').forEach(b => {
+    b.onclick = () => {
+      packType = b.dataset.t;
+      $$('#pack-type button').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', x === b); });
+      loadPack();
+    };
+  });
+
+  // --- Admin: trial limits ---
+  window.loadLimits = async function loadLimits() {
+    const f = $('#limits-form');
+    if (!f || me?.role !== 'admin') return;
+    try { const { trial } = await apiGlobal('/api/plans'); for (const [k, v] of Object.entries(trial)) if (f.elements[k]) f.elements[k].value = v; } catch { /* shown on save */ }
+  };
+  $('#limits-form').onsubmit = async e => {
+    e.preventDefault();
+    const f = e.target, body = Object.fromEntries(['policies', 'hr', 'thirdparty', 'facilities'].map(k => [k, Number(f.elements[k].value)]));
+    try { await apiGlobal('/api/plans', { method: 'PUT', body: JSON.stringify({ trial: body }) }); $('#limits-msg').textContent = 'Saved.'; }
+    catch (err) { $('#limits-msg').textContent = err.message; }
+  };
 })();

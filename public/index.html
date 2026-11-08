@@ -62,6 +62,7 @@
         <button type="button" data-theme-set="light" title="Light mode"><svg viewBox="0 0 24 24"><path d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zM11 1h2v3h-2zm0 19h2v3h-2zM1 11h3v2H1zm19 0h3v2h-3zM4.2 2.8l2.1 2.1-1.4 1.4-2.1-2.1zm14.9 14.9 2.1 2.1-1.4 1.4-2.1-2.1zM2.8 19.8l2.1-2.1 1.4 1.4-2.1 2.1zM17.7 4.9l2.1-2.1 1.4 1.4-2.1 2.1z"/></svg>Light</button>
         <button type="button" data-theme-set="dark" title="Dark mode"><svg viewBox="0 0 24 24"><path d="M21 14.5A9 9 0 0 1 9.5 3a9 9 0 1 0 11.5 11.5z"/></svg>Dark</button>
       </div>
+    <button type="button" class="plan-chip" id="plan-chip" hidden><span>Free trial</span><b>Get Premium</b></button>
     <details class="menu user-menu">
         <summary><span class="avatar" id="me-avatar">?</span><span class="who"><b id="me-name">–</b><small id="me-role"></small></span></summary>
         <div class="menu-pop up">
@@ -473,6 +474,23 @@
         <p class="muted">Every file for <b id="ex-fac">this facility</b> in one place.</p>
       </div>
     </header>
+    <section class="card pack" id="pack" aria-labelledby="pack-title">
+      <header class="pack-head">
+        <div>
+          <span class="pack-kicker">Facility pack</span>
+          <h2 id="pack-title">Everything in one folder</h2>
+          <p class="muted small">Downloads as <b class="pack-root" id="pack-root">Facility</b> with a folder for each part. Take the whole pack, one folder, or single files.</p>
+        </div>
+        <div class="pack-actions">
+          <div class="pack-type" id="pack-type" role="radiogroup" aria-label="File type">
+            <button type="button" role="radio" data-t="all" aria-checked="true" class="on">Word + PDF</button><button type="button" role="radio" data-t="word" aria-checked="false">Word</button><button type="button" role="radio" data-t="pdf" aria-checked="false">PDF</button>
+          </div>
+          <a class="btn primary" id="pack-all" href="#">⬇ Full pack (.zip)</a>
+        </div>
+      </header>
+      <div class="pack-tree" id="pack-tree"><p class="muted small">Loading…</p></div>
+    </section>
+    <h2 class="ex-sub">Quick downloads</h2>
     <div class="ex-grid">
       <article class="card ex-card">
         <header><span class="ex-ic">📄</span><div><h2>Policies</h2><p class="muted small" id="ex-pol-sub">–</p></div></header>
@@ -666,7 +684,7 @@
         <div class="panel">
           <h2>Users</h2>
           <p class="muted small">Every user signs in with a username, a password (stored as a BCrypt hash) and a 6-digit code from an authenticator app (or an e-mailed code). <b>Admin</b>: everything · <b>Manager</b>: register, documents, monitoring and exports for their facilities · <b>Viewer</b>: read-only and exports. 5 wrong attempts lock an account for 15 minutes.</p>
-          <div class="table-wrap flat"><table id="users-tbl"><thead><tr><th>User</th><th>Role</th><th>Facilities</th><th>2FA</th><th>Last sign-in</th><th class="right">Actions</th></tr></thead><tbody></tbody></table></div>
+          <div class="table-wrap flat"><table id="users-tbl"><thead><tr><th>User</th><th>Role</th><th>Plan</th><th>Facilities</th><th>2FA</th><th>Last sign-in</th><th class="right">Actions</th></tr></thead><tbody></tbody></table></div>
         </div>
         <form id="user-form" class="panel">
           <h2>Add a user</h2>
@@ -674,6 +692,7 @@
             <label>Username<input name="username" required minlength="3" autocomplete="off"></label>
             <label>E-mail (sign-in codes)<input name="email" type="email" autocomplete="off"></label>
             <label>Role<select name="role"><option value="manager">Manager</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select></label>
+            <label>Plan<select name="plan"><option value="trial">Free trial</option><option value="premium">Premium</option></select></label>
           </div>
           <div><span class="small muted">Facilities</span><div class="fac-checks" id="user-facs"></div></div>
           <div class="row3">
@@ -682,6 +701,17 @@
           </div>
           <p class="muted small">Give the user the temporary password securely. At the first sign-in they choose their own password and link their authenticator app.</p>
           <div class="actions"><button class="btn primary" type="submit">Add user</button><span id="user-msg" class="muted"></span></div>
+        </form>
+        <form id="limits-form" class="panel">
+          <h2>Free trial limits</h2>
+          <p class="muted small">What a <b>Free trial</b> account may create. The LEGAL REGISTER is always a locked, read-only preview on the trial (no edits, no DoH updates, no register downloads). Administrators and <b>Premium</b> accounts have no limits. Accounts made before plans existed are Premium.</p>
+          <div class="row4">
+            <label>Policies<input name="policies" type="number" min="0" max="999" required></label>
+            <label>HR &amp; training documents<input name="hr" type="number" min="0" max="999" required></label>
+            <label>3rd-party documents<input name="thirdparty" type="number" min="0" max="999" required></label>
+            <label>Facilities<input name="facilities" type="number" min="1" max="999" required></label>
+          </div>
+          <div class="actions"><button class="btn primary" type="submit">Save limits</button><span id="limits-msg" class="muted"></span></div>
         </form>
       </div>
 
@@ -1114,6 +1144,23 @@
   </form>
   <p class="ai-foot">Answers come from your portal's data. The assistant only reads – it never changes anything.</p>
 </section>
+<dialog id="upgrade-dlg" class="upgrade-dlg" aria-labelledby="up-title">
+  <form method="dialog">
+    <span class="up-badge">★ Premium</span>
+    <h2 id="up-title">Get Premium to unlock full compliance packs</h2>
+    <p class="up-why" id="up-why"></p>
+    <div class="up-meters" id="up-meters"></div>
+    <ul class="up-list">
+      <li>All 33 ADHICS policies, Word + PDF</li>
+      <li>Every HR, training and 3rd-party document</li>
+      <li>A live LEGAL REGISTER – edits, renewals and weekly DoH updates</li>
+      <li>The full facility pack and compliance reports</li>
+      <li>More than one facility</li>
+    </ul>
+    <div class="btn-row"><button class="btn" value="close">Not now</button><button type="button" class="btn primary" id="up-request">Request Premium</button></div>
+    <p class="small muted" id="up-msg" role="status"></p>
+  </form>
+</dialog>
 <script src="iso-factory.js"></script>
 <script src="app.js"></script>
 </body>
