@@ -1368,6 +1368,12 @@ test('10q. free trial end to end: the first 2 items open as Word + PDF, everythi
       finally { fs.writeFileSync(regFile, saved); }
     }
 
+    // production: no file-system path of the server reaches the browser
+    for (const p of ['/api/status', '/api/settings', '/api/policies', '/api/facilities', '/api/hr', '/api/master', '/api/package']) {
+      const txt = await (await fetch(`${base}${p}${q}`, opt())).text();
+      assert.ok(!/[A-Za-z]:\\\\|\\\\\\\\[^\\\\"]+\\\\/.test(txt), `${p} holds no server path: ${(txt.match(/.{0,40}[A-Za-z]:\\\\.{0,40}/) || [''])[0]}`);
+    }
+
     // DoH circulars: the basic, non-updated view – nothing from the last 90 days
     const cut = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
     const br = await (await fetch(`${base}/api/circulars/brief${q}`, opt())).json();

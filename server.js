@@ -181,6 +181,26 @@ app.use((req, res, next) => {
   next();
 });
 
+// Production: no file-system paths of this server ever reach the browser (C:\…, \\server\share\…, /home/…). A value
+// that is a path becomes its file name; a path inside a message is cut down to the file name too.
+const PATH_IN_TEXT = /(?:[A-Za-z]:[\\/]|\\\\[^\\\s"<>|]+\\)(?:[^\\/\n"<>|]+[\\/])*([^\\/\n"<>|]+\.(?:xlsx|xlsm|xls|docx?|pdf|png|jpe?g|json|log|txt|csv))/g;
+function scrubPaths(v, depth = 0) {
+  if (depth > 12) return v;
+  if (typeof v === 'string') {
+    if (/^(?:[A-Za-z]:[\\/]|\\\\[^\\]+\\|\/(?:Users|home|var|srv|mnt|opt|tmp)\/)/.test(v)) return path.win32.basename(v.replace(/[\\/]+$/, '')) || '';
+    return v.includes(':\\') || v.includes('\\\\') ? v.replace(PATH_IN_TEXT, '$1') : v;
+  }
+  if (Array.isArray(v)) return v.map(x => scrubPaths(x, depth + 1));
+  if (v && typeof v === 'object' && !Buffer.isBuffer(v)) return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, scrubPaths(x, depth + 1)]));
+  return v;
+}
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/api/')) return next();
+  const json = res.json.bind(res);
+  res.json = body => json(scrubPaths(body));
+  next();
+});
+
 app.use(express.static(path.join(APP_DIR, 'public')));
 const wrap = fn => (req, res) => Promise.resolve(fn(req, res)).catch(e => res.status(e.status || 400).json({ error: e.message, ...(e.upgrade ? { upgrade: true, info: e.info || {} } : {}), ...(e.adminNeeded ? { adminNeeded: true } : {}), ...(e.locked ? { locked: true, facility: e.facility } : {}) }));
 const fac = req => req.query.f || req.facOverride || undefined;

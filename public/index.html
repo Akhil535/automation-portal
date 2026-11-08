@@ -148,7 +148,7 @@
       </div>
       <div class="iso-bar"><i id="iso-bar"></i></div>
     </section>
-    <div class="iso-show" id="iso-show" hidden><button type="button" class="link-btn" id="iso-unhide">▶ Show "How it works"</button></div>
+    <div class="iso-show" id="iso-show" hidden><button type="button" class="link-btn" id="iso-unhide"><i class=i-play></i> Show "How it works"</button></div>
 
     <!-- The journey: 1 Policies -> 2 HR documents -> 3 LEGAL REGISTER (final); DoH monitoring runs all the time -->
     <ol class="jr-track" id="jr-track">
@@ -165,7 +165,7 @@
         <div id="hx-policies" class="hx-pol-body"><p class="muted small">Loading…</p></div>
         <div class="btn-row">
           <button class="btn primary small" id="hx-pol-open">Open Policies →</button>
-          <a class="btn small" id="jr-zip" href="#" hidden>⬇ Word + PDF (.zip)</a>
+          <a class="btn small" id="jr-zip" href="#" hidden><i class=i-download></i> Word + PDF (.zip)</a>
         </div>
       </article>
 
@@ -288,7 +288,7 @@
           <p class="sec-sub">The standard policies (e.g. the 33 ADHICS policies) as Word files. They are the same for every facility and are never changed – each facility gets its own filled copy. Only an administrator can upload, lock or replace them.</p></div>
         <div class="btn-row">
           <label class="btn primary" data-admin id="pp-upload-btn"><input type="file" id="pp-tpl-files" accept=".docx,.doc" multiple hidden>⇪ Upload policies (.docx / .doc)</label>
-          <button class="btn primary" data-admin id="pp-lock" hidden>🔒 Lock as master baseline</button>
+          <button class="btn primary" data-admin id="pp-lock" hidden><i class=i-lock></i> Lock as master baseline</button>
           <button class="btn" data-admin id="pp-unlock" hidden>Unlock to replace…</button>
         </div>
       </div>
@@ -358,7 +358,7 @@
       <div class="pw-title"><span class="pw-num">3</span><div><h2>Create the policies</h2><p class="muted small">Every policy is filled in and saved as Word and PDF.</p></div></div>
       <div id="pp-need"></div>
       <div class="pw-create">
-        <button class="btn primary big" id="pp-generate" data-write>⚙ Create all policies</button>
+        <button class="btn primary big" id="pp-generate" data-write><i class=i-gear></i> Create all policies</button>
         <div class="pp-progress" id="pp-progress" hidden><div class="days-bar"><i id="pp-bar" style="width:0%"></i></div><span id="pp-step"></span></div>
       </div>
       <div id="pp-problems"></div>
@@ -366,7 +366,7 @@
         <div class="pw-download">
           <div><b id="pp-out-title">Generated files</b><p class="muted small" id="pp-folder"></p></div>
           <div class="btn-row">
-            <a class="btn primary" id="pp-zip-all" href="#">⬇ Download all (Word + PDF)</a>
+            <a class="btn primary" id="pp-zip-all" href="#"><i class=i-download></i> Download all (Word + PDF)</a>
             <a class="btn small" id="pp-zip-word" href="#">Word only</a>
             <a class="btn small" id="pp-zip-pdf" href="#">PDF only</a>
           </div>
@@ -404,9 +404,9 @@
         <p class="muted">Every HR form opens with <b>this facility's name, code and logo</b>. Track each checklist document as Completed, Pending or Not applicable, add remarks and download it as Excel.</p>
       </div>
       <div class="pw-head-side">
-        <button type="button" class="btn primary" id="hr-gen" data-write>⚙ Create all HR documents</button>
-        <a class="btn" id="hr-zip" href="#">⬇ HR documents (.zip)</a>
-        <a class="btn" id="hr-xlsx" href="#">⬇ Checklist Excel</a>
+        <button type="button" class="btn primary" id="hr-gen" data-write><i class=i-gear></i> Create all HR documents</button>
+        <a class="btn" id="hr-zip" href="#"><i class=i-download></i> HR documents (.zip)</a>
+        <a class="btn" id="hr-xlsx" href="#"><i class=i-download></i> Checklist Excel</a>
       </div>
     </header>
     <div class="pp-for step-for"><img id="hr-logo" alt="" onerror="this.hidden=true"><span>Preparing HR documents for</span><b id="hr-fac">–</b></div>
@@ -429,7 +429,7 @@
     <article class="card hr-check">
       <header class="hr-sec-head">
         <div><h2>ADHICS document checklist</h2><p class="muted small">Change a status or remark and it is saved straight away.</p></div>
-        <div class="btn-row"><a class="btn small" id="hr-xlsx-one" href="#">⬇ This section (.xlsx)</a><button type="button" class="btn small" id="hr-reset" data-write>↺ Reset to master list</button></div>
+        <div class="btn-row"><a class="btn small" id="hr-xlsx-one" href="#"><i class=i-download></i> This section (.xlsx)</a><button type="button" class="btn small" id="hr-reset" data-write>↺ Reset to master list</button></div>
       </header>
       <div class="hr-tabs" id="hr-tabs" role="tablist"></div>
       <div class="hr-filter"><input type="search" id="hr-q" placeholder="Search documents…" aria-label="Search documents"><div class="viewswitch" id="hr-st" role="group" aria-label="Show"><button type="button" data-st="" class="on">All</button><button type="button" data-st="Pending">Pending</button><button type="button" data-st="Completed">Completed</button></div></div>
@@ -439,7 +439,7 @@
 
     <article class="card hr-admin" data-admin>
       <header class="hr-sec-head"><div><h2>Master HR forms &amp; cross-check</h2><p class="muted small">The forms belong to the master template. They can come from any facility – each one is checked and that facility's name, code and logo are replaced for every facility.</p></div>
-        <div class="btn-row"><label class="btn small primary">⬆ Upload forms<input type="file" id="hr-up" accept=".docx,.doc" multiple hidden></label><label class="btn small">⬆ Checklist workbook (.xlsx)<input type="file" id="hr-up-xlsx" accept=".xlsx" hidden></label></div></header>
+        <div class="btn-row"><label class="btn small primary"><i class=i-upload></i> Upload forms<input type="file" id="hr-up" accept=".docx,.doc" multiple hidden></label><label class="btn small"><i class=i-upload></i> Checklist workbook (.xlsx)<input type="file" id="hr-up-xlsx" accept=".xlsx" hidden></label></div></header>
       <div id="hr-cross"></div>
     </article>
   </section>
@@ -453,8 +453,8 @@
         <p class="muted">Documents your vendors and service providers sign – each one with <b>this facility's logo, name, code and Ref. No.</b>, made from the master template like the HR forms.</p>
       </div>
       <div class="pw-head-side">
-        <button type="button" class="btn primary" id="tp-gen" data-write>⚙ Create the documents</button>
-        <a class="btn" id="tp-zip" href="#">⬇ Word + PDF (.zip)</a>
+        <button type="button" class="btn primary" id="tp-gen" data-write><i class=i-gear></i> Create the documents</button>
+        <a class="btn" id="tp-zip" href="#"><i class=i-download></i> Word + PDF (.zip)</a>
       </div>
     </header>
     <div class="pp-for step-for"><img id="tp-logo" alt="" onerror="this.hidden=true"><span>Preparing vendor documents for</span><b id="tp-fac">–</b></div>
@@ -474,7 +474,7 @@
         <p class="muted">One overview of this facility's compliance: the <b>HR checklist</b> (ADHICS documents) and the <b>LEGAL REGISTER checklist</b> (licences, certificates, contracts and laws) – status, dates, responsible person and remarks.</p>
       </div>
       <div class="pw-head-side">
-        <a class="btn" id="ck-xlsx" href="#">⬇ HR checklist (.xlsx)</a>
+        <a class="btn" id="ck-xlsx" href="#"><i class=i-download></i> HR checklist (.xlsx)</a>
       </div>
     </header>
     <div class="pp-for step-for"><span>Checklist for</span><b id="ck-fac">–</b></div>
@@ -508,7 +508,7 @@
           <div class="pack-type" id="pack-type" role="radiogroup" aria-label="File type">
             <button type="button" role="radio" data-t="all" aria-checked="true" class="on">Word + PDF</button><button type="button" role="radio" data-t="word" aria-checked="false">Word</button><button type="button" role="radio" data-t="pdf" aria-checked="false">PDF</button>
           </div>
-          <a class="btn primary" id="pack-all" href="#">⬇ Full pack (.zip)</a>
+          <a class="btn primary" id="pack-all" href="#"><i class=i-download></i> Full pack (.zip)</a>
         </div>
       </header>
       <div class="pack-tree" id="pack-tree"><p class="muted small">Loading…</p></div>
@@ -516,24 +516,24 @@
     <h2 class="ex-sub">Quick downloads</h2>
     <div class="ex-grid">
       <article class="card ex-card">
-        <header><span class="ex-ic">📄</span><div><h2>Policies</h2><p class="muted small" id="ex-pol-sub">–</p></div></header>
-        <a class="btn primary ex-main" id="ex-pol-all" href="#">⬇ Word + PDF (.zip)</a>
+        <header><span class="ex-ic"><i class=i-doc></i></span><div><h2>Policies</h2><p class="muted small" id="ex-pol-sub">–</p></div></header>
+        <a class="btn primary ex-main" id="ex-pol-all" href="#"><i class=i-download></i> Word + PDF (.zip)</a>
         <div class="btn-row"><a class="btn small" id="ex-pol-word" href="#">Word only</a><a class="btn small" id="ex-pol-pdf" href="#">PDF only</a></div>
         <button type="button" class="link-btn ex-empty" id="ex-pol-go" hidden>Create the policies first →</button>
       </article>
       <article class="card ex-card">
-        <header><span class="ex-ic">📊</span><div><h2>LEGAL REGISTER</h2><p class="muted small" id="ex-reg-sub">The master Excel register with all dates</p></div></header>
-        <a class="btn primary ex-main" id="ex-reg-xlsx" href="#">⬇ Excel register (.xlsx)</a>
+        <header><span class="ex-ic"><i class=i-chart></i></span><div><h2>LEGAL REGISTER</h2><p class="muted small" id="ex-reg-sub">The master Excel register with all dates</p></div></header>
+        <a class="btn primary ex-main" id="ex-reg-xlsx" href="#"><i class=i-download></i> Excel register (.xlsx)</a>
         <div class="btn-row"><button type="button" class="btn small" id="ex-reg-pdf">PDF report…</button><a class="btn small" id="ex-reg-print" href="#" target="_blank">Print view</a></div>
       </article>
       <article class="card ex-card">
-        <header><span class="ex-ic">🗂</span><div><h2>HR forms &amp; checklist</h2><p class="muted small" id="ex-hr-sub">With this facility's name, code and logo</p></div></header>
-        <a class="btn primary ex-main" id="ex-hr-xlsx" href="#">⬇ ADHICS checklist (.xlsx)</a>
+        <header><span class="ex-ic"><i class=i-folder></i></span><div><h2>HR forms &amp; checklist</h2><p class="muted small" id="ex-hr-sub">With this facility's name, code and logo</p></div></header>
+        <a class="btn primary ex-main" id="ex-hr-xlsx" href="#"><i class=i-download></i> ADHICS checklist (.xlsx)</a>
         <div class="btn-row"><a class="btn small" id="ex-hr-zip" href="#">HR forms Word + PDF</a><a class="btn small" id="ex-hr-word" href="#">Word only</a></div>
       </article>
       <article class="card ex-card">
-        <header><span class="ex-ic">🏛</span><div><h2>DoH circulars</h2><p class="muted small" id="ex-doh-sub">Recorded in the Excel register</p></div></header>
-        <a class="btn primary ex-main" id="ex-doh-xlsx" href="#">⬇ Excel with circulars (.xlsx)</a>
+        <header><span class="ex-ic"><i class=i-building></i></span><div><h2>DoH circulars</h2><p class="muted small" id="ex-doh-sub">Recorded in the Excel register</p></div></header>
+        <a class="btn primary ex-main" id="ex-doh-xlsx" href="#"><i class=i-download></i> Excel with circulars (.xlsx)</a>
         <div class="btn-row"><a class="btn small" id="ex-doh-report" href="#" target="_blank" hidden>Last check report</a></div>
       </article>
     </div>
@@ -562,9 +562,9 @@
         <details class="menu">
           <summary class="btn">⋯ More</summary>
           <div class="menu-pop right">
-            <a id="lnk-download" href="/api/register/download">⬇ Download Excel (.xlsx)</a>
-            <button type="button" id="btn-export-more">⬇ Download PDF report…</button>
-            <a id="lnk-export" href="/api/master/export" target="_blank">🖨 Print view</a>
+            <a id="lnk-download" href="/api/register/download"><i class=i-download></i> Download Excel (.xlsx)</a>
+            <button type="button" id="btn-export-more"><i class=i-download></i> Download PDF report…</button>
+            <a id="lnk-export" href="/api/master/export" target="_blank"><i class=i-print></i> Print view</a>
             <button type="button" id="btn-import" data-write>Import from policy document…</button>
           </div>
         </details>
@@ -598,7 +598,7 @@
 
   <!-- ============================== DoH circulars ============================== -->
   <section id="circulars" class="tab">
-    <div class="trial-lock" data-trial-only><span class="tl-ic" aria-hidden="true">🔒</span><div><b>Basic, non-updated view on the free trial</b><span>DoH circulars from the last 90 days, weekly DoH checks, reviews and every download / export are part of Premium.</span></div><button type="button" class="btn small premium-btn" data-up>★ Get Premium</button></div>
+    <div class="trial-lock" data-trial-only><span class="tl-ic" aria-hidden="true"><i class=i-lock></i></span><div><b>Basic, non-updated view on the free trial</b><span>DoH circulars from the last 90 days, weekly DoH checks, reviews and every download / export are part of Premium.</span></div><button type="button" class="btn small premium-btn" data-up>★ Get Premium</button></div>
     <div class="page-title">
       <div>
         <span class="pw-kicker">Always on · keeps Step 4 current</span>
@@ -682,7 +682,7 @@
           <p class="small">Current workbook: <b id="src-current">–</b></p>
           <div class="row3">
             <label>Upload a workbook (.xlsx)<input type="file" id="src-file" accept=".xlsx"></label>
-            <label>…or link a path<input id="src-path" placeholder="\\server\share\LEGAL REGISTER.xlsx"></label>
+            <label data-admin>…or link a workbook on the server<input id="src-path" placeholder="Path on the portal server (administrators)"></label>
             <div class="actions"><button class="btn" type="button" id="btn-src-check">Check workbook</button></div>
           </div>
           <div id="src-preview"></div>
@@ -857,7 +857,7 @@
       <label>Compliance<select name="compliance"></select></label>
     </div>
     <p class="alert ok small" id="entry-life" hidden>∞ Malaffi is a one-time (lifetime) connection certificate – it has no expiry date and no due date. Only the issue date is kept.</p>
-    <div class="entry-doc" id="entry-doc" data-write><span id="entry-doc-now" class="small muted">No document attached</span><label class="btn small"><input type="file" id="entry-photo" accept="image/*,.pdf,.docx,.doc" hidden>📷 Add photo / document</label></div>
+    <div class="entry-doc" id="entry-doc" data-write><span id="entry-doc-now" class="small muted">No document attached</span><label class="btn small"><input type="file" id="entry-photo" accept="image/*,.pdf,.docx,.doc" hidden><i class=i-camera></i> Add photo / document</label></div>
     <p class="muted small">Leave a date empty to show "______" in the register. A photo of the certificate works too – its dates are read for you.</p>
     <div class="actions">
       <button class="btn primary" type="submit">Save</button>
@@ -871,7 +871,7 @@
   <form id="docs-form">
     <h2>Upload facility documents</h2>
     <p class="muted small">Licences, certificates and contracts (PDF, Word .docx or .doc) – any file names. Each document is read (scans with the built-in Windows OCR), recognised and matched to its LEGAL REGISTER entry with its issue and expiry dates. Check the results, correct anything, then apply.</p>
-    <p class="trial-note" data-trial-only>🔒 <b>Free trial:</b> every document is read and matched. Documents for your free LEGAL REGISTER entries are unlocked – up to 2 can be applied. Documents for the other entries are locked; applying them, renewals and tracking are part of Premium.</p>
+    <p class="trial-note" data-trial-only><i class=i-lock></i> <b>Free trial:</b> every document is read and matched. Documents for your free LEGAL REGISTER entries are unlocked – up to 2 can be applied. Documents for the other entries are locked; applying them, renewals and tracking are part of Premium.</p>
     <label class="drop" id="docs-drop">
       <input type="file" id="docs-files" accept=".pdf,.docx,.doc,image/*" multiple>
       <span><b>Choose documents</b> or drop them here</span>
@@ -968,7 +968,7 @@
         <label class="check"><input type="radio" name="source" value="template" checked> Generate from the standard template of <select name="templateFrom" id="add-template"></select></label>
         <details class="more"><summary class="small">Use an existing workbook instead</summary>
           <label class="check"><input type="radio" name="source" value="upload"> Upload a workbook <input type="file" id="add-file" accept=".xlsx"></label>
-          <label class="check"><input type="radio" name="source" value="link"> Link a path <input name="path" placeholder="\\server\share\LEGAL REGISTER.xlsx"></label>
+          <label class="check"><input type="radio" name="source" value="link"> Link a path <input name="path" placeholder="Path on the portal server"></label>
         </details>
         <div id="add-preview"></div>
       </div></div>
@@ -1049,7 +1049,7 @@
         <p class="muted small">A photo, scan, PDF or Word file. The picture is found, cropped and its background removed straight away – you see the result. ✕ removes it.</p>
         <label class="np-sort" id="np-sort">
           <input type="file" id="np-sort-files" accept="image/png,image/jpeg,.png,.jpg,.jpeg,.pdf,.docx,.doc" multiple hidden>
-          <span class="np-sort-ic">✨</span>
+          <span class="np-sort-ic"><i class=i-sparkle></i></span>
           <span><b>Sort for me</b> – drop the logo, signature and stamp together (photos, PDF or Word). Each picture is recognised and put in its box.</span>
           <span class="np-sort-btn btn small primary">Choose files</span>
         </label>
@@ -1095,7 +1095,7 @@
     </fieldset>
 
     <div class="lock-warn" id="np-lockwarn" role="note">
-      <span aria-hidden="true">⚠</span>
+      <span aria-hidden="true"><i class=i-alert></i></span>
       <div><b>Warning: Once a facility is created, details cannot be edited directly. Any subsequent changes require explicit Administrator permission.</b>
         <label class="check"><input type="checkbox" id="np-ack"> I have checked the facility name, code, contacts, dates, people and pictures</label></div>
     </div>
@@ -1106,16 +1106,16 @@
       <button class="btn" type="button" id="pp-new-cancel">Close</button>
       <button class="btn" type="button" id="np-back">← Back</button>
       <button class="btn primary big" type="button" id="np-next">Next →</button>
-      <button class="btn primary big" type="submit" id="pp-new-create">⚙ Create the policy pack</button>
+      <button class="btn primary big" type="submit" id="pp-new-create"><i class=i-gear></i> Create the policy pack</button>
     </div>
   </form>
 </dialog>
 <!-- full-screen document reader -->
 <dialog id="doc-viewer" class="doc-viewer" aria-label="Document preview">
   <header class="dv-bar">
-    <span class="dv-ic">📄</span>
+    <span class="dv-ic"><i class=i-doc></i></span>
     <div class="dv-title"><b id="dv-title">Document</b><small id="dv-sub" class="muted"></small></div>
-    <a class="btn small" id="dv-download" href="#" download>⬇ Download</a>
+    <a class="btn small" id="dv-download" href="#" download><i class=i-download></i> Download</a>
     <a class="btn small" id="dv-tab" href="#" target="_blank" rel="noopener">Open in new tab</a>
     <button type="button" class="btn small primary" id="dv-close">✕ Close</button>
   </header>
@@ -1128,7 +1128,7 @@
       <div class="pm-vers" id="pm-vers" role="group" aria-label="Version"></div>
     </div>
     <div class="chips pm-tabs" id="pm-tabs">
-      <button type="button" data-pm="view" class="active">👁 View document</button>
+      <button type="button" data-pm="view" class="active"><i class=i-eye></i> View document</button>
       <button type="button" data-pm="edit" data-admin>✎ Edit text &amp; add clauses</button>
       <button type="button" data-pm="file" data-admin>⇅ Word file</button>
     </div>
@@ -1150,7 +1150,7 @@
         <h2>Edit in Microsoft Word</h2>
         <p class="muted small">For larger changes: download this master, edit it in Word (keep the Document Control and version tables), then upload it here. It replaces this version's master, a copy of the previous one is kept, and the set is locked again.</p>
         <div class="btn-row">
-          <a class="btn" id="pm-download" href="#">⬇ Download this master (.docx)</a>
+          <a class="btn" id="pm-download" href="#"><i class=i-download></i> Download this master (.docx)</a>
           <label class="btn primary"><input type="file" id="pm-upload" accept=".docx,.doc" hidden>⇪ Upload the edited Word file</label>
         </div>
         <p class="small" id="pm-file-msg"></p>
@@ -1161,7 +1161,7 @@
       <span class="muted small" id="pm-msg"></span>
       <span class="np-spacer"></span>
       <button type="button" class="btn" id="pm-close">Close</button>
-      <button type="button" class="btn primary" id="pm-save" data-admin hidden>💾 Save &amp; lock</button>
+      <button type="button" class="btn primary" id="pm-save" data-admin hidden><i class=i-save></i> Save &amp; lock</button>
     </div>
   </div>
 </dialog>
@@ -1193,7 +1193,7 @@
 </section>
 <dialog id="lock-dlg" class="lock-dlg" aria-labelledby="lk-title">
   <form method="dialog">
-    <span class="lk-badge" aria-hidden="true">🔒</span>
+    <span class="lk-badge" aria-hidden="true"><i class=i-lock></i></span>
     <h2 id="lk-title">Facility details are locked</h2>
     <p id="lk-text"></p>
     <div id="lk-req">
@@ -1215,7 +1215,7 @@
       <div class="wl-sup-body">
         <h3 id="wl-sup-title"></h3>
         <p id="wl-sup-text"></p>
-        <a class="wl-call" id="wl-call" href="#"><span aria-hidden="true">📞</span><span>Contact us: <b id="wl-phone"></b> <small id="wl-phone-note"></small></span></a>
+        <a class="wl-call" id="wl-call" href="#"><span aria-hidden="true"><i class=i-phone></i></span><span>Contact us: <b id="wl-phone"></b> <small id="wl-phone-note"></small></span></a>
       </div>
     </section>
     <div class="wl-foot">

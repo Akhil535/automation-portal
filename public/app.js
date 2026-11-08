@@ -68,13 +68,13 @@ async function loadFacilities() {
     <td><b>${esc(f.name)}</b><br><span class="muted small">${esc(f.code)}${f.isDefault ? ' · default' : ''}${f.id === facility ? ' · selected' : ''}${f.createdBy ? ` · created by ${esc(f.createdBy)}` : ''}</span></td>
     <td>${healthBar(f.health)}</td>
     <td class="small">${f.lock ? `<span class="tag warn">${esc(f.lock)}</span>` : '<span class="tag ok">Ready</span>'}
-      ${f.editUnlock ? `<br><span class="tag warn" title="Allowed by ${esc(f.editUnlock.by)}">✎ Edits allowed until ${fmt(f.editUnlock.until)}</span>` : f.detailsLocked ? '<br><span class="tag na">🔒 Details locked</span>' : ''}
+      ${f.editUnlock ? `<br><span class="tag warn" title="Allowed by ${esc(f.editUnlock.by)}">✎ Edits allowed until ${fmt(f.editUnlock.until)}</span>` : f.detailsLocked ? '<br><span class="tag na"><i class=i-lock></i> Details locked</span>' : ''}
       ${f.changeRequest ? `<div class="chg-req"><b>Change requested by ${esc(f.changeRequest.by)}</b> · ${fmt(f.changeRequest.at)}<br>“${esc(f.changeRequest.note)}”</div>` : ''}</td>
     <td class="num">${f.lastSuccess ? fmt(f.lastSuccess) : 'Never'}</td><td>${f.lastStatus ? tagFor(f.lastStatusCode, f.lastStatus) : '–'}</td>
     <td><div class="row-actions">
       ${f.finalized && !f.editUnlock ? `<button class="icon-btn" data-admin data-unlock="${esc(f.id)}" title="Let this facility's users change its details for 24 hours">${f.changeRequest ? '✓ Allow edits (24 h)' : 'Allow edits'}</button>` : ''}
-      ${f.editUnlock ? `<button class="icon-btn" data-admin data-relock="${esc(f.id)}">🔒 Lock again</button>` : ''}
-      ${!f.finalized && f.createdBy ? `<button class="icon-btn" data-admin data-relock="${esc(f.id)}" title="Lock its details now (otherwise they lock when its policies are created)">🔒 Lock details</button>` : ''}
+      ${f.editUnlock ? `<button class="icon-btn" data-admin data-relock="${esc(f.id)}"><i class=i-lock></i> Lock again</button>` : ''}
+      ${!f.finalized && f.createdBy ? `<button class="icon-btn" data-admin data-relock="${esc(f.id)}" title="Lock its details now (otherwise they lock when its policies are created)"><i class=i-lock></i> Lock details</button>` : ''}
       ${f.id === facility ? '' : `<button class="icon-btn" data-open="${esc(f.id)}">Open</button>`}
       <button class="icon-btn" data-write data-edit="${esc(f.id)}">Edit</button>
       <button class="icon-btn del" data-admin data-del="${esc(f.id)}" ${f.isDefault ? 'disabled title="The default facility cannot be removed"' : ''}>Delete</button>
@@ -84,11 +84,11 @@ async function loadFacilities() {
   $$('#fac-tbl [data-del]').forEach(b => b.onclick = () => removeFacility(b.dataset.del));
   $$('#fac-tbl [data-unlock]').forEach(b => b.onclick = async () => {
     try { const r = await apiGlobal(`/api/facilities/${encodeURIComponent(b.dataset.unlock)}/unlock`, { method: 'POST', body: JSON.stringify({ hours: 24 }) }); toast(`Edits allowed until ${fmt(r.until)} – then the details lock again by themselves`); await loadFacilities(); }
-    catch (e) { toast(`⚠ ${esc(e.message)}`); }
+    catch (e) { toast(`<i class=i-alert></i> ${esc(e.message)}`); }
   });
   $$('#fac-tbl [data-relock]').forEach(b => b.onclick = async () => {
     try { await apiGlobal(`/api/facilities/${encodeURIComponent(b.dataset.relock)}/lock`, { method: 'POST', body: '{}' }); toast('Details locked again'); await loadFacilities(); }
-    catch (e) { toast(`⚠ ${esc(e.message)}`); }
+    catch (e) { toast(`<i class=i-alert></i> ${esc(e.message)}`); }
   });
   renderFacLock();
 }
@@ -107,7 +107,7 @@ function renderFacLock() {
   document.body.classList.toggle('fac-locked', locked);
   for (const sel of ['#pp-form', '#pp-assets', '#doc-form', '#profile-form']) { const el = $(sel); if (el) el.inert = locked; }
   const html = locked
-    ? `<span class="fl-ic" aria-hidden="true">🔒</span><div><b>${esc(LOCK_WARNING)}</b>
+    ? `<span class="fl-ic" aria-hidden="true"><i class=i-lock></i></span><div><b>${esc(LOCK_WARNING)}</b>
         <span>${f.changeRequest ? `Your change request was sent on ${fmt(f.changeRequest.at)} – an administrator will allow the edit.` : 'Need to correct something? Send a change request – an administrator allows the edit.'}</span></div>
         <button type="button" class="btn small" data-chg-req>${f.changeRequest ? 'Update the request' : 'Request a change'}</button>`
     : open ? `<span class="fl-ic" aria-hidden="true">✎</span><div><b>An administrator allowed edits until ${fmt(f.editUnlock.until)}.</b><span>After that the details lock again by themselves.</span></div>` : '';
@@ -514,8 +514,8 @@ hoverCards.entry = el => {
   const expiry = i.status === 'lifetime' ? 'Lifetime' : ISO.test(i.expiry || '') ? `Expires ${fmtDay(i.expiry)}` : 'No expiry date';
   return `<div class="hc-head"><b>${esc(i.name)}</b>${statusPill(i.status)}</div>
     <p class="hc-big">${esc(i.fixed ? 'Federal law – fixed' : daysText(i))}</p>
-    ${i.fixed ? '' : `<p class="hc-line">${esc(expiry)} · 👤 ${esc(i.responsible || '—')}</p>`}
-    ${isPic ? `<img class="hc-thumb" src="${u(`/api/facility-document?entry=${encodeURIComponent(i.name)}`)}" alt="">` : doc?.hasFile ? `<p class="hc-line">📄 ${esc(doc.original || 'document attached')}</p>` : ''}`;
+    ${i.fixed ? '' : `<p class="hc-line">${esc(expiry)} · <i class=i-user></i> ${esc(i.responsible || '—')}</p>`}
+    ${isPic ? `<img class="hc-thumb" src="${u(`/api/facility-document?entry=${encodeURIComponent(i.name)}`)}" alt="">` : doc?.hasFile ? `<p class="hc-line"><i class=i-doc></i> ${esc(doc.original || 'document attached')}</p>` : ''}`;
 };
 const GROUPS = { valid: ['Valid', ['valid', 'lifetime']], expiring: ['Expiring soon', ['expiring']], expired: ['Expired', ['expired']], missing: ['No dates yet', ['missing', 'no-expiry']] };
 hoverCards.group = el => {
@@ -578,7 +578,14 @@ function renderHome(s = status) {
   const order = { expired: 0, expiring: 1, missing: 2, 'no-expiry': 3, valid: 4, lifetime: 5 };
   const cls = { expired: 'bad', expiring: 'warn', missing: 'missing', 'no-expiry': 'missing', valid: 'ok', lifetime: 'ok' };
   $('#hx-mosaic').innerHTML = !master ? '<p class="muted">Loading…</p>' : !items.length ? '<p class="muted">No entries in this register.</p>'
-    : [...items].sort((a, b) => order[a.status] - order[b.status] || String(a.expiry).localeCompare(String(b.expiry))).map(i => {
+    : [...items].sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9) || String(a.expiry).localeCompare(String(b.expiry))).map(i => {
+      if (i.locked) { // free trial: an entry that is part of Premium – blurred, padlock, Get Premium
+        return `<button type="button" class="tile t2 t2-locked" data-up title="Part of Premium">
+          <span class="t2-top"><span class="t2-chip"><i class=i-lock></i>Premium</span><span class="lock-emblem"></span></span>
+          <b class="t2-name blur-txt" aria-hidden="true">XXXXXXXX XXXXXXXXXX</b><span class="sr-only">Locked entry – part of Premium</span>
+          <span class="t2-date blur-txt" aria-hidden="true">Expires 31 Dec 2026</span>
+          <span class="t2-foot"><span class="muted small">Part of Premium</span><span class="btn small premium-btn">★ Get Premium</span></span></button>`;
+      }
       const d = ISO.test(i.expiry || '') ? daysTo(i.expiry) : null;
       const fill = i.status === 'lifetime' ? 100 : d === null ? 0 : Math.max(4, Math.min(100, (d / 365) * 100));
       const big = i.status === 'lifetime' ? '∞' : d === null ? '?' : String(Math.abs(d));
@@ -587,7 +594,7 @@ function renderHome(s = status) {
         <span class="t2-top"><span class="t2-chip"><i></i>${esc(STATUS[i.status]?.[0] || i.status)}</span><span class="t2-ring" style="--f:${i.status === 'expired' ? 100 : fill}"><b>${esc(big)}</b><small>${esc(unit)}</small></span></span>
         <b class="t2-name" title="${esc(i.name)}">${esc(i.name)}</b>
         <span class="t2-date">${esc(i.status === 'lifetime' ? 'Never expires' : ISO.test(i.expiry || '') ? `Expires ${fmtDay(i.expiry)}` : 'No expiry date yet')}</span>
-        <span class="t2-foot"><span>${esc(i.responsible ? `👤 ${i.responsible}` : '')}</span><span class="t2-go">${i.status === 'expired' || i.status === 'expiring' ? 'Renew' : 'Update'} →</span></span></button>`;
+        <span class="t2-foot"><span>${i.responsible ? `<i class=i-user></i> ${esc(i.responsible)}` : ''}</span><span class="t2-go">${i.status === 'expired' || i.status === 'expiring' ? 'Renew' : 'Update'} →</span></span></button>`;
     }).join('');
   $$('#overview [data-open]').forEach(el => {
     const go = () => (me?.role === 'viewer' ? (statusFilter = 'all', showTab('master')) : openEntry(Number(el.dataset.open)));
@@ -639,12 +646,12 @@ function renderDohBrief() {
     return `<li class="dl-item">
       <span class="dl-date"><b>${day(c.date).split(' ')[0]}</b><small>${day(c.date).split(' ')[1] || ''}</small></span>
       <span class="dl-body"><span class="dl-no">${esc(c.number)}</span><b title="${esc(c.name)}">${esc(c.name)}</b>
-        <span class="dl-meta"><span class="dl-chip ${applies ? 'ok' : 'na'}">${applies ? 'Applies' : 'Not applicable'}</span>${c.responsible ? `<span>👤 ${esc(c.responsible)}</span>` : ''}${c.target && c.target !== '_' ? `<span>⏱ ${esc(c.target)}</span>` : ''}</span></span>
+        <span class="dl-meta"><span class="dl-chip ${applies ? 'ok' : 'na'}">${applies ? 'Applies' : 'Not applicable'}</span>${c.responsible ? `<span><i class=i-user></i> ${esc(c.responsible)}</span>` : ''}${c.target && c.target !== '_' ? `<span><i class=i-clock></i> ${esc(c.target)}</span>` : ''}</span></span>
       ${c.url ? `<a class="dl-open" href="${esc(c.url)}" target="_blank" rel="noopener noreferrer" title="Open the circular on doh.gov.ae">PDF ↗</a>` : ''}
     </li>`;
   }).join('') : '<li class="muted small">No circulars in the register yet.</li>';
   // free trial: the newest circulars are held back – say how many, with the way to get them
-  if (b.trialHeld) list.insertAdjacentHTML('afterbegin', `<li class="dl-item dl-locked"><span class="dl-date" aria-hidden="true">🔒</span>
+  if (b.trialHeld) list.insertAdjacentHTML('afterbegin', `<li class="dl-item dl-locked"><span class="dl-date" aria-hidden="true"><i class=i-lock></i></span>
       <span class="dl-body"><b>${b.trialHeld} DoH circular${b.trialHeld === 1 ? '' : 's'} from the last ${b.trialDays} days</b><span class="dl-meta"><span>The live, updated register is part of Premium.</span></span></span>
       <button type="button" class="btn small premium-btn" data-up>★ Get Premium</button></li>`);
 }
@@ -658,7 +665,7 @@ function renderHomeHr() {
   const needLogo = h.forms.some(f => f.installed && f.need.some(n => /logo/.test(n)));
   box.innerHTML = j?.running
     ? `<div class="hx-live" role="status"><div class="hx-live-top"><span class="spin"></span><b>Creating the HR documents – ${j.done || 0} of ${j.total}</b><span>${Math.round(((j.done || 0) / Math.max(1, j.total)) * 100)}%</span></div><div class="days-bar"><i style="width:${Math.round(((j.done || 0) / Math.max(1, j.total)) * 100)}%"></i></div><small>${esc(j.step || '')}</small></div>`
-    : g ? `<div class="hx-live ${g.passed < g.total ? 'warn' : 'ok'}"><b>${g.passed < g.total ? '⚠' : '✓'} ${g.count} of ${g.total} documents created · ${g.passed} checked and correct</b><small>${fmt(g.at)} · Word + PDF with this facility's name and logo</small></div>`
+    : g ? `<div class="hx-live ${g.passed < g.total ? 'warn' : 'ok'}"><b>${g.passed < g.total ? '<i class=i-alert></i>' : '✓'} ${g.count} of ${g.total} documents created · ${g.passed} checked and correct</b><small>${fmt(g.at)} · Word + PDF with this facility's name and logo</small></div>`
     : `<p class="small muted">${!installed ? 'No master HR forms uploaded yet.' : needLogo ? 'Add the facility logo first (Prepare policies → Pictures).' : `${installed} forms ready to create: NDA, orientation, background verification, IT/EMR user form, disciplinary process, acceptable usage, IT quiz, awareness training, exit clearance.`}</p>`;
   $('#hx-hr-checklist').textContent = `Checklist: ${h.checklist.counts.completed} of ${h.checklist.counts.total} documents completed`;
   clearTimeout(homeHrPoll);
@@ -669,14 +676,14 @@ function renderHomePolicies() {
   const p = homePolicies;
   if (!p) return;
   const lg = p.lastGenerated, val = p.job?.validation;
-  const steps = [['Masters', p.templates.length > 0, `${p.templates.length} master policies${p.lock?.locked ? ' · 🔒 locked' : ''}`],
+  const steps = [['Masters', p.templates.length > 0, `${p.templates.length} master policies${p.lock?.locked ? ' · <i class=i-lock></i> locked' : ''}`],
     ['Details', !p.need.filter(n => !/templates/i.test(n)).length, p.need.length ? `Still needed: ${p.need.join(', ')}` : 'Dates, people, logo and signatures set'],
     ['Generated', !!p.files.word.length, lg ? `${lg.count} policies · ${fmt(lg.at)}${val ? ` · validation ${val.passed}/${val.total}` : ''}` : 'Not generated yet']];
   const j = p.job;
   // live: while the policies are being created, show how far it is (refreshed every 2 s until done)
   const live = j?.running ? `<div class="hx-live" role="status"><div class="hx-live-top"><span class="spin"></span><b>Creating the policies – ${j.done || 0} of ${j.total || '…'}</b><span>${Math.round(((j.done || 0) / Math.max(1, j.total || 1)) * 100)}%</span></div>
       <div class="days-bar"><i style="width:${Math.round(((j.done || 0) / Math.max(1, j.total || 1)) * 100)}%"></i></div><small>${esc(j.step || '')}</small></div>`
-    : (val && !j?.running ? `<div class="hx-live ${val.failed?.length ? 'warn' : 'ok'}"><b>${val.failed?.length ? '⚠' : '✓'} Last run: ${val.passed} of ${val.total} policies checked and correct</b>${val.failed?.length ? `<small>Please look at ${esc(val.failed.join(', '))}</small>` : ''}</div>` : '');
+    : (val && !j?.running ? `<div class="hx-live ${val.failed?.length ? 'warn' : 'ok'}"><b>${val.failed?.length ? '<i class=i-alert></i>' : '✓'} Last run: ${val.passed} of ${val.total} policies checked and correct</b>${val.failed?.length ? `<small>Please look at ${esc(val.failed.join(', '))}</small>` : ''}</div>` : '');
   $('#hx-policies').innerHTML = `${live}<ol class="hx-steps">${steps.map(([k, done, tip]) => `<li class="${done ? 'done' : ''}" data-hc="tip" data-tip="${esc(tip)}"><i>${done ? '✓' : ''}</i><span>${k}</span></li>`).join('')}</ol>
     <p class="small muted">${p.files.word.length ? `${p.files.word.length} Word · ${p.files.pdf.length} PDF files ready` : 'Prepare this facility\'s 33 policies in a few minutes.'}</p>`;
   clearTimeout(homePolicyPoll);
@@ -687,10 +694,10 @@ var homePolicyPoll = 0;
 function renderHomeActivity() {
   const s = status, ev = [];
   if (s?.lastRun) ev.push([s.lastRun.finished || s.lastRun.started, '↻', `DoH check – ${s.lastRun.statusLabel || s.lastRun.status}${s.lastRun.added ? `, ${plural(s.lastRun.added, 'circular', 'circulars')} added` : ''}`]);
-  for (const [name, d] of Object.entries(master?.documents || {})) if (d.appliedAt) ev.push([d.appliedAt, '📄', `Document applied to ${name}${d.original ? ` (${d.original})` : ''}`]);
-  if (homePolicies?.lastGenerated) ev.push([homePolicies.lastGenerated.at, '📚', `${homePolicies.lastGenerated.count} policies generated`]);
-  if (homePolicies?.linked) ev.push([homePolicies.linked, '🔗', 'Policies linked to the LEGAL REGISTER']);
-  if (homePolicies?.lock?.at) ev.push([homePolicies.lock.at, '🔒', `Master policies locked${homePolicies.lock.by ? ` by ${homePolicies.lock.by}` : ''}`]);
+  for (const [name, d] of Object.entries(master?.documents || {})) if (d.appliedAt) ev.push([d.appliedAt, '<i class=i-doc></i>', `Document applied to ${name}${d.original ? ` (${d.original})` : ''}`]);
+  if (homePolicies?.lastGenerated) ev.push([homePolicies.lastGenerated.at, '<i class=i-book></i>', `${homePolicies.lastGenerated.count} policies generated`]);
+  if (homePolicies?.linked) ev.push([homePolicies.linked, '<i class=i-link></i>', 'Policies linked to the LEGAL REGISTER']);
+  if (homePolicies?.lock?.at) ev.push([homePolicies.lock.at, '<i class=i-lock></i>', `Master policies locked${homePolicies.lock.by ? ` by ${homePolicies.lock.by}` : ''}`]);
   const list = ev.filter(e => e[0]).sort((a, b) => String(b[0]).localeCompare(String(a[0]))).slice(0, 6);
   $('#hx-activity').innerHTML = list.length ? list.map(([at, ic, text]) => `<li data-hc="tip" data-tip="${esc(fmt(at))}"><i>${ic}</i><span>${esc(text)}</span><small>${esc(fmtShort(at))}</small></li>`).join('')
     : '<li class="muted">Nothing yet.</li>';
@@ -979,8 +986,8 @@ function renderMasterRows() {
       <dl class="ecard-dates"><div><dt>Issued</dt><dd>${ISO.test(i.issued || '') ? fmtDay(i.issued) : '—'}</dd></div><div><dt>Expiry</dt><dd>${i.status === 'lifetime' ? '∞ Lifetime' : ISO.test(i.expiry || '') ? fmtDay(i.expiry) : '—'}</dd></div><div><dt>Due</dt><dd>${i.status !== 'lifetime' && ISO.test(i.due || '') ? fmtDay(i.due) : '—'}</dd></div></dl>
       <div class="tile-bar"><i style="width:${fill}%"></i></div>
       <p class="ecard-days">${esc(daysText(i))}</p>
-      <footer><span class="ecard-who" title="Responsible person">👤 ${esc(i.responsible || '—')}</span>
-        <span class="row-actions">${doc?.hasFile ? `<a class="icon-btn" href="${u(`/api/facility-document?entry=${encodeURIComponent(i.name)}`)}" target="_blank" title="${esc(doc.original || 'Source document')}">📄</a>` : ''}<label class="icon-btn" data-write title="Add a photo or document (dates are read for you)">📷<input type="file" accept="image/*,.pdf,.docx,.doc" hidden data-photo-row="${i.row}"></label><button class="icon-btn" data-write data-edit-row="${i.row}">Edit</button><button class="icon-btn del" data-write data-del-row="${i.row}">Delete</button></span></footer>`}
+      <footer><span class="ecard-who" title="Responsible person"><i class=i-user></i> ${esc(i.responsible || '—')}</span>
+        <span class="row-actions">${doc?.hasFile ? `<a class="icon-btn" href="${u(`/api/facility-document?entry=${encodeURIComponent(i.name)}`)}" target="_blank" title="${esc(doc.original || 'Source document')}"><i class=i-doc></i></a>` : ''}<label class="icon-btn" data-write title="Add a photo or document (dates are read for you)"><i class=i-camera></i><input type="file" accept="image/*,.pdf,.docx,.doc" hidden data-photo-row="${i.row}"></label><button class="icon-btn" data-write data-edit-row="${i.row}">Edit</button><button class="icon-btn del" data-write data-del-row="${i.row}">Delete</button></span></footer>`}
     </article>`;
   }).join('');
   // free trial: entries after the first ones are masked by the server – a blurred row under a padlock, a click = Get Premium
@@ -995,7 +1002,7 @@ function renderMasterRows() {
   </tr>`;
   $('#mtbl tbody').innerHTML = rows.map(i => i.locked ? lockedRow(i) : `<tr class="${i.fixed ? 'fixed' : ''} st-${i.status}" data-hc="entry" data-row="${i.row}">
     <td class="num">${esc(i.sl)}</td>
-    <td class="name">${esc(i.name)}${master.documents?.[i.name]?.hasFile ? `<a class="doc-link" href="${u(`/api/facility-document?entry=${encodeURIComponent(i.name)}`)}" target="_blank" title="Source document: ${esc(master.documents[i.name].original || '')}">📄 source document</a>` : ''}</td>
+    <td class="name">${esc(i.name)}${master.documents?.[i.name]?.hasFile ? `<a class="doc-link" href="${u(`/api/facility-document?entry=${encodeURIComponent(i.name)}`)}" target="_blank" title="Source document: ${esc(master.documents[i.name].original || '')}"><i class=i-doc></i> source document</a>` : ''}</td>
     <td>${statusPill(i.status)}</td>
     <td>${dateCell('issued', i.issued)}</td><td>${i.status === 'lifetime' ? LIFETIME_CELL : dateCell('expiry', i.expiry)}</td><td>${i.status === 'lifetime' ? '<span class="date empty">—</span>' : dateCell('due', i.due)}</td>
     <td>${esc(i.responsible)}</td>
@@ -1025,7 +1032,7 @@ function openEntry(row) {
   const doc = it && master.documents?.[it.name];
   $('#entry-doc').hidden = !it;
   $('#entry-doc-now').innerHTML = doc?.hasFile
-    ? `📄 <a href="${u(`/api/facility-document?entry=${encodeURIComponent(it.name)}`)}" target="_blank">${esc(doc.original || 'document')}</a> <span class="muted">· replace it:</span>`
+    ? `<i class=i-doc></i> <a href="${u(`/api/facility-document?entry=${encodeURIComponent(it.name)}`)}" target="_blank">${esc(doc.original || 'document')}</a> <span class="muted">· replace it:</span>`
     : 'No document attached yet';
   $('#entry-dlg').showModal();
 }
@@ -1132,8 +1139,8 @@ function renderDocs() {
   $('#docs-result').innerHTML = docResults.length ? `<div class="table-wrap flat"><table class="docs-table"><thead><tr>
       <th></th><th>Document</th><th>Recognised as</th><th>Register entry</th><th>Issued</th><th>Expiry</th><th>Due</th><th>Notes</th></tr></thead><tbody>
     ${docResults.map((r, k) => r.pending ? `<tr class="doc-skel" aria-busy="true"><td><span class="spin"></span></td><td class="file">${esc(r.file)}<div class="muted small">Reading and matching…</div></td><td><i class="sk w70"></i><i class="sk w40"></i></td><td><i class="sk w90"></i></td><td><i class="sk w60"></i></td><td><i class="sk w60"></i></td><td><i class="sk w60"></i></td><td><i class="sk w50"></i></td></tr>`
-      : r.lockedMatch ? `<tr class="trial-locked"><td>🔒</td><td class="file"><span class="blur-txt" aria-hidden="true">${esc(r.file)}</span><span class="sr-only">Document for a Premium entry</span></td><td colspan="6"><span class="tag lock-tag">Premium</span> <span class="lock-msg">Read and matched to a LEGAL REGISTER entry that is part of Premium – it cannot be applied to another entry</span> <button type="button" class="icon-btn premium-mini" data-up>🔒 Get Premium</button></td></tr>`
-      : r.locked ? `<tr class="trial-locked"><td>🔒</td><td class="file"><span class="blur-txt" aria-hidden="true">${esc(r.file)}</span><span class="sr-only">Locked document – part of Premium</span></td><td colspan="6"><span class="tag lock-tag">Premium</span> <span class="lock-msg">The free trial reads up to 25 different documents – this one is part of Premium</span> <button type="button" class="icon-btn premium-mini" data-up>🔒 Get Premium</button></td></tr>`
+      : r.lockedMatch ? `<tr class="trial-locked"><td><i class=i-lock></i></td><td class="file"><span class="blur-txt" aria-hidden="true">${esc(r.file)}</span><span class="sr-only">Document for a Premium entry</span></td><td colspan="6"><span class="tag lock-tag">Premium</span> <span class="lock-msg">Read and matched to a LEGAL REGISTER entry that is part of Premium – it cannot be applied to another entry</span> <button type="button" class="icon-btn premium-mini" data-up><i class=i-lock></i> Get Premium</button></td></tr>`
+      : r.locked ? `<tr class="trial-locked"><td><i class=i-lock></i></td><td class="file"><span class="blur-txt" aria-hidden="true">${esc(r.file)}</span><span class="sr-only">Locked document – part of Premium</span></td><td colspan="6"><span class="tag lock-tag">Premium</span> <span class="lock-msg">The free trial reads up to 25 different documents – this one is part of Premium</span> <button type="button" class="icon-btn premium-mini" data-up><i class=i-lock></i> Get Premium</button></td></tr>`
       : r.error ? `<tr><td></td><td class="file">${esc(r.file)}</td><td colspan="6" class="notes">${esc(r.error)}</td></tr>`
       : `<tr data-k="${k}">
         <td><input type="checkbox" data-f="include" ${r.include ? 'checked' : ''}></td>
@@ -1280,7 +1287,7 @@ hoverCards.circ = el => {
   if (!c) return '';
   const target = hval(c.values?.targetDate);
   return `<div class="hc-head"><b>${esc(c.number)}</b>${decisionTag(c)}</div>
-    <p class="hc-line">👤 ${esc(c.values?.responsible || '—')}${target && target !== '_' ? ` · 🎯 ${esc(target)}` : ''}</p>
+    <p class="hc-line"><i class=i-user></i> ${esc(c.values?.responsible || '—')}${target && target !== '_' ? ` · <i class=i-target></i> ${esc(target)}` : ''}</p>
     ${c.reason ? `<p class="hc-why">${esc(c.reason.length > 140 ? `${c.reason.slice(0, 140)}…` : c.reason)}</p>` : ''}`;
 };
 async function loadCirculars() { circulars = await api('/api/circulars'); renderCirculars(); }
@@ -1677,7 +1684,7 @@ function editAccess(u) {
         const facs = allBox.checked ? ['*'] : [...dlg.querySelectorAll('.access-list input:checked')].map(i => i.value);
         const allow = dlg.querySelector('#acc-allow');
         try { await apiGlobal(`/api/users/${u.id}`, { method: 'PUT', body: JSON.stringify({ facilities: facs, ...(allow ? { facilityAllowance: Number(allow.value) } : {}) }) }); toast(`Access saved – ${esc(u.username)} now sees ${facs[0] === '*' ? 'all facilities' : facs.length ? `${facs.length} facilit${facs.length > 1 ? 'ies' : 'y'}` : 'no facility'}`); }
-        catch (e) { toast(`⚠ ${esc(e.message)}`); }
+        catch (e) { toast(`<i class=i-alert></i> ${esc(e.message)}`); }
       }
       dlg.remove(); loadUsersPanel(); resolve();
     });
@@ -1770,8 +1777,8 @@ function renderPolicies() {
   $('#pp-lockbar').hidden = !L.locked && !L.unlockedAt;
   $('#pp-lockbar').className = `pp-lockbar ${L.locked ? 'on' : 'off'}`;
   $('#pp-lockbar').innerHTML = L.locked
-    ? `🔒 <b>Master template locked</b> · ${L.count} policies · locked ${fmt(L.at)}${L.by ? ` by ${esc(L.by)}` : ''}. The files are fingerprinted – structure, wording, layout and tables stay exactly as uploaded; each facility gets its own filled copy.`
-    : `🔓 Unlocked ${L.unlockedAt ? fmt(L.unlockedAt) : ''}${L.unlockedBy ? ` by ${esc(L.unlockedBy)}` : ''} – templates can be replaced. Lock them again when done.`;
+    ? `<i class=i-lock></i> <b>Master template locked</b> · ${L.count} policies · locked ${fmt(L.at)}${L.by ? ` by ${esc(L.by)}` : ''}. The files are fingerprinted – structure, wording, layout and tables stay exactly as uploaded; each facility gets its own filled copy.`
+    : `<i class=i-unlock></i> Unlocked ${L.unlockedAt ? fmt(L.unlockedAt) : ''}${L.unlockedBy ? ` by ${esc(L.unlockedBy)}` : ''} – templates can be replaced. Lock them again when done.`;
   $('#pp-upload-btn').hidden = !!L.locked;
   $('#pp-lock').hidden = !!L.locked || !t.length;
   $('#pp-unlock').hidden = !L.locked;
@@ -1792,9 +1799,9 @@ function renderPolicies() {
       <td><input data-desc="${x.no}" data-write placeholder="${Number(ver(x.no)) >= 2 ? 'Major revision – policy updated' : 'Reviewed No Changes'}" value="${esc(s.descriptions[x.no] || '')}"></td>
       <td class="small">${(x.labels || []).length >= 4 && x.hasRevisionTable ? '<span class="tag ok">All fields</span>' : `<span class="tag warn">${(x.labels || []).length} fields${x.hasRevisionTable ? '' : ' · no version table'}</span>`}</td>
       <td><div class="row-actions">
-        <button class="icon-btn" data-pm-open="${x.no}" data-pm-mode="view" title="See this master as a document">👁 View</button>
+        <button class="icon-btn" data-pm-open="${x.no}" data-pm-mode="view" title="See this master as a document"><i class=i-eye></i> View</button>
         <button class="icon-btn" data-admin data-pm-open="${x.no}" data-pm-mode="edit" title="Edit the text or add clauses">✎ Edit</button>
-        ${pp.lock?.locked ? '<span class="muted small" title="Locked master">🔒</span>' : `<button class="icon-btn del" data-admin data-del-tpl="${x.no}">Remove</button>`}
+        ${pp.lock?.locked ? '<span class="muted small" title="Locked master"><i class=i-lock></i></span>' : `<button class="icon-btn del" data-admin data-del-tpl="${x.no}">Remove</button>`}
       </div></td></tr>`).join('')
     : '<tr><td colspan="8" class="muted">No master policies yet – an administrator uploads the Word files (e.g. all 33 ADHICS policies) once.</td></tr>';
   $$('#pp-tpl-body [data-ver]').forEach(el => el.onchange = () => saveVersions());
@@ -1827,16 +1834,16 @@ function renderPolicies() {
   const need = pp.need;
   $('#pp-need').innerHTML = need.length ? `<div class="alert warn">Still needed before generating: <b>${need.map(esc).join(' · ')}</b></div>` : '';
   $('#pp-generate').disabled = !!need.length || !!pp.job?.running;
-  $('#pp-generate').innerHTML = pp.job?.running ? '<span class="spin"></span> Generating…' : `⚙ Create all ${t.length || ''} policies`;
+  $('#pp-generate').innerHTML = pp.job?.running ? '<span class="spin"></span> Generating…' : `<i class=i-gear></i> Create all ${t.length || ''} policies`;
   const j = pp.job;
   $('#pp-progress').hidden = !j?.running;
   if (j?.running) { $('#pp-bar').style.width = `${Math.round(((j.done || 0) / Math.max(1, j.total)) * 100)}%`; $('#pp-step').textContent = `${j.done}/${j.total} · ${j.step}`; }
   const val = j && !j.running ? j.validation : null;
-  $('#pp-problems').innerHTML = (val ? `<div class="alert ${val.failed.length ? 'warn' : 'ok'}">${val.failed.length ? '⚠' : '✓'} Checked: <b>${val.passed} of ${val.total}</b> policies are correct for ${esc(s.facilityName)}${val.failed.length ? ` – please look at ${val.failed.map(esc).join(', ')}` : ''}.${val.pages ? ` <span class="muted small">${val.pages} pages · ${val.megabytes} MB</span>` : ''}</div>` : '') +
+  $('#pp-problems').innerHTML = (val ? `<div class="alert ${val.failed.length ? 'warn' : 'ok'}">${val.failed.length ? '<i class=i-alert></i>' : '✓'} Checked: <b>${val.passed} of ${val.total}</b> policies are correct for ${esc(s.facilityName)}${val.failed.length ? ` – please look at ${val.failed.map(esc).join(', ')}` : ''}.${val.pages ? ` <span class="muted small">${val.pages} pages · ${val.megabytes} MB</span>` : ''}</div>` : '') +
     (j && !j.running && j.problems?.length ? `<div class="alert warn">${j.problems.map(esc).join('<br>')}</div>` : '');
   const files = pp.files;
   $('#pp-out').hidden = !files.word.length && !files.pdf.length;
-  $('#pp-folder').textContent = `Saved in ${files.folder} → Word\\ and PDF\\`;
+  $('#pp-folder').textContent = 'Saved on the portal · Word and PDF';
   $('#pp-out-title').textContent = `${files.word.length} Word · ${files.pdf.length} PDF files`;
   $('#pp-zip-word').href = u('/api/policies/zip?type=word'); $('#pp-zip-pdf').href = u('/api/policies/zip?type=pdf'); $('#pp-zip-all').href = u('/api/policies/zip?type=all');
   const results = j?.results || [];
@@ -1846,9 +1853,9 @@ function renderPolicies() {
     const pdf = files.pdf.find(p => p.replace(/\.pdf$/, '') === w.replace(/\.docx$/, ''));
     const filled = r ? r.report.filled.map(k => PP_FIELD[k] || k) : null;
     if (trialLocked('policies', no)) { // free trial: only the first policies open – the rest are locked
-      return `<tr class="trial-locked"><td class="name"><span class="lock-ic" aria-hidden="true">🔒</span><span class="blur-txt" aria-hidden="true">${esc(w.replace(/\.docx$/, ''))}</span><span class="sr-only">Locked policy – part of Premium</span></td><td>${esc(r?.version || '')}</td>
+      return `<tr class="trial-locked"><td class="name"><span class="lock-ic" aria-hidden="true"><i class=i-lock></i></span><span class="blur-txt" aria-hidden="true">${esc(w.replace(/\.docx$/, ''))}</span><span class="sr-only">Locked policy – part of Premium</span></td><td>${esc(r?.version || '')}</td>
         <td class="small"><span class="muted">Part of Premium</span></td>
-        <td><div class="row-actions"><button type="button" class="icon-btn premium-mini" data-up>🔒 Get Premium</button></div></td></tr>`;
+        <td><div class="row-actions"><button type="button" class="icon-btn premium-mini" data-up><i class=i-lock></i> Get Premium</button></div></td></tr>`;
     }
     return `<tr><td class="name">${esc(w.replace(/\.docx$/, ''))}</td><td>${esc(r?.version || '')}</td>
       <td class="small">${filled ? `${filled.length} items${r.report.missing.length ? ` · <span class="warn-txt">not found: ${r.report.missing.map(k => PP_FIELD[k] || k).join(', ')}</span>` : ''}${r.report.nameReplaced ? ` · name replaced ${r.report.nameReplaced}×` : ''}` : '<span class="muted">–</span>'}</td>
@@ -1864,17 +1871,17 @@ function renderPolicies() {
     $('#pp-out-body').innerHTML = tpls.map(t => {
       const w = files.word.find(x => Number(x.match(/PO(\d+)/)?.[1]) === t.no);
       if (!trialLocked('policies', t.no)) return w ? rowFor(w) : `<tr><td class="name">${esc(title(t))}</td><td></td><td class="small muted">Not created yet – press “Create policies”</td><td></td></tr>`;
-      return `<tr class="trial-locked"><td class="name"><span class="lock-ic" aria-hidden="true">🔒</span><span class="blur-txt" aria-hidden="true">${esc(title(t))}</span><span class="sr-only">PO${String(t.no).padStart(2, '0')} – locked, part of Premium</span></td><td></td>
+      return `<tr class="trial-locked"><td class="name"><span class="lock-ic" aria-hidden="true"><i class=i-lock></i></span><span class="blur-txt" aria-hidden="true">${esc(title(t))}</span><span class="sr-only">PO${String(t.no).padStart(2, '0')} – locked, part of Premium</span></td><td></td>
         <td class="small"><span class="tag lock-tag">Premium</span></td>
-        <td><div class="row-actions"><button type="button" class="icon-btn premium-mini" data-up>🔒 Get Premium</button></div></td></tr>`;
+        <td><div class="row-actions"><button type="button" class="icon-btn premium-mini" data-up><i class=i-lock></i> Get Premium</button></div></td></tr>`;
     }).join('');
     $('#pp-out').hidden = !tpls.length;
     $('#pp-out-title').textContent = `${free.length} of ${tpls.length} policies included in the free trial · ${tpls.length - free.length} locked`;
-    $('#pp-zip-all').textContent = `⬇ Download the ${free.length} free policies (Word + PDF)`;
+    $('#pp-zip-all').innerHTML = `<i class=i-download></i> Download the ${free.length} free policies (Word + PDF)`;
     $('#pp-out .pw-more').open = true; // the list is the point here – shown at once
   } else {
     $('#pp-out-body').innerHTML = files.word.map(rowFor).join('');
-    $('#pp-zip-all').textContent = '⬇ Download all (Word + PDF)';
+    $('#pp-zip-all').innerHTML = '<i class=i-download></i> Download all (Word + PDF)';
   }
 
   $('#pw-next-3').disabled = !files.word.length;
@@ -1920,7 +1927,7 @@ function pmHeader() {
   });
   $('#pm-info').innerHTML = `${esc(v.original || v.file || '')} · written for <b>${esc(v.oldName || '–')}</b>` +
     (v.editedAt ? ` · edited ${fmt(v.editedAt)}${v.editedBy ? ` by ${esc(v.editedBy)}` : ''}` : '') +
-    (pp.lock?.locked ? ' · 🔒 locked master' : '') +
+    (pp.lock?.locked ? ' · <i class=i-lock></i> locked master' : '') +
     (pm.version === chosen ? ' · <span class="tag ok">used for this facility\'s policies</span>' : ` · <span class="tag na">not used – this facility uses version ${chosen}</span>`);
 }
 async function pmShow(mode) {
@@ -2006,7 +2013,7 @@ $('#pm-save').onclick = async () => {
     pmHeader(); pmRender();
     $('#pm-msg').innerHTML = '<span class="ok-txt">✓ Saved and locked – this is now the master used for every generation.</span>';
   } catch (e) { $('#pm-msg').innerHTML = `<span class="warn-txt">Not saved: ${esc(e.message)}</span>`; }
-  finally { btn.innerHTML = '💾 Save &amp; lock'; }
+  finally { btn.innerHTML = '<i class=i-save></i> Save &amp; lock'; }
 };
 $('#pm-close').onclick = () => { if (pmDirty() && !confirm('Close without saving the changes?')) return; $('#pm-dlg').close(); };
 
@@ -2172,7 +2179,7 @@ function npOpen() {
   $('#np-email-note').textContent = base.emails?.length ? `replaces ${base.emails.join(', ')}` : 'incident contact';
   $('#np-phone-note').textContent = base.phones?.length ? `replaces ${base.phones.join(', ')}` : 'incident contact';
   $('#np-run').hidden = true; $('#np-result').innerHTML = ''; $('#pp-new-msg').textContent = '';
-  $('#pp-new-create').hidden = false; $('#pp-new-create').disabled = false; $('#pp-new-create').innerHTML = '⚙ Create the policy pack';
+  $('#pp-new-create').hidden = false; $('#pp-new-create').disabled = false; $('#pp-new-create').innerHTML = '<i class=i-gear></i> Create the policy pack';
   $$('#pp-new-form fieldset').forEach(x => { x.disabled = false; });
   $('#np-inputs').hidden = false; f.querySelector('.np-live').hidden = false; $('#np-check').hidden = true;
   $$('#pp-new-form .invalid').forEach(x => x.classList.remove('invalid'));
@@ -2266,7 +2273,7 @@ $$('#pp-new-form .np-pic').forEach(l => {
       await l._set(d, `✓ ${d.cropped ? 'Cropped' : 'Ready'}${d.transparent ? ' · background removed' : ''} · from ${d.source}`);
       // looks like another kind (e.g. a round stamp in the signature slot): say so and offer to move it
       if (d.mismatch && NP_LABEL[d.mismatch]) {
-        note.innerHTML = `<span class="warn-txt">⚠ This looks like a ${NP_LABEL[d.mismatch]}.</span> <button type="button" class="link-btn" data-move="${d.mismatch}">Move it to ${NP_LABEL[d.mismatch]} →</button>`;
+        note.innerHTML = `<span class="warn-txt"><i class=i-alert></i> This looks like a ${NP_LABEL[d.mismatch]}.</span> <button type="button" class="link-btn" data-move="${d.mismatch}">Move it to ${NP_LABEL[d.mismatch]} →</button>`;
         note.querySelector('[data-move]').onclick = async ev => {
           ev.preventDefault(); ev.stopPropagation();
           const to = np().querySelector(`.np-pic[data-pic="${d.mismatch}"]`);
@@ -2426,8 +2433,8 @@ np().onsubmit = async e => {
       <br>2 · HR documents: ${hr.skipped ? `<span class="warn-txt">${esc(hr.skipped)}</span>` : `<b>${hv.passed ?? 0} of ${hv.total ?? 0}</b> checked – this facility's name, code and logo only; Acceptable Usage matches PO11`}.
       <br>3 · LEGAL REGISTER: ${trialPack ? 'a locked preview on the free trial' : $('#np-autolink').checked ? 'linked ✓ (final step)' : 'not linked yet – do it on the Policies page'}.
       ${trialPack ? `<br><span class="np-trial">★ Free trial: ${st.files.word.length} of ${pp?.templates?.length || 33} policies and ${hv.count ?? 0} HR documents are included. <button type="button" class="btn small premium-btn" id="np-premium">Get Premium for the full pack</button></span>` : ''}
-      ${[...(j.problems || []), ...(hr.problems || [])].length ? `<br>${[...(j.problems || []), ...(hr.problems || [])].map(esc).join('<br>')}` : ''}<br><span class="small">Saved in ${esc(st.files.folder)}</span></div>
-      <div class="btn-row"><a class="btn primary" href="/api/policies/zip?type=all&f=${encodeURIComponent(id)}">⬇ Policies Word + PDF (.zip)</a>${hr.skipped ? '' : `<a class="btn" href="/api/hr/zip?f=${encodeURIComponent(id)}">⬇ HR documents (.zip)</a>`}
+      ${[...(j.problems || []), ...(hr.problems || [])].length ? `<br>${[...(j.problems || []), ...(hr.problems || [])].map(esc).join('<br>')}` : ''}</div>
+      <div class="btn-row"><a class="btn primary" href="/api/policies/zip?type=all&f=${encodeURIComponent(id)}"><i class=i-download></i> Policies Word + PDF (.zip)</a>${hr.skipped ? '' : `<a class="btn" href="/api/hr/zip?f=${encodeURIComponent(id)}"><i class=i-download></i> HR documents (.zip)</a>`}
       <button type="button" class="btn" id="np-open">Open the policies</button><button type="button" class="btn" id="np-hr">Open HR &amp; checklist</button><button type="button" class="btn" id="np-register">Open the LEGAL REGISTER</button></div>`;
     $('#pp-new-create').hidden = true;
     await loadFacilities();
@@ -2439,7 +2446,7 @@ np().onsubmit = async e => {
   } catch (err) {
     npStep(step, 'bad');
     $('#np-result').innerHTML = `<div class="alert bad">Stopped at “${esc($(`#np-steps [data-s="${step}"]`).textContent)}”: ${esc(err.message)}${id ? '<br>The facility was created – open it on the Policies page to finish.' : ''}</div>`;
-    btn.disabled = false; btn.innerHTML = '⚙ Create the policy pack';
+    btn.disabled = false; btn.innerHTML = '<i class=i-gear></i> Create the policy pack';
     if (!id) { // nothing was created: give the form back to correct it
       $$('#pp-new-form fieldset').forEach(x => { x.disabled = false; });
       $('#np-inputs').hidden = false; f.querySelector('.np-live').hidden = false;
@@ -2615,7 +2622,7 @@ var iso = (() => { // var: renderFlow may ask for it during start-up
   function setPlaying(on) {
     st.playing = on;
     $('#iso-stage')?.classList.toggle('paused', !on);
-    $('#iso-play').innerHTML = on ? '❚❚ Pause' : '▶ Play'; $('#iso-play').setAttribute('aria-label', on ? 'Pause' : 'Play');
+    $('#iso-play').innerHTML = on ? '❚❚ Pause' : '<i class=i-play></i> Play'; $('#iso-play').setAttribute('aria-label', on ? 'Pause' : 'Play');
     if (on) { st.t0 = performance.now() - st.k * STEP_MS - MOVE_MS; run(); } else { cancelAnimationFrame(st.raf); st.raf = 0; }
   }
   function jump(k) { show(k); place(k, 1); $('#iso-bar').style.width = `${((k + 1) / 4) * 100}%`; st.t0 = performance.now() - k * STEP_MS - MOVE_MS; }
@@ -2694,7 +2701,7 @@ function hrPdfLine(key) {
   if (!p || p.blocked) return '';
   const lay = p.layout;
   const where = lay?.centred ? ' · logo centred ✓' : lay?.centred === false ? ` · <span class="warn">logo ${Math.abs(lay.offsetMm)} mm off centre</span>` : '';
-  return p.ready ? `<small class="hr-pdf ok">⚡ PDF ready – opens at once${where}</small>` : '<small class="hr-pdf muted"><span class="spin"></span> Preparing the PDF…</small>';
+  return p.ready ? `<small class="hr-pdf ok"><i class=i-bolt></i> PDF ready – opens at once${where}</small>` : '<small class="hr-pdf muted"><span class="spin"></span> Preparing the PDF…</small>';
 }
 var hrPdfPoll = 0;
 function renderHrForms() {
@@ -2726,10 +2733,10 @@ function renderDocCards(sel, forms) {
     const ok = f.installed && !f.need.length;
     if (f.installed && trialLocked(f.group === 'thirdparty' ? 'thirdparty' : 'hr', f.key)) { // free trial: locked
       return `<div class="hr-form trial-locked">
-      <div class="hr-form-top"><span class="hr-no blur-txt" aria-hidden="true">Ref. No. ${esc(hrData.facility.code)}/${f.series}/FORM-${nn}</span><span class="tag lock-tag">🔒 Premium</span></div>
+      <div class="hr-form-top"><span class="hr-no blur-txt" aria-hidden="true">Ref. No. ${esc(hrData.facility.code)}/${f.series}/FORM-${nn}</span><span class="tag lock-tag"><i class=i-lock></i> Premium</span></div>
       <b class="blur-txt" aria-hidden="true">${esc(f.title)}</b><span class="sr-only">Locked document – part of Premium</span>
       <small class="muted">${(n => (n ? `Part of Premium – the free trial includes the first ${n} documents.` : 'Part of Premium – 3rd-party documents are not included in the free trial.'))(planState.limits[f.group === 'thirdparty' ? 'thirdparty' : 'hr'])}</small>
-      <div class="btn-row"><button type="button" class="btn small premium-btn" data-up>🔒 Get Premium</button></div>
+      <div class="btn-row"><button type="button" class="btn small premium-btn" data-up><i class=i-lock></i> Get Premium</button></div>
     </div>`;
     }
     return `<div class="hr-form${ok ? '' : ' off'}">
@@ -2766,7 +2773,7 @@ function renderDocDates(sel, setting) {
     ? 'Enter it once – it fills every date in the training documents. A document can have its own date below (e.g. the acknowledgement signed on another day).'
     : `One date for the 3rd-party documents${fallback ? ` – empty = the policy review date (${ymdToDmy(fallback)})` : ''}. Policy ID, issued / reviewed / due dates follow PO11.`;
   box.innerHTML = `<div class="doc-dates${tpLocked ? ' trial-locked-box' : ''}" data-setting="${setting}">
-    ${tpLocked ? '<div class="dd-lock"><span aria-hidden="true">🔒</span><span><b>Own document dates are part of Premium.</b> On the free trial the 3rd-party documents use the policy review date and follow PO11.</span><button type="button" class="btn small premium-btn" data-up>Get Premium</button></div>' : ''}
+    ${tpLocked ? '<div class="dd-lock"><span aria-hidden="true"><i class=i-lock></i></span><span><b>Own document dates are part of Premium.</b> On the free trial the 3rd-party documents use the policy review date and follow PO11.</span><button type="button" class="btn small premium-btn" data-up>Get Premium</button></div>' : ''}
     <div class="dd-global"><label><b>${title}</b><input type="date" data-dd-global value="${esc(globalDate)}"${ro}></label><small class="muted">${hint}</small></div>
     <div class="dd-list">${forms.filter(f => f.dates).map(f => {
       const dt = f.dates;
@@ -2777,7 +2784,7 @@ function renderDocDates(sel, setting) {
     ${forms.filter(f => f.details?.length).map(f => `<div class="dd-details"><b class="small">Details in the ${esc(f.title)}</b><div class="dd-grid">${f.details.map(x => `<label>${esc(x.label)}<input data-dd-detail="${f.key}" data-k="${x.key}" value="${esc(x.value)}" placeholder="${esc(x.master)}"${ro}></label>`).join('')}</div></div>`).join('')}</div>`;
   const save = async (body, msg) => {
     try { await api('/api/hr/documents', { method: 'PUT', body: JSON.stringify(body) }); hrData = await api('/api/hr'); renderHr(); toast(msg); }
-    catch (e) { toast(`⚠ ${esc(e.message)}`); }
+    catch (e) { toast(`<i class=i-alert></i> ${esc(e.message)}`); }
   };
   box.querySelector('[data-dd-global]').onchange = e => save({ group: setting, date: e.target.value }, `${title} saved – every document without its own date follows it`);
   box.querySelectorAll('[data-dd-doc]').forEach(i => i.onchange = () => save({ key: i.dataset.ddDoc, date: i.value }, i.value ? 'Date saved for this document' : `Back to the ${title.toLowerCase()}`));
@@ -2805,16 +2812,16 @@ function renderThirdParty() {
   renderDocDates('#tp-dates', 'thirdparty');
   // free trial with no 3rd-party documents included: creating / downloading them opens Get Premium
   const tpNone = !!planState?.included && !planState.included.thirdparty?.length;
-  for (const [id, label] of [['#tp-gen', '⚙ Create the documents'], ['#tp-zip', '⬇ Word + PDF (.zip)']]) {
+  for (const [id, label] of [['#tp-gen', '<i class=i-gear></i> Create the documents'], ['#tp-zip', '<i class=i-download></i> Word + PDF (.zip)']]) {
     const b = $(id); if (!b) continue;
     b.toggleAttribute('data-up', tpNone);
-    b.textContent = tpNone ? `🔒 ${label.slice(2)}` : label;
+    b.innerHTML = tpNone ? `<i class=i-lock></i> ${label.replace(/^(<i [^>]*><\/i>|\S+)\s*/, '')}` : label;
   }
   if (tpNone) $('#tp-sub').textContent = `3rd-party documents are part of Premium · Ref. No. ${d.facility.code}/TP/FORM-NN`;
 }
 $('#tp-gen').onclick = async () => {
   try { const r = await api('/api/hr/generate', { method: 'POST', body: JSON.stringify({ group: 'thirdparty' }) }); toast(`Creating ${r.total} 3rd-party documents (Word + PDF)…`); hrData = await api('/api/hr'); renderThirdParty(); }
-  catch (e) { toast(`⚠ ${esc(e.message)}`); }
+  catch (e) { toast(`<i class=i-alert></i> ${esc(e.message)}`); }
 };
 async function viewHrForm(key) {
   const f = hrData.forms.find(x => x.key === key);
@@ -2822,15 +2829,15 @@ async function viewHrForm(key) {
   try {
     const res = await fetch(u(`/api/hr/forms/${key}?inline=1`));
     if (res.status === 401) return location.replace('/login.html');
-    if (!res.ok) { const e = await res.json().catch(() => ({})); return toast(`⚠ ${esc(e.error || res.statusText)}`); }
+    if (!res.ok) { const e = await res.json().catch(() => ({})); return toast(`<i class=i-alert></i> ${esc(e.error || res.statusText)}`); }
     const rep = JSON.parse(decodeURIComponent(res.headers.get('X-HR-Report') || '%7B%7D'));
-    const checks = (rep.leftovers?.length ? `⚠ still mentions ${rep.leftovers.join(', ')}` : '✓ only this facility’s name, code and logo') + (rep.refNo ? ` · Ref. No.: ${rep.refNo}` : '') + (rep.layout?.centred ? ' · logo centred ✓' : rep.layout?.centred === false ? ` · ⚠ logo ${Math.abs(rep.layout.offsetMm)} mm off centre` : '');
+    const checks = (rep.leftovers?.length ? `<i class=i-alert></i> still mentions ${rep.leftovers.join(', ')}` : '✓ only this facility’s name, code and logo') + (rep.refNo ? ` · Ref. No.: ${rep.refNo}` : '') + (rep.layout?.centred ? ' · logo centred ✓' : rep.layout?.centred === false ? ` · <i class=i-alert></i> logo ${Math.abs(rep.layout.offsetMm)} mm off centre` : '');
     const sync = rep.sync ? (rep.sync.ok && (!rep.sync.generated || rep.sync.generated.ok) ? ' · ✓ same values as PO11'
-      : ` · ⚠ differs from PO11: ${[...(rep.sync.diffs || []), ...(rep.sync.generated?.diffs || [])].join('; ')}${rep.sync.generated && !rep.sync.generated.ok ? ' – create the policies again' : ''}`) : '';
+      : ` · <i class=i-alert></i> differs from PO11: ${[...(rep.sync.diffs || []), ...(rep.sync.generated?.diffs || [])].join('; ')}${rep.sync.generated && !rep.sync.generated.ok ? ' – create the policies again' : ''}`) : '';
     const file = (res.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/)?.[1] || `${f.title}.pdf`;
     openViewer(URL.createObjectURL(await res.blob()), { title: f.title, sub: checks + sync, file, revoke: true });
     $('#toast')?.classList.remove('on');
-  } catch (e) { toast(`⚠ ${esc(e.message)}`); }
+  } catch (e) { toast(`<i class=i-alert></i> ${esc(e.message)}`); }
 }
 function renderHrTabs() {
   $('#hr-tabs').innerHTML = hrData.checklist.sections.map(s => `<button type="button" role="tab" data-sec="${esc(s.id)}" class="${s.id === hrSection ? 'on' : ''}" aria-selected="${s.id === hrSection}">${esc(s.title)}<small>${s.counts.completed}/${s.counts.total}</small></button>`).join('');
@@ -2849,12 +2856,12 @@ function renderHrRows() {
       return `<tr class="trial-locked ck-locked">
         <td class="num">${k + 1}</td>
         <td><span class="hr-name blur-txt" aria-hidden="true">${fake[k % fake.length]}</span><span class="sr-only">Locked document – part of Premium</span></td>
-        <td colspan="3"><div class="ck-lock"><span class="tag lock-tag">🔒 Premium</span><span class="muted small">Shown with Premium</span><button type="button" class="icon-btn premium-mini" data-up>🔒 Get Premium</button></div></td>
+        <td colspan="3"><div class="ck-lock"><span class="tag lock-tag"><i class=i-lock></i> Premium</span><span class="muted small">Shown with Premium</span><button type="button" class="icon-btn premium-mini" data-up><i class=i-lock></i> Get Premium</button></div></td>
       </tr>`;
     }
-    const link = it.form ? `<button type="button" class="link-btn" data-hr-view="${it.form}">📄 Open form</button>`
+    const link = it.form ? `<button type="button" class="link-btn" data-hr-view="${it.form}"><i class=i-doc></i> Open form</button>`
       : it.formMissing ? '<span class="muted small">form not uploaded</span>'
-      : it.policy ? (it.policy.pdf ? `<a class="link-btn" href="${u(`/api/policies/file?type=pdf&inline=1&name=${encodeURIComponent(it.policy.pdf)}`)}" target="_blank">📄 Policy PDF</a>` : '<span class="muted small">policy not created yet</span>') : '';
+      : it.policy ? (it.policy.pdf ? `<a class="link-btn" href="${u(`/api/policies/file?type=pdf&inline=1&name=${encodeURIComponent(it.policy.pdf)}`)}" target="_blank"><i class=i-doc></i> Policy PDF</a>` : '<span class="muted small">policy not created yet</span>') : '';
     return `<tr data-id="${esc(it.id)}">
       <td class="num">${k + 1}</td>
       <td><span class="hr-name">${esc(it.name)}</span>${link ? `<div class="hr-link">${link}</div>` : ''}${it.updatedBy ? `<div class="muted small">${esc(it.updatedBy)} · ${fmt(it.updatedAt)}</div>` : ''}</td>
@@ -2865,7 +2872,7 @@ function renderHrRows() {
   }).join('') || `<tr><td colspan="5" class="muted">${q || hrStatus ? 'Nothing matches.' : 'No documents in this section yet.'}</td></tr>`;
   const save = async (tr, body, msg) => {
     try { hrData.checklist = await api(`/api/hr/checklist/${encodeURIComponent(hrSection)}/${encodeURIComponent(tr.dataset.id)}`, { method: 'PATCH', body: JSON.stringify(body) }); toast(msg); }
-    catch (e) { toast(`⚠ ${esc(e.message)}`); }
+    catch (e) { toast(`<i class=i-alert></i> ${esc(e.message)}`); }
     renderHr();
   };
   $$('#hr-rows tr[data-id]').forEach(tr => {
@@ -2882,7 +2889,7 @@ function renderHrRows() {
       const name = tr.querySelector('.hr-name').textContent;
       if (!confirm(`Remove "${name}" from this facility's checklist?\n\nOnly this facility's list changes. "Reset to master list" brings it back.`)) return;
       try { hrData.checklist = await api(`/api/hr/checklist/${encodeURIComponent(hrSection)}/${encodeURIComponent(tr.dataset.id)}`, { method: 'DELETE' }); toast('Removed from the checklist'); }
-      catch (e) { toast(`⚠ ${esc(e.message)}`); }
+      catch (e) { toast(`<i class=i-alert></i> ${esc(e.message)}`); }
       renderHr();
     };
     tr.querySelector('[data-hr-view]')?.addEventListener('click', e => viewHrForm(e.currentTarget.dataset.hrView));
@@ -2895,12 +2902,12 @@ $('#hr-add').onsubmit = async e => {
   const name = e.target.elements.name.value.trim();
   if (!name) return;
   try { hrData.checklist = await api(`/api/hr/checklist/${encodeURIComponent(hrSection)}`, { method: 'POST', body: JSON.stringify({ name }) }); e.target.reset(); toast('Added to the checklist'); renderHr(); }
-  catch (er) { toast(`⚠ ${esc(er.message)}`); }
+  catch (er) { toast(`<i class=i-alert></i> ${esc(er.message)}`); }
 };
 $('#hr-reset').onclick = async () => {
   if (!confirm('Use the master checklist again for this facility?\n\nStatuses and remarks of documents with the same name are kept; documents you added yourself are removed.')) return;
   try { hrData.checklist = await api('/api/hr/checklist/reset', { method: 'POST' }); toast('Checklist reset to the master list'); renderHr(); }
-  catch (e) { toast(`⚠ ${esc(e.message)}`); }
+  catch (e) { toast(`<i class=i-alert></i> ${esc(e.message)}`); }
 };
 
 /** Administrators: the master HR forms, which facility each was written for, and uploads. */
@@ -2929,7 +2936,7 @@ async function uploadHrForms(files, key = '') {
       added.push(...j.added); problems.push(...j.problems);
     } catch (e) { problems.push(`${f.name}: ${e.message}`); }
   }
-  toast(`${added.length ? `✓ ${added.length} form${added.length > 1 ? 's' : ''} added` : 'Nothing added'}${problems.length ? ` · ⚠ ${esc(problems.join('; '))}` : ''}`);
+  toast(`${added.length ? `✓ ${added.length} form${added.length > 1 ? 's' : ''} added` : 'Nothing added'}${problems.length ? ` · <i class=i-alert></i> ${esc(problems.join('; '))}` : ''}`);
   loadHr();
 }
 $('#hr-up').onchange = e => { uploadHrForms([...e.target.files]); e.target.value = ''; };
@@ -2941,7 +2948,7 @@ $('#hr-up-xlsx').onchange = async e => {
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || r.statusText);
     toast(`✓ Master checklist updated: ${j.checklist.map(s => `${esc(s.title)} (${s.items.length})`).join(', ')}. New facilities get it; existing ones with ↺ Reset to master list.`);
-  } catch (er) { toast(`⚠ ${esc(er.message)}`); }
+  } catch (er) { toast(`<i class=i-alert></i> ${esc(er.message)}`); }
 };
 
 /** Step 2 of the sequence on the HR page: create every HR document (Word + PDF), live progress, then on to step 3. */
@@ -2962,9 +2969,9 @@ function renderHrGen() {
   if (!g) { box.hidden = true; return; }
   const linked = homePolicies?.linked;
   box.hidden = false;
-  box.innerHTML = `<div class="hx-live ${g.passed < g.total || (j?.problems?.length) ? 'warn' : 'ok'}"><b>${g.passed < g.total ? '⚠' : '✓'} Step 2 done: ${g.count} of ${g.total} HR documents created · ${g.passed} checked and correct (${g.pdf} PDF)</b>
-    <small>${fmt(g.at)} · saved in the facility folder (HR\\Word and HR\\PDF)${j?.problems?.length ? ` · ${j.problems.map(esc).join(' · ')}` : ''}</small></div>
-    <div class="btn-row"><a class="btn small" href="${u('/api/hr/zip')}">⬇ Word + PDF (.zip)</a>${linked ? '<span class="muted small">Step 3 · LEGAL REGISTER is linked ✓</span>' : '<button type="button" class="btn small primary" id="hr-next">Next: Step 3 · link the LEGAL REGISTER (final) →</button>'}</div>`;
+  box.innerHTML = `<div class="hx-live ${g.passed < g.total || (j?.problems?.length) ? 'warn' : 'ok'}"><b>${g.passed < g.total ? '<i class=i-alert></i>' : '✓'} Step 2 done: ${g.count} of ${g.total} HR documents created · ${g.passed} checked and correct (${g.pdf} PDF)</b>
+    <small>${fmt(g.at)} · saved on the portal (Word and PDF)${j?.problems?.length ? ` · ${j.problems.map(esc).join(' · ')}` : ''}</small></div>
+    <div class="btn-row"><a class="btn small" href="${u('/api/hr/zip')}"><i class=i-download></i> Word + PDF (.zip)</a>${linked ? '<span class="muted small">Step 3 · LEGAL REGISTER is linked ✓</span>' : '<button type="button" class="btn small primary" id="hr-next">Next: Step 3 · link the LEGAL REGISTER (final) →</button>'}</div>`;
   $('#hr-next')?.addEventListener('click', () => { pwStep = 4; showTab('policies'); });
 }
 $('#hr-gen').onclick = async () => {
@@ -2972,7 +2979,7 @@ $('#hr-gen').onclick = async () => {
     const r = await api('/api/hr/generate', { method: 'POST', body: '{}' });
     toast(`Creating ${r.total} HR documents…`);
     hrData = await api('/api/hr'); renderHr();
-  } catch (e) { toast(`⚠ ${esc(e.message)}`); }
+  } catch (e) { toast(`<i class=i-alert></i> ${esc(e.message)}`); }
 };
 
 $('#pp-to-hr').onclick = () => showTab('hr');
@@ -3067,7 +3074,7 @@ document.addEventListener('click', e => {
     try {
       const res = await realFetch(href);
       if (res.status === 402) { showUpgrade(await res.json().catch(() => ({}))); return; }
-      if (!res.ok) { const d = await res.json().catch(() => ({})); toast(`⚠ ${esc(d.error || res.statusText)}`); return; }
+      if (!res.ok) { const d = await res.json().catch(() => ({})); toast(`<i class=i-alert></i> ${esc(d.error || res.statusText)}`); return; }
       const blob = await res.blob(), url = URL.createObjectURL(blob);
       const cd = res.headers.get('content-disposition') || '';
       const name = /filename\*=UTF-8''([^;]+)/.exec(cd)?.[1] || /filename="([^"]+)"/.exec(cd)?.[1] || '';
@@ -3075,7 +3082,7 @@ document.addEventListener('click', e => {
       if (!a.target) link.download = decodeURIComponent(name) || 'download';
       document.body.append(link); link.click(); link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch (err) { toast(`⚠ ${esc(err.message)}`); }
+    } catch (err) { toast(`<i class=i-alert></i> ${esc(err.message)}`); }
   }, true);
 
   const KIND = { policies: 'Policies', hr: 'HR & training documents', thirdparty: '3rd-party documents', facilities: 'Facilities' };
@@ -3087,10 +3094,10 @@ document.addEventListener('click', e => {
       const p = planState;
       $('#up-meters').innerHTML = p?.limits ? Object.keys(KIND).map(k => {
         const lim = p.limits[k];
-        if (k !== 'facilities') return `<div class="up-meter${lim ? '' : ' up-locked'}"><span>${KIND[k]}</span><b>${lim ? `First ${lim} included · rest 🔒` : '🔒 Premium only'}</b><i style="--w:100%"></i></div>`;
+        if (k !== 'facilities') return `<div class="up-meter${lim ? '' : ' up-locked'}"><span>${KIND[k]}</span><b>${lim ? `First ${lim} included · rest <i class=i-lock></i>` : '<i class=i-lock></i> Premium only'}</b><i style="--w:100%"></i></div>`;
         const used = p.usage.facilities || 0;
         return `<div class="up-meter${used >= lim ? ' full' : ''}"><span>${KIND[k]}</span><b>${Math.min(used, lim)} / ${lim} created</b><i style="--w:${lim ? Math.min(100, (used / lim) * 100) : 100}%"></i></div>`;
-      }).join('') + '<div class="up-meter up-locked"><span>LEGAL REGISTER</span><b>🔒 Preview</b><i style="--w:100%"></i></div>' : '';
+      }).join('') + '<div class="up-meter up-locked"><span>LEGAL REGISTER</span><b><i class=i-lock></i> Preview</b><i style="--w:100%"></i></div>' : '';
       const sent = !!me?.premiumRequest, url = planState?.upgradeUrl;
       $('#up-msg').textContent = sent && !url ? 'Premium requested – an administrator will upgrade your account.' : '';
       $('#up-request').textContent = url ? '★ Get Premium ↗' : sent ? '✓ Premium requested' : '★ Get Premium';
@@ -3147,14 +3154,14 @@ document.addEventListener('click', e => {
     if (trial) {
       const l = planState.limits, us = planState.usage;
       $('#plan-chip').title = `Free trial: the first ${l.policies} policies, ${l.hr} HR and ${l.thirdparty} 3rd-party documents · ${us.facilities}/${l.facilities} facilities · LEGAL REGISTER preview`;
-      if (!$('#trial-reg')) $('#master')?.insertAdjacentHTML('afterbegin', '<div class="trial-lock" id="trial-reg"><span class="tl-ic" aria-hidden="true">🔒</span><div><b>View only – the free trial shows the basic, non-updated LEGAL REGISTER</b><span>You can see and edit its first 2 entries and apply your 2 free documents to them. The other entries, renewals, weekly DoH updates and every download / export are part of Premium.</span></div><button type="button" class="btn small premium-btn" data-up>★ Get Premium</button></div>');
+      if (!$('#trial-reg')) $('#master')?.insertAdjacentHTML('afterbegin', '<div class="trial-lock" id="trial-reg"><span class="tl-ic" aria-hidden="true"><i class=i-lock></i></span><div><b>View only – the free trial shows the basic, non-updated LEGAL REGISTER</b><span>You can see and edit its first 2 entries and apply your 2 free documents to them. The other entries, renewals, weekly DoH updates and every download / export are part of Premium.</span></div><button type="button" class="btn small premium-btn" data-up>★ Get Premium</button></div>');
       $$('[data-up]').forEach(b => { b.onclick = () => showUpgrade(); });
     } else $('#trial-reg')?.remove();
   };
 
   // --- Downloads: the facility pack (folder tree, one folder or single files) ---
   let packType = 'all';
-  const ICON = { policies: '📄', hr: '🧑‍⚕️', thirdparty: '🤝', register: '📊' };
+  const ICON = { policies: '<i class=i-doc></i>', hr: '<i class=i-user></i>', thirdparty: '<i class=i-handshake></i>', register: '<i class=i-chart></i>' };
   window.loadPack = async function loadPack() {
     const tree = $('#pack-tree');
     if (!tree || !facility) return;
@@ -3163,16 +3170,16 @@ document.addEventListener('click', e => {
     $('#pack-root').textContent = `${d.root}/`;
     $('#pack-all').href = u(`/api/package.zip?type=${packType}`);
     const show = f => packType === 'all' || f.type === packType || f.type === 'xlsx';
-    tree.innerHTML = `<div class="pk-root"><span aria-hidden="true">📁</span><b>${esc(d.root)}</b></div>` + d.folders.filter(fo => !(planState?.included && fo.key === 'register')).map(fo => { // free trial: no register downloads
+    tree.innerHTML = `<div class="pk-root"><span aria-hidden="true"><i class=i-folder></i></span><b>${esc(d.root)}</b></div>` + d.folders.filter(fo => !(planState?.included && fo.key === 'register')).map(fo => { // free trial: no register downloads
       const files = fo.files.filter(show);
       const open = files.filter(f => !f.locked).length;
       return `<details class="pk-folder${fo.locked ? ' locked' : ''}">
         <summary>
           <span class="pk-ic" aria-hidden="true">${ICON[fo.key]}</span>
-          <span class="pk-name"><b>${esc(fo.name)}</b><small>${files.length ? `${open} file${open === 1 ? '' : 's'}${files.length > open ? ` · ${files.length - open} 🔒 Premium` : ''}` : 'Nothing yet'}</small></span>
-          ${fo.locked ? '<button type="button" class="btn small" data-up>🔒 Get Premium</button>' : `<a class="btn small" href="${u(`/api/package.zip?modules=${fo.key}&type=${packType}`)}"${open ? '' : ' data-empty'}>⬇ Folder (.zip)</a>`}
+          <span class="pk-name"><b>${esc(fo.name)}</b><small>${files.length ? `${open} file${open === 1 ? '' : 's'}${files.length > open ? ` · ${files.length - open} <i class=i-lock></i> Premium` : ''}` : 'Nothing yet'}</small></span>
+          ${fo.locked ? '<button type="button" class="btn small" data-up><i class=i-lock></i> Get Premium</button>' : `<a class="btn small" href="${u(`/api/package.zip?modules=${fo.key}&type=${packType}`)}"${open ? '' : ' data-empty'}><i class=i-download></i> Folder (.zip)</a>`}
         </summary>
-        <ul class="pk-files">${files.map(f => `<li class="${f.locked ? 'locked' : ''}"><span class="pk-sub">${esc(f.sub || '')}</span><span class="pk-file">${esc(f.name)}</span>${f.locked ? '<a href="#" class="pk-dl" data-locked="1" title="Premium" aria-label="Locked – Premium">🔒</a>' : `<a class="pk-dl" href="${esc(f.url)}" title="Download" aria-label="Download ${esc(f.name)}">⬇</a>`}</li>`).join('') || '<li class="muted small">Nothing created yet.</li>'}</ul>
+        <ul class="pk-files">${files.map(f => `<li class="${f.locked ? 'locked' : ''}"><span class="pk-sub">${esc(f.sub || '')}</span><span class="pk-file">${esc(f.name)}</span>${f.locked ? '<a href="#" class="pk-dl" data-locked="1" title="Premium" aria-label="Locked – Premium"><i class=i-lock></i></a>' : `<a class="pk-dl" href="${esc(f.url)}" title="Download" aria-label="Download ${esc(f.name)}"><i class=i-download></i></a>`}</li>`).join('') || '<li class="muted small">Nothing created yet.</li>'}</ul>
       </details>`;
     }).join('');
     $$('#pack-tree [data-up]').forEach(b => { b.onclick = e => { e.preventDefault(); showUpgrade(); }; });
@@ -3322,7 +3329,7 @@ function renderChecklistPage(hrErr, regErr) {
     <div class="ck-kpi ${attention ? 'warn' : 'ok'}"><b>${attention}</b><span>need attention</span><small class="muted">${[hc.pending && `${hc.pending} HR pending`, rc.expired && `${rc.expired} expired`, rc.expiring && `${rc.expiring} expiring`, rc.missing && `${rc.missing} without dates`].filter(Boolean).join(' · ') || 'nothing open'}</small></div>`;
 
   // --- HR sections
-  $('#ck-hr-sub').textContent = hrErr ? hrErr : `${hc.done} completed · ${hc.pending} pending · ${hc.na} not applicable${hc.locked ? ` · ${hc.locked} 🔒 Premium` : ''}`;
+  $('#ck-hr-sub').textContent = hrErr ? hrErr : `${hc.done} completed · ${hc.pending} pending · ${hc.na} not applicable${hc.locked ? ` · ${hc.locked} locked (Premium)` : ''}`;
   const pill = st => `<span class="tag ${{ Completed: 'ok', Pending: 'warn', 'Not applicable': 'na' }[st] || 'warn'}">${esc(st || 'Pending')}</span>`;
   $('#ck-hr').innerHTML = hrErr ? '' : secs.map((sec, n) => {
     const op = sec.items.filter(i => !i.locked), d = op.filter(i => i.status === 'Completed').length;
@@ -3330,17 +3337,17 @@ function renderChecklistPage(hrErr, regErr) {
       <summary><b>${esc(sec.title)}</b><span class="muted small">${d} of ${sec.items.length} completed</span>${bar(pct(d, sec.items.length), 'ok')}</summary>
       <div class="table-wrap flat"><table class="ck-table"><thead><tr><th>#</th><th>Document</th><th>Status</th><th>Remarks</th><th>Updated</th></tr></thead><tbody>
       ${sec.items.map((it, k) => (it.locked
-        ? `<tr class="reg-locked" data-up title="Part of Premium"><td class="num">${k + 1}</td><td colspan="3"><span class="blur-txt" aria-hidden="true">XXXXXXXX XXXXXXXXXX XXXXX</span><span class="sr-only">Locked – part of Premium</span></td><td><span class="tag lock-tag">🔒 Premium</span></td></tr>`
+        ? `<tr class="reg-locked" data-up title="Part of Premium"><td class="num">${k + 1}</td><td colspan="3"><span class="blur-txt" aria-hidden="true">XXXXXXXX XXXXXXXXXX XXXXX</span><span class="sr-only">Locked – part of Premium</span></td><td><span class="tag lock-tag"><i class=i-lock></i> Premium</span></td></tr>`
         : `<tr><td class="num">${k + 1}</td><td>${esc(it.name)}</td><td>${pill(it.status)}</td><td class="muted small">${esc(it.remarks || '—')}</td><td class="muted small">${it.updatedAt ? `${esc(it.updatedBy || '')} · ${fmtDay(String(it.updatedAt).slice(0, 10))}` : '—'}</td></tr>`)).join('')}
       </tbody></table></div></details>`;
   }).join('') || '<p class="muted small">No checklist yet.</p>';
 
   // --- register entries
-  $('#ck-reg-sub').textContent = regErr ? regErr : `${rc.ok} in date · ${rc.expiring} expiring · ${rc.expired} expired · ${rc.missing} without dates${rc.locked ? ` · ${rc.locked} 🔒 Premium` : ''} · ${rc.laws} federal laws`;
+  $('#ck-reg-sub').textContent = regErr ? regErr : `${rc.ok} in date · ${rc.expiring} expiring · ${rc.expired} expired · ${rc.missing} without dates${rc.locked ? ` · ${rc.locked} locked (Premium)` : ''} · ${rc.laws} federal laws`;
   const day = v => (ISO.test(v || '') ? fmtDay(v) : '—');
   $('#ck-reg').innerHTML = regErr ? '' : `<div class="table-wrap flat"><table class="ck-table"><thead><tr><th>SL</th><th>Entry</th><th>Status</th><th>Issued</th><th>Expiry</th><th>Due</th><th>Responsible</th><th>Compliance</th></tr></thead><tbody>
     ${items.map(i => (i.locked
-      ? `<tr class="reg-locked" data-up title="Part of Premium"><td class="num">${esc(i.sl)}</td><td colspan="6"><span class="blur-txt" aria-hidden="true">XXXXXXXXXX XX XXXXXX · 01 Jan 2026 · 31 Dec 2026</span><span class="sr-only">Locked – part of Premium</span></td><td><span class="tag lock-tag">🔒 Premium</span></td></tr>`
+      ? `<tr class="reg-locked" data-up title="Part of Premium"><td class="num">${esc(i.sl)}</td><td colspan="6"><span class="blur-txt" aria-hidden="true">XXXXXXXXXX XX XXXXXX · 01 Jan 2026 · 31 Dec 2026</span><span class="sr-only">Locked – part of Premium</span></td><td><span class="tag lock-tag"><i class=i-lock></i> Premium</span></td></tr>`
       : `<tr class="${i.fixed ? 'fixed' : ''}"><td class="num">${esc(i.sl)}</td><td>${esc(i.name)}</td><td>${i.fixed ? '<span class="tag na">Federal law</span>' : statusPill(i.status)}</td><td>${day(i.issued)}</td><td>${i.status === 'lifetime' ? '∞' : day(i.expiry)}</td><td>${i.status === 'lifetime' ? '—' : day(i.due)}</td><td>${esc(i.responsible || '—')}</td><td>${i.compliance ? `<span class="tag ${/not applicable/i.test(i.compliance) ? 'na' : 'ok'}">${esc(i.compliance)}</span>` : '—'}</td></tr>`)).join('')}
     </tbody></table></div>`;
 }
