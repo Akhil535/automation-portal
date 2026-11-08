@@ -147,7 +147,8 @@ export async function buildChecklistXlsx({ sections, facility, logo = null, expo
   const hasLogo = !!img && ['png', 'jpeg', 'gif'].includes(ext);
   const day = exportedOn.toLocaleDateString('en-GB', { timeZone: 'Asia/Dubai', day: '2-digit', month: 'short', year: 'numeric' });
   const used = new Set();
-  const names = sections.map(s => sheetName(s.sheet || s.title, used));
+  // tabs named like the portal sections: HR & facility · IT documents · EMR & others · Policies
+  const names = sections.map(s => sheetName(s.title || s.sheet, used));
   sections.forEach((sec, i) => {
     zip.file(`xl/worksheets/sheet${i + 1}.xml`, sheetXml(sec, facility, hasLogo, day));
     if (hasLogo) {

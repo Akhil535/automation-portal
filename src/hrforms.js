@@ -887,5 +887,5 @@ export async function checklistXlsx(id, only = null, trim = null) { // trim: sec
   if (trim) sections = trim(sections);
   if (!sections.length) throw new Error('Nothing to export');
   const buffer = await buildChecklistXlsx({ sections, facility: { name: s.facilityName, code: s.code }, logo });
-  return { buffer, name: `${s.code} - ADHICS CHECKLIST${only?.length === 1 ? ` - ${sections[0].title.toUpperCase()}` : ''}.xlsx` };
+  return { buffer, name: `${s.code} - ${only ? 'ADHICS CHECKLIST' : 'MASTER CHECKLIST'}${only?.length === 1 ? ` - ${sections[0].title.toUpperCase()}` : ''}.xlsx` };
 }

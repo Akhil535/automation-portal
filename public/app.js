@@ -2848,7 +2848,7 @@ async function viewHrForm(key) {
 function renderHrTabs() {
   $('#hr-tabs').innerHTML = hrData.checklist.sections.map(s => `<button type="button" role="tab" data-sec="${esc(s.id)}" class="${s.id === hrSection ? 'on' : ''}" aria-selected="${s.id === hrSection}">${esc(s.title)}<small>${s.counts.completed}/${s.counts.total}</small></button>`).join('');
   $$('#hr-tabs [data-sec]').forEach(b => b.onclick = () => { hrSection = b.dataset.sec; renderHrTabs(); renderHrRows(); });
-  $('#hr-xlsx-one').href = u(`/api/hr/checklist.xlsx?sections=${encodeURIComponent(hrSection)}`);
+  $('#hr-xlsx-one').href = u('/api/hr/checklist.xlsx'); // the master workbook: every section on its own tab
 }
 function renderHrRows() {
   const sec = hrData.checklist.sections.find(s => s.id === hrSection);
