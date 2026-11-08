@@ -305,7 +305,7 @@ function renderHeader(s) {
 // ===================================================================================================
 // Navigation
 // ===================================================================================================
-const loaders = { overview: () => { if (!master) loadMaster(); }, policies: () => loadPolicies(), master: () => loadMaster(), circulars: () => loadCirculars(), settings: () => loadSettings(), exports: () => loadExports(), hr: () => loadHr(), thirdparty: () => loadThirdParty() };
+const loaders = { overview: () => { if (!master) loadMaster(); }, policies: () => loadPolicies(), master: () => loadMaster(), circulars: () => loadCirculars(), settings: () => loadSettings(), exports: () => loadExports(), hr: () => loadHr(), thirdparty: () => loadThirdParty(), checklist: () => loadChecklistPage() };
 
 /** Export hub: every download of the current facility on one page. */
 async function loadExports() {
@@ -724,7 +724,17 @@ function renderJourney() {
   else if (!h.forms.some(f => f.installed)) st.push(['warn', 'Master forms not uploaded']);
   else if (h.generated?.count) st.push([h.generated.passed < h.generated.total ? 'warn' : 'done', `${h.generated.count} documents ready`]);
   else st.push(['todo', h.forms.some(f => f.installed && f.need.some(n => /logo/.test(n))) ? 'Facility logo needed' : 'Ready to create']);
-  // 3 LEGAL REGISTER – the final step: policies linked, every entry dated, DoH circulars recorded
+  // 3 3rd-party / vendor documents
+  if (!h) st.push(['todo', 'Checking…']);
+  else {
+    const tp = h.forms.filter(f => f.group === 'thirdparty' && f.installed);
+    if (!tp.length) st.push(['done', 'No vendor forms']);
+    else if (planState?.included && !(planState.included.thirdparty || []).length) st.push(['done', 'Part of Premium']);
+    else if (tp.some(f => f.need.length)) st.push(['todo', 'Details still needed']);
+    else if (h.generated?.count) st.push(['done', `${tp.length} vendor document${tp.length === 1 ? '' : 's'} ready`]);
+    else st.push(['todo', 'Ready to create']);
+  }
+  // 4 LEGAL REGISTER – policies linked, every entry dated, DoH circulars recorded
   if (!c) st.push(['todo', 'No register yet']);
   else if (p?.files.word.length && !p.linked) st.push(['todo', 'Link the policies']);
   else if (r && (r.status === 'failed' || r.status === 'register_locked')) st.push(['bad', 'Last DoH check failed']);
@@ -734,14 +744,16 @@ function renderJourney() {
   else if (!s?.lastSuccess) st.push(['todo', 'Run the first DoH check']);
   else st.push(['done', `All ${c.total} entries valid · DoH ${fmtShort(s.lastSuccess).replace(/,.*$/, '')}`]);
   const firstOpen = st.findIndex(([x]) => x !== 'done');
+  const CARD = [1, 2, null, 3]; // dashboard cards: 1 policies, 2 HR, 3 LEGAL REGISTER (3rd-party has none)
   st.forEach(([state, text], k) => {
     const li = $(`#jr-track [data-jr="${k + 1}"]`);
+    if (!li) return;
     li.className = `${state}${k === firstOpen ? ' current' : ''}`;
     li.querySelector('i').textContent = state === 'done' ? '✓' : String(k + 1);
     $(`#jr-s${k + 1}`).textContent = text;
-    const badge = $(`#jr-st${k + 1}`);
+    const badge = CARD[k] ? $(`#jr-st${CARD[k]}`) : null;
     if (badge) { badge.className = `jr-state ${state}`; badge.textContent = { done: 'Done', warn: 'Needs attention', bad: 'Problem', todo: k === firstOpen ? 'Do this now' : 'To do' }[state]; }
-    $(`#jr-c${k + 1}`)?.classList.toggle('current', k === firstOpen);
+    if (CARD[k]) $(`#jr-c${CARD[k]}`)?.classList.toggle('current', k === firstOpen);
   });
   $('#jr-zip').hidden = !p?.files.word.length;
   if (p?.files.word.length) $('#jr-zip').href = u('/api/policies/zip?type=all');
@@ -762,10 +774,11 @@ function renderFlow() {
   flow.hidden = !facility || tab === 'admin' || tab === 'nofac';
   if (!flowState || flow.hidden) return;
   const { st, firstOpen, p, c, s, r } = flowState;
-  const here = { policies: 1, hr: 2, master: 3, circulars: 3 }[tab] || 0;
+  const here = { policies: 1, hr: 2, thirdparty: 3, master: 4, circulars: 4 }[tab] || 0;
   const allDone = firstOpen < 0;
   st.forEach(([state, text], k) => {
     const li = $(`#flow [data-f="${k + 1}"]`);
+    if (!li) return;
     li.className = [state === 'done' ? 'done' : state === 'bad' ? 'bad' : state === 'warn' ? 'warn' : 'todo', k === firstOpen ? 'now' : '', here === k + 1 ? 'here' : ''].join(' ').trim();
     li.querySelector('.fl-dot').textContent = state === 'done' ? '✓' : String(k + 1);
     $(`#fl-s${k + 1}`).textContent = k === firstOpen ? `Do this now · ${text}` : text;
@@ -775,8 +788,8 @@ function renderFlow() {
   $('#fl-ring')?.style.setProperty('--p', pct);
   if ($('#fl-pct')) $('#fl-pct').textContent = `${pct}%`;
   if ($('#fl-sum')) $('#fl-sum').textContent = allDone ? 'All steps done' : `${doneSteps} of ${st.length} steps done`;
-  $('#flow [data-f="4"]').className = allDone ? 'done now' : 'todo';
-  $('#fl-s4').textContent = allDone ? 'Everything up to date ✓' : 'When steps 1–3 are done';
+  $('#flow [data-f="5"]').className = allDone ? 'done now' : 'todo';
+  $('#fl-s5').textContent = allDone ? 'Everything up to date ✓' : 'When steps 1–4 are done';
   // the one next step, in plain words
   let title, sub = '', go = null, badge = 'Next step';
   if (allDone) { title = 'All done – everything is up to date'; sub = 'The DoH check runs every week by itself. Come back when a licence is due.'; badge = 'Finished'; }
@@ -794,9 +807,14 @@ function renderFlow() {
     else if (h?.forms.some(f => f.installed && f.need.some(n => /logo/.test(n)))) { title = 'Add the facility logo'; sub = 'The HR documents carry this facility’s logo – add it under Prepare policies → Pictures.'; go = 'policies'; }
     else if (h?.generated?.count) { title = 'Check the HR documents'; sub = `${h.generated.total - h.generated.passed} of ${h.generated.total} documents need a look.`; }
     else { title = 'Create the HR & onboarding documents'; sub = 'NDA, orientation, background verification, IT/EMR form, disciplinary process, acceptable usage, exit clearance… with this facility’s name and logo.'; }
-  } else if (firstOpen === 2 && p?.files.word.length && !p.linked) {
-    go = 'policies'; title = 'Final step: link everything to the LEGAL REGISTER'; sub = 'One click copies the facility details, approver and author into the register (Prepare policies → step 4).';
-  } else if (firstOpen === 2 && (!c || c.expired || c.expiring || c.missing)) {
+  } else if (firstOpen === 2) {
+    go = 'thirdparty';
+    const tp = (homeHr?.forms || []).filter(f => f.group === 'thirdparty' && f.installed);
+    if (tp.some(f => f.need.length)) { title = 'Complete the 3rd-party document details'; sub = 'Vendor NDA and acceptable usage – with this facility’s logo, name and Ref. No.'; }
+    else { title = 'Create the 3rd-party documents'; sub = 'Vendor NDA and acceptable usage acknowledgement – with this facility’s logo, name and Ref. No.'; }
+  } else if (firstOpen === 3 && p?.files.word.length && !p.linked) {
+    go = 'policies'; title = 'Step 4: link everything to the LEGAL REGISTER'; sub = 'One click copies the facility details, approver and author into the register (Prepare policies → step 4).';
+  } else if (firstOpen === 3 && (!c || c.expired || c.expiring || c.missing)) {
     go = 'master';
     if (!c) title = 'Set up the LEGAL REGISTER';
     else if (c.expired || c.expiring) { title = `Renew ${[c.expired && `${c.expired} expired`, c.expiring && `${c.expiring} expiring`].filter(Boolean).join(' and ')} item${(c.expired || 0) + (c.expiring || 0) > 1 ? 's' : ''}`; sub = 'Upload the new licence or certificate – the dates are read for you.'; }
@@ -820,7 +838,7 @@ $$('#flow [data-goto]').forEach(b => b.onclick = () => showTab(b.dataset.goto));
 $('#btn-add-facility-2').onclick = () => $('#btn-add-facility').click();
 
 // Menu items explain themselves on hover
-const NAV_TIPS = { overview: 'Where you are in the process and what to do next', policies: 'Step 1 – fill in the details and create the policies (Word + PDF)', hr: 'Step 2 – HR and onboarding documents, employee training documents and the ADHICS checklist', thirdparty: '3rd-party / vendor documents: NDA and acceptable usage, with this facility\'s logo, name and Ref. No.', master: 'Step 3, the final step – link the policies, licences and certificates with their dates', circulars: 'Always on – new DoH Abu Dhabi circulars are added to the register every week', exports: 'Every file to download in one place', settings: 'Details of this facility and your account' };
+const NAV_TIPS = { overview: 'Where you are in the process and what to do next', policies: 'Step 1 – fill in the details and create the policies (Word + PDF)', hr: 'Step 2 – HR and onboarding documents, employee training documents and the ADHICS checklist', thirdparty: 'Step 3 – 3rd-party / vendor documents: NDA and acceptable usage, with this facility\'s logo, name and Ref. No.', master: 'Step 4 – link the policies, licences and certificates with their dates', circulars: 'Always on – new DoH Abu Dhabi circulars are added to the register every week', checklist: 'Step 5 – the checklist of everything: HR documents and LEGAL REGISTER entries at a glance', exports: 'Every file to download in one place', settings: 'Details of this facility and your account' };
 $$('#tabs button').forEach(b => { b.dataset.hc = 'tip'; b.dataset.tip = NAV_TIPS[b.dataset.tab] || ''; });
 
 // ---- Export window: Master Excel (.xlsx) and PDF summary report (.pdf) ----
@@ -2558,7 +2576,7 @@ var iso = (() => { // var: renderFlow may ask for it during start-up
   const STEPS = [
     { title: 'Step 1 · Prepare the ADHICS policies', sub: 'The policies are printed as Word + PDF with your logo, signature and stamp – each one stamped with your facility’s details.', tab: 'policies' },
     { title: 'Step 2 · HR, training & 3rd-party documents', sub: 'NDA, orientation, exit clearance, training records and vendor forms – same logo, each with its own Ref. No.', tab: 'hr' },
-    { title: 'Step 3 · LEGAL REGISTER – the final step', sub: 'Policies are filed in the register and every licence, certificate and contract is tracked with its dates.', tab: 'master' },
+    { title: 'Step 4 · LEGAL REGISTER', sub: 'Policies are filed in the register and every licence, certificate and contract is tracked with its dates.', tab: 'master' },
     { title: 'Always on · DoH updates', sub: 'New Department of Health circulars are checked every week and added to your register.', tab: 'circulars' },
   ];
   let F = null;
@@ -2608,12 +2626,13 @@ var iso = (() => { // var: renderFlow may ask for it during start-up
     const { st: steps, firstOpen, s, r } = flowState;
     $$('#iso-stage .iso-isle').forEach(g => {
       const k = Number(g.dataset.k);
-      const state = k < 3 ? steps[k]?.[0] : (r && (r.status === 'failed' || r.status === 'register_locked')) ? 'bad' : s?.lastSuccess ? 'done' : 'todo';
+      const state = k < 3 ? steps[[0, 1, 3][k]]?.[0] : (r && (r.status === 'failed' || r.status === 'register_locked')) ? 'bad' : s?.lastSuccess ? 'done' : 'todo';
+      const nowK = { 0: 0, 1: 1, 3: 2 }[firstOpen];
       g.classList.toggle('done', state === 'done');
-      g.classList.toggle('now', k === firstOpen);
+      g.classList.toggle('now', k === nowK);
       g.classList.toggle('warn', state === 'warn' || state === 'bad');
       const t = g.querySelector('.b-txt');
-      if (t) t.textContent = state === 'done' ? `${LABELS[k]} ✓` : k === firstOpen ? 'Do this now' : LABELS[k];
+      if (t) t.textContent = state === 'done' ? `${LABELS[k]} ✓` : k === nowK ? 'Do this now' : LABELS[k];
     });
   }
 
@@ -3259,3 +3278,68 @@ document.addEventListener('click', e => {
     open({ ...Object.fromEntries(WL_FIELDS.map(k => [k, f.elements[k].value])), title: f.elements.title.value || 'Welcome', version: 0 }, { preview: true });
   };
 })();
+
+// ===================================================================================================
+// Step 5 · Checklist – one executive overview: the HR checklist (ADHICS documents per section) and the LEGAL
+// REGISTER checklist (every entry with status, dates, person, compliance). Read-only here; each part opens the page
+// where it is edited. On the free trial the same masking applies (locked items are blurred, a click = Get Premium).
+// ===================================================================================================
+async function loadChecklistPage() {
+  const fac = facilities.find(f => f.id === facility);
+  $('#ck-fac').innerHTML = fac ? `${esc(fac.name)} <span class="pp-code">${esc(fac.code)}</span>` : '–';
+  $('#ck-xlsx').href = u('/api/hr/checklist.xlsx');
+  if (!hrData || !master) { $('#ck-hr').innerHTML = $('#ck-reg').innerHTML = '<p class="muted small"><span class="spin"></span> Loading…</p>'; }
+  const [h, m] = await Promise.all([api('/api/hr').catch(e => ({ error: e.message })), api('/api/master').catch(e => ({ error: e.message }))]);
+  if (!h.error) hrData = h;
+  if (!m.error) master = m;
+  renderChecklistPage(h.error, m.error);
+}
+function renderChecklistPage(hrErr, regErr) {
+  const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+  const bar = (p, cls = '') => `<span class="ck-bar ${cls}"><i style="width:${p}%"></i></span>`;
+  // --- HR checklist
+  const secs = hrErr ? [] : hrData.checklist.sections;
+  const hrItems = secs.flatMap(sec => sec.items);
+  const hrOpen = hrItems.filter(i => !i.locked);
+  const hc = { total: hrItems.length, done: hrOpen.filter(i => i.status === 'Completed').length, na: hrOpen.filter(i => i.status === 'Not applicable').length, locked: hrItems.length - hrOpen.length };
+  hc.pending = hrOpen.length - hc.done - hc.na;
+  // --- LEGAL REGISTER checklist
+  const items = regErr ? [] : master.items;
+  const open = items.filter(i => !i.locked && !i.fixed);
+  const rc = { total: items.filter(i => !i.fixed).length, ok: open.filter(i => ['valid', 'lifetime', 'no-expiry'].includes(i.status)).length,
+    expiring: open.filter(i => i.status === 'expiring').length, expired: open.filter(i => i.status === 'expired').length,
+    missing: open.filter(i => i.status === 'missing').length, locked: items.filter(i => i.locked && !i.fixed).length, laws: items.filter(i => i.fixed).length };
+  // --- the KPIs
+  const readyHr = hc.total - hc.na - hc.locked, readyReg = rc.total - rc.locked;
+  const overall = pct(hc.done + rc.ok, Math.max(1, readyHr + readyReg));
+  const attention = hc.pending + rc.expiring + rc.expired + rc.missing;
+  $('#ck-kpis').innerHTML = `
+    <div class="ck-kpi main"><span class="ck-ring" style="--p:${overall}"><b>${overall}%</b></span><div><b>Overall readiness</b><small>HR documents completed and register entries in date</small></div></div>
+    <div class="ck-kpi"><b>${hc.done}<small>/ ${readyHr}</small></b><span>HR documents completed</span>${bar(pct(hc.done, readyHr), 'ok')}</div>
+    <div class="ck-kpi"><b>${rc.ok}<small>/ ${readyReg}</small></b><span>register entries in date</span>${bar(pct(rc.ok, readyReg), 'ok')}</div>
+    <div class="ck-kpi ${attention ? 'warn' : 'ok'}"><b>${attention}</b><span>need attention</span><small class="muted">${[hc.pending && `${hc.pending} HR pending`, rc.expired && `${rc.expired} expired`, rc.expiring && `${rc.expiring} expiring`, rc.missing && `${rc.missing} without dates`].filter(Boolean).join(' · ') || 'nothing open'}</small></div>`;
+
+  // --- HR sections
+  $('#ck-hr-sub').textContent = hrErr ? hrErr : `${hc.done} completed · ${hc.pending} pending · ${hc.na} not applicable${hc.locked ? ` · ${hc.locked} 🔒 Premium` : ''}`;
+  const pill = st => `<span class="tag ${{ Completed: 'ok', Pending: 'warn', 'Not applicable': 'na' }[st] || 'warn'}">${esc(st || 'Pending')}</span>`;
+  $('#ck-hr').innerHTML = hrErr ? '' : secs.map((sec, n) => {
+    const op = sec.items.filter(i => !i.locked), d = op.filter(i => i.status === 'Completed').length;
+    return `<details class="ck-group"${n === 0 ? ' open' : ''}>
+      <summary><b>${esc(sec.title)}</b><span class="muted small">${d} of ${sec.items.length} completed</span>${bar(pct(d, sec.items.length), 'ok')}</summary>
+      <div class="table-wrap flat"><table class="ck-table"><thead><tr><th>#</th><th>Document</th><th>Status</th><th>Remarks</th><th>Updated</th></tr></thead><tbody>
+      ${sec.items.map((it, k) => (it.locked
+        ? `<tr class="reg-locked" data-up title="Part of Premium"><td class="num">${k + 1}</td><td colspan="3"><span class="blur-txt" aria-hidden="true">XXXXXXXX XXXXXXXXXX XXXXX</span><span class="sr-only">Locked – part of Premium</span></td><td><span class="tag lock-tag">🔒 Premium</span></td></tr>`
+        : `<tr><td class="num">${k + 1}</td><td>${esc(it.name)}</td><td>${pill(it.status)}</td><td class="muted small">${esc(it.remarks || '—')}</td><td class="muted small">${it.updatedAt ? `${esc(it.updatedBy || '')} · ${fmtDay(String(it.updatedAt).slice(0, 10))}` : '—'}</td></tr>`)).join('')}
+      </tbody></table></div></details>`;
+  }).join('') || '<p class="muted small">No checklist yet.</p>';
+
+  // --- register entries
+  $('#ck-reg-sub').textContent = regErr ? regErr : `${rc.ok} in date · ${rc.expiring} expiring · ${rc.expired} expired · ${rc.missing} without dates${rc.locked ? ` · ${rc.locked} 🔒 Premium` : ''} · ${rc.laws} federal laws`;
+  const day = v => (ISO.test(v || '') ? fmtDay(v) : '—');
+  $('#ck-reg').innerHTML = regErr ? '' : `<div class="table-wrap flat"><table class="ck-table"><thead><tr><th>SL</th><th>Entry</th><th>Status</th><th>Issued</th><th>Expiry</th><th>Due</th><th>Responsible</th><th>Compliance</th></tr></thead><tbody>
+    ${items.map(i => (i.locked
+      ? `<tr class="reg-locked" data-up title="Part of Premium"><td class="num">${esc(i.sl)}</td><td colspan="6"><span class="blur-txt" aria-hidden="true">XXXXXXXXXX XX XXXXXX · 01 Jan 2026 · 31 Dec 2026</span><span class="sr-only">Locked – part of Premium</span></td><td><span class="tag lock-tag">🔒 Premium</span></td></tr>`
+      : `<tr class="${i.fixed ? 'fixed' : ''}"><td class="num">${esc(i.sl)}</td><td>${esc(i.name)}</td><td>${i.fixed ? '<span class="tag na">Federal law</span>' : statusPill(i.status)}</td><td>${day(i.issued)}</td><td>${i.status === 'lifetime' ? '∞' : day(i.expiry)}</td><td>${i.status === 'lifetime' ? '—' : day(i.due)}</td><td>${esc(i.responsible || '—')}</td><td>${i.compliance ? `<span class="tag ${/not applicable/i.test(i.compliance) ? 'na' : 'ok'}">${esc(i.compliance)}</span>` : '—'}</td></tr>`)).join('')}
+    </tbody></table></div>`;
+}
+$$('#checklist [data-goto]').forEach(b => { b.onclick = () => showTab(b.dataset.goto); });
