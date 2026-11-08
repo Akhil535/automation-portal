@@ -676,6 +676,11 @@ function renderFlow() {
     li.querySelector('.fl-dot').textContent = state === 'done' ? '✓' : String(k + 1);
     $(`#fl-s${k + 1}`).textContent = k === firstOpen ? `Do this now · ${text}` : text;
   });
+  // overall completion in the bar: steps 1-3 done (100 % when everything is finished)
+  const doneSteps = st.filter(([x]) => x === 'done').length, pct = allDone ? 100 : Math.round((doneSteps / st.length) * 100);
+  $('#fl-ring')?.style.setProperty('--p', pct);
+  if ($('#fl-pct')) $('#fl-pct').textContent = `${pct}%`;
+  if ($('#fl-sum')) $('#fl-sum').textContent = allDone ? 'All steps done' : `${doneSteps} of ${st.length} steps done`;
   $('#flow [data-f="4"]').className = allDone ? 'done now' : 'todo';
   $('#fl-s4').textContent = allDone ? 'Everything up to date ✓' : 'When steps 1–3 are done';
   // the one next step, in plain words
@@ -766,7 +771,7 @@ function applyTheme(t) {
   document.documentElement.dataset.theme = t;
   $$('[data-theme-set]').forEach(b => b.classList.toggle('active', b.dataset.themeSet === t));
 }
-if (store.get('ui-look') !== 'fluid') { store.set('ui-look', 'fluid'); store.set('ui-theme', 'light'); } // the Fluid look starts light
+if (store.get('ui-look') !== 'teal') { store.set('ui-look', 'teal'); store.set('ui-theme', 'light'); } // the Clinical Teal look starts light
 applyTheme(store.get('ui-theme') || 'light');
 $$('[data-theme-set]').forEach(b => b.onclick = () => { store.set('ui-theme', b.dataset.themeSet); store.set('theme', b.dataset.themeSet); applyTheme(b.dataset.themeSet); });
 

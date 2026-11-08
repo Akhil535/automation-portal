@@ -6,7 +6,7 @@
 <title>Compliance Portal – Policies · LEGAL REGISTER · DoH</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Poppins:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=Poppins:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -75,6 +75,7 @@
 <main class="page">
   <!-- the process, start to finish: done ✓ · do this now · later; plus the one next step -->
   <nav class="flow" id="flow" aria-label="Your progress">
+    <div class="flow-head"><div class="flow-ring" id="fl-ring"><b id="fl-pct">0%</b></div><div class="flow-head-txt"><b>Your progress</b><small id="fl-sum">–</small></div></div>
     <ol class="flow-steps">
       <li data-f="0" class="done"><span class="fl-dot"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><span class="fl-txt"><b>Start</b><small>Facility set up</small></span></li>
       <li data-f="1"><button type="button" data-goto="policies"><span class="fl-dot">1</span><span class="fl-txt"><b>Prepare policies</b><small id="fl-s1">–</small></span></button></li>

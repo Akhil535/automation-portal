@@ -1,7 +1,7 @@
 // Sign-in flow: (first-run setup) -> password -> (new password) -> (authenticator enrolment) -> 6-digit code.
 const $ = s => document.querySelector(s);
 let token = null;
-try { if (localStorage.getItem('ui-look') !== 'fluid') { localStorage.setItem('ui-look', 'fluid'); localStorage.setItem('ui-theme', 'light'); } document.documentElement.dataset.theme = localStorage.getItem('ui-theme') || 'light'; } catch {}
+try { if (localStorage.getItem('ui-look') !== 'teal') { localStorage.setItem('ui-look', 'teal'); localStorage.setItem('ui-theme', 'light'); } document.documentElement.dataset.theme = localStorage.getItem('ui-theme') || 'light'; } catch {}
 
 async function post(url, body) {
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
