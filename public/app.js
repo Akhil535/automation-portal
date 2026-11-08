@@ -766,7 +766,8 @@ function applyTheme(t) {
   document.documentElement.dataset.theme = t;
   $$('[data-theme-set]').forEach(b => b.classList.toggle('active', b.dataset.themeSet === t));
 }
-applyTheme(store.get('ui-theme') || 'dark');
+if (store.get('ui-look') !== 'fluid') { store.set('ui-look', 'fluid'); store.set('ui-theme', 'light'); } // the Fluid look starts light
+applyTheme(store.get('ui-theme') || 'light');
 $$('[data-theme-set]').forEach(b => b.onclick = () => { store.set('ui-theme', b.dataset.themeSet); store.set('theme', b.dataset.themeSet); applyTheme(b.dataset.themeSet); });
 
 async function startRun(mode, force = false, all = false) {
@@ -2429,7 +2430,7 @@ var iso = (() => { // var: renderFlow may ask for it during start-up
     // the travelling package
     s += `<g class="iso-pkg" id="iso-pkg">${box(-9, -9, 0, 18, 18, 18, 'pkg')}</g>`;
     return `<svg viewBox="12 156 1122 238" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
-      <defs><linearGradient id="isoGlow" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff5101"/><stop offset=".5" stop-color="#ff7a3a"/><stop offset="1" stop-color="#ffb37a"/></linearGradient>
+      <defs><linearGradient id="isoGlow" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6a4cf0"/><stop offset=".5" stop-color="#a64ff0"/><stop offset="1" stop-color="#ff5fb8"/></linearGradient>
       <filter id="isoBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter></defs>
       <g class="iso-world">${s}</g></svg>`;
   }
