@@ -3845,3 +3845,9 @@ tr.reg-locked:hover td { background-color: rgba(251, 191, 36, .05); }
 
 /* sidebar: the free-trial count next to 3rd-party documents (gold, not a step number) */
 .sb-step.sb-free { background: linear-gradient(135deg, var(--prem-1, #fde68a), var(--prem-3, #f59e0b)) !important; color: #2b1700 !important; border: 0 !important; font-weight: 800; }
+
+/* upload window: skeleton rows while a document is read */
+.doc-skel .sk { display: block; height: 9px; margin: 5px 0; border-radius: 6px; background: linear-gradient(90deg, rgba(148,163,184,.14) 25%, rgba(148,163,184,.3) 37%, rgba(148,163,184,.14) 63%); background-size: 400% 100%; animation: skShine 1.3s ease infinite; }
+.doc-skel .w40 { width: 40%; } .doc-skel .w50 { width: 50%; } .doc-skel .w60 { width: 60%; } .doc-skel .w70 { width: 70%; } .doc-skel .w90 { width: 90%; }
+@keyframes skShine { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+@media (prefers-reduced-motion: reduce) { .doc-skel .sk { animation: none; } }

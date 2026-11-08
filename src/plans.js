@@ -102,26 +102,29 @@ export function claim(user, kind, ids, { quiet = false } = {}) {
  * previewed; the same files can be uploaded again, any further file is Premium. Files are remembered by a SHA-256
  * of their content (not by name), per account.
  */
-export const TRIAL_UPLOADS = 2;
+export const TRIAL_UPLOADS = 2; // documents a trial user can apply (to the free register entries)
+export const TRIAL_SCANS = 25; // different files a trial account can have read
 /** Checks the file may be read (throws the upgrade error if not) and returns a function that counts it – called
  *  only after the document was read successfully, so a file that cannot be read does not use up a preview. */
 export function claimUpload(user, buffer) {
   if (!isTrial(user)) return () => {};
   const hash = crypto.createHash('sha256').update(buffer).digest('hex');
   const seen0 = new Set(loadUsers().users.find(x => x.id === user.id)?.usage?.uploads || []);
-  if (!seen0.has(hash) && seen0.size >= TRIAL_UPLOADS) throw upgradeError(`The free trial previews ${TRIAL_UPLOADS} uploaded documents – further documents are part of Premium`, { kind: 'uploads', limit: TRIAL_UPLOADS });
+  // every file is read; documents that match a free entry are usable (up to TRIAL_UPLOADS applied), the others masked.
+  // TRIAL_SCANS different files per trial account keeps the reading (OCR) from being used without limit.
+  if (!seen0.has(hash) && seen0.size >= TRIAL_SCANS) throw upgradeError(`The free trial reads up to ${TRIAL_SCANS} different documents – reading more is part of Premium`, { kind: 'uploads', limit: TRIAL_SCANS });
   // token: the id of this reading – only documents read this way can be applied to the register on the trial
   // token: the id of this reading; row / confidence: the entry it was recognised as – a trial user can apply the
   // document only to that entry (a confident match is never moved to another row)
-  return (token, row = null, confidence = 'none') => {
+  return (token, row = null, confidence = 'none', usable = true) => {
     const data = loadUsers();
     const u = data.users.find(x => x.id === user.id);
     if (!u) return;
     const seen = new Set(u.usage?.uploads || []);
-    if (seen.size >= TRIAL_UPLOADS && !seen.has(hash)) return; // (another upload took the last preview meanwhile)
+    if (seen.size >= TRIAL_SCANS && !seen.has(hash)) return; // (another upload took the last one meanwhile)
     seen.add(hash);
     const old = (u.usage?.uploadTokens || []).map(t => (typeof t === 'string' ? { t } : t));
-    const tokens = [...old, ...(token ? [{ t: token, row: row ?? null, sure: ['high', 'medium'].includes(confidence) }] : [])].slice(-50);
+    const tokens = [...old, ...(token && usable ? [{ t: token, row: row ?? null, sure: ['high', 'medium'].includes(confidence) }] : [])].slice(-50);
     u.usage = { ...(u.usage || {}), uploads: [...seen], uploadTokens: tokens };
     saveUsers(data);
   };

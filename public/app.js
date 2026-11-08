@@ -1089,8 +1089,9 @@ async function analyzeFiles(files, forRow = null) {
     try {
       const res = await fetch(u(`/api/facilities/${encodeURIComponent(facility)}/documents/analyze?name=${encodeURIComponent(f.name)}`), { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: f });
       const d = await res.json();
-      if (res.status === 402 && d.upgrade) { Object.assign(slot, { pending: false, locked: true, include: false }); trialFull = true; } // free trial: beyond the first 2
+      if (res.status === 402 && d.upgrade) { Object.assign(slot, { pending: false, locked: true, include: false }); trialFull = true; } // free trial: reading limit reached
       else if (!res.ok) throw new Error(d.error);
+      else if (d.locked) Object.assign(slot, d, { pending: false, include: false }); // free trial: matches a Premium entry – masked by the server
       else {
         const sure = ['high', 'medium'].includes(d.confidence);
         // a low-confidence reading is never ticked by itself: the best guess is only suggested in the list
@@ -1112,9 +1113,9 @@ function renderDocs() {
     .map(i => `<option value="${i.row}"${i.row === r.row ? ' selected' : ''}>${esc(i.name)}${i.row === r.suggest ? '  (suggested)' : ''}</option>`).join('');
   $('#docs-result').innerHTML = docResults.length ? `<div class="table-wrap flat"><table class="docs-table"><thead><tr>
       <th></th><th>Document</th><th>Recognised as</th><th>Register entry</th><th>Issued</th><th>Expiry</th><th>Due</th><th>Notes</th></tr></thead><tbody>
-    ${docResults.map((r, k) => r.pending ? `<tr><td></td><td class="file">${esc(r.file)}</td><td colspan="6"><span class="spin"></span> Reading…</td></tr>`
-      : r.lockedMatch ? `<tr class="trial-locked"><td>🔒</td><td class="file">${esc(r.file)}</td><td>${esc(r.typeLabel)}<br><span class="conf ${r.confidence}">${r.confidence} confidence</span></td><td colspan="5"><span class="tag lock-tag">Premium</span> <span class="lock-msg">Recognised as <b>${esc(r.entryName || r.typeLabel)}</b> – that LEGAL REGISTER entry is part of Premium, so this document cannot be applied to another entry.</span> <button type="button" class="icon-btn premium-mini" data-up>🔒 Get Premium</button></td></tr>`
-      : r.locked ? `<tr class="trial-locked"><td>🔒</td><td class="file"><span class="blur-txt" aria-hidden="true">${esc(r.file)}</span><span class="sr-only">Locked document – part of Premium</span></td><td colspan="6"><span class="tag lock-tag">Premium</span> <span class="lock-msg">The free trial previews ${planState?.limits?.uploads || 2} uploaded documents – this one is part of Premium</span> <button type="button" class="icon-btn premium-mini" data-up>🔒 Get Premium</button></td></tr>`
+    ${docResults.map((r, k) => r.pending ? `<tr class="doc-skel" aria-busy="true"><td><span class="spin"></span></td><td class="file">${esc(r.file)}<div class="muted small">Reading and matching…</div></td><td><i class="sk w70"></i><i class="sk w40"></i></td><td><i class="sk w90"></i></td><td><i class="sk w60"></i></td><td><i class="sk w60"></i></td><td><i class="sk w60"></i></td><td><i class="sk w50"></i></td></tr>`
+      : r.lockedMatch ? `<tr class="trial-locked"><td>🔒</td><td class="file"><span class="blur-txt" aria-hidden="true">${esc(r.file)}</span><span class="sr-only">Document for a Premium entry</span></td><td colspan="6"><span class="tag lock-tag">Premium</span> <span class="lock-msg">Read and matched to a LEGAL REGISTER entry that is part of Premium – it cannot be applied to another entry</span> <button type="button" class="icon-btn premium-mini" data-up>🔒 Get Premium</button></td></tr>`
+      : r.locked ? `<tr class="trial-locked"><td>🔒</td><td class="file"><span class="blur-txt" aria-hidden="true">${esc(r.file)}</span><span class="sr-only">Locked document – part of Premium</span></td><td colspan="6"><span class="tag lock-tag">Premium</span> <span class="lock-msg">The free trial reads up to 25 different documents – this one is part of Premium</span> <button type="button" class="icon-btn premium-mini" data-up>🔒 Get Premium</button></td></tr>`
       : r.error ? `<tr><td></td><td class="file">${esc(r.file)}</td><td colspan="6" class="notes">${esc(r.error)}</td></tr>`
       : `<tr data-k="${k}">
         <td><input type="checkbox" data-f="include" ${r.include ? 'checked' : ''}></td>

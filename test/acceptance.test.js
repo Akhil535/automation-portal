@@ -1319,9 +1319,15 @@ test('10q. free trial end to end: the first 2 items open as Word + PDF, everythi
     assert.notEqual(r1.status, 402, 'first document previewed'); assert.notEqual(r2.status, 402, 'second document previewed');
     const j1 = await r1.json(), j2 = await r2.json(), t1 = j1.token, t2 = j2.token;
     const u3 = await upload(d3, 'waste.docx');
-    assert.equal(u3.status, 402, 'a third document is Premium'); assert.equal((await u3.json()).info?.kind, 'uploads');
+    assert.notEqual(u3.status, 402, 'every document is read (no cap at 2)');
+    // a document for a Premium entry comes back masked: no type, dates or entry name
+    const freeRows = new Set((await (await import('../src/master.js')).readMaster(loadConfig(id))).slice(0, 2).map(x => x.row));
+    for (const j of [j1, j2, await u3.json()]) {
+      if (j.locked) { assert.equal(j.lockedMatch, true); assert.equal(j.issued ?? j.expiry ?? j.typeLabel ?? j.row, undefined, 'masked'); }
+      else assert.ok(j.row == null || freeRows.has(j.row), 'unmasked only for a free entry (or not recognised)');
+    }
     assert.notEqual((await upload(d1, 'licence-again.docx')).status, 402, 'the same document again is fine');
-    assert.equal((await (await fetch(`${base}/api/plan`, opt())).json()).usage.uploads, 2);
+    assert.equal((await (await fetch(`${base}/api/plan`, opt())).json()).usage.uploads, 3, '3 different files read');
     // applying: the 2 free previews may be applied to the register; foreign documents or more than 2 are Premium
     const reg = (await (await fetch(`${base}/api/master${q}`, opt())).json()).items?.filter(i => !i.fixed) || [];
     const apply = items => fetch(`${base}/api/facilities/${id}/documents/apply${q}`, opt({ method: 'POST', body: JSON.stringify({ items }) }));
@@ -1353,9 +1359,12 @@ test('10q. free trial end to end: the first 2 items open as Word + PDF, everythi
         assert.equal((await fetch(`${base}/api/facility-document${q}&entry=${encodeURIComponent(full[full.length - 1].name)}`, opt())).status, 402, 'no document of a locked entry');
       } finally { fs.writeFileSync(regFile, saved); }
     }
-    if (t1 && reg.length) { // (the register is put back afterwards – later tests check its contents)
+    const usable = [[j1, t1], [j2, t2]].find(([j]) => !j.locked);
+    for (const [j, t] of [[j1, t1], [j2, t2]]) if (j.locked) assert.equal((await apply([it(t, 0)])).status, 402, 'a masked document cannot be applied');
+    if (usable && reg.length) { // (the register is put back afterwards – later tests check its contents)
       const regFile = loadConfig(id).register.path, saved = fs.readFileSync(regFile);
-      try { assert.notEqual((await apply([it(t1, 0)])).status, 402, 'a free preview can be applied'); }
+      const [uj, ut] = usable, k = uj.row ? reg.findIndex(x => x.row === uj.row) : 0;
+      try { assert.notEqual((await apply([it(ut, Math.max(0, k))])).status, 402, 'a document for a free entry can be applied'); }
       finally { fs.writeFileSync(regFile, saved); }
     }
 

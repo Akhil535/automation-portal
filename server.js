@@ -618,11 +618,18 @@ app.post('/api/facilities-removed/:archive/restore', wrap(async (req, res) => { 
 // Register entry documents (licences, certificates, contracts): recognise -> review -> apply -------------
 app.post('/api/facilities/:id/documents/analyze', express.raw({ type: () => true, limit: '50mb' }), wrap(async (req, res) => {
   if (!req.body?.length) throw new Error('No file received');
-  const counted = claimUpload(req.user, req.body); // free trial: the first 2 different documents are previewed, then Premium
+  const counted = claimUpload(req.user, req.body); // free trial: every file is read (up to TRIAL_SCANS different files)
   const token = crypto.randomUUID();
   const r = await analyzeDocument(req.params.id, req.body, String(req.query.name || 'document.pdf'), token);
-  counted(r?.token || token, r?.row ?? null, r?.confidence);
-  res.json(r);
+  if (!isTrial(req.user)) { counted(); return res.json(r); }
+  // free trial: a document that matches an entry beyond the free ones is masked – no type, dates or entry name are
+  // sent, it cannot be applied and it does not use a free slot. Documents for the free entries (or not recognised,
+  // to be placed by hand on a free entry) are fully usable.
+  const free = freeRegisterRows(await readMaster(loadConfig(req.params.id)));
+  const target = r?.row ?? r?.suggest ?? null;
+  const usable = target == null || free.has(Number(target));
+  counted(r?.token || token, r?.row ?? null, r?.confidence, usable);
+  res.json(usable ? r : { token: r.token, file: r.file, locked: true, lockedMatch: true, confidence: r.confidence });
 }));
 
 app.post('/api/facilities/:id/documents/apply', wrap(async (req, res) => {
