@@ -531,7 +531,10 @@ test('10f. weekly runs read recent circulars only; full sweep when forced; PDF s
   if (process.platform === 'win32') {
     const R = await import('../src/report.js');
     const html = R.reportHtml({ cfg, items: await MA.readMaster(cfg), circulars: { total: 1, latest: 'USO/260/2026' } });
-    assert.match(html, /Compliance snapshot/); assert.match(html, /RESTRICTED/);
+    // the master's structure only: Document Control + the 7 columns of the LEGAL REGISTER, nothing added
+    assert.ok(html.includes('A. Document Control') && html.includes('RESTRICTED'));
+    assert.ok(html.includes('<th>SL NO</th><th>NAME OF DEPARTMENT</th><th>ISSUED DATE</th><th>EXPIRY DATE</th><th>DUE DATE</th><th>RESPONSIBLE PERSON</th><th>COMPLIANCE</th>'), 'the master\'s 7 columns');
+    assert.doesNotMatch(html, /Compliance status|Total entries|class="tile|class="pill|DoH circulars/, 'no summary tiles, scores, status labels or circular statistics');
     const pdf = await R.htmlToPdf(html);
     assert.equal(pdf.subarray(0, 4).toString(), '%PDF', 'PDF created');
   }

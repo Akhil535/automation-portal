@@ -3691,11 +3691,19 @@ function dsThumbFor(id, a, kind) {
   const L = (x, y, w) => `<rect x="${x}" y="${y}" width="${w}" height="3" rx="1.5" fill="#cfd5df"/>`;
   if (kind === 'register') {
     const page = inner => `<svg viewBox="0 0 150 110" aria-hidden="true"><rect x="1" y="1" width="148" height="108" rx="6" fill="#fff" stroke="#e3e6ec"/>${inner}</svg>`;
-    const rows = (y0, head) => `${head}${[0, 1, 2, 3, 4].map(i => `<rect x="10" y="${y0 + 8 + i * 8}" width="130" height="6" fill="${i % 2 ? '#f6f7fa' : '#fff'}"/>${L(13, y0 + 9.5 + i * 8, 40)}<rect x="${100}" y="${y0 + 9 + i * 8}" width="18" height="4" rx="2" fill="${['#bbf7d0', '#bbf7d0', '#fde68a', '#fecdd3', '#bbf7d0'][i]}"/>`).join('')}`;
-    if (id === 'split') return page(`<rect x="10" y="9" width="50" height="5" rx="2" fill="${a}"/><rect x="10" y="20" width="44" height="26" rx="3" fill="${a}" opacity=".12"/><rect x="10" y="20" width="2.5" height="26" fill="${a}"/>${[0, 1, 2].map(i => `<rect x="${62 + i * 26}" y="22" width="22" height="20" rx="3" fill="#f1f3f8" stroke="${a}" stroke-width=".5"/>`).join('')}${rows(50, `<rect x="10" y="50" width="130" height="7" fill="${a}"/>`)}`);
-    if (id === 'minimal') return page(`<rect x="10" y="9" width="60" height="5" rx="2" fill="#1f2937"/><rect x="10" y="17" width="130" height="1" fill="${a}"/>${[0, 1, 2, 3].map(i => `<rect x="${10 + i * 33}" y="22" width="30" height="16" fill="#f6f7fa"/><rect x="${10 + i * 33}" y="22" width="30" height="1.5" fill="${a}"/>`).join('')}${rows(46, `<rect x="10" y="53" width="130" height="1.2" fill="${a}"/>${L(12, 49, 30)}`)}`);
-    if (id === 'official') return page(`<rect x="4" y="4" width="142" height="102" rx="2" fill="none" stroke="${a}" stroke-width="1.5"/><rect x="7" y="7" width="136" height="96" fill="none" stroke="${a}" stroke-width=".5"/><rect x="45" y="11" width="60" height="5" rx="2" fill="${a}"/><rect x="40" y="19" width="70" height="1" fill="${a}"/>${rows(46, `<rect x="10" y="46" width="130" height="7" fill="${a}"/>`)}${[0, 1, 2, 3].map(i => `<rect x="${12 + i * 32}" y="25" width="28" height="15" fill="none" stroke="#d6dce6"/>`).join('')}`);
-    return page(`<rect x="10" y="9" width="50" height="5" rx="2" fill="#1f2937"/><rect x="10" y="17" width="130" height="1.5" fill="#3b5bfd"/>${[0, 1, 2, 3].map(i => `<rect x="${10 + i * 33}" y="22" width="30" height="16" rx="3" fill="none" stroke="#e3e6ec"/><rect x="${10 + i * 33}" y="22" width="30" height="2" fill="${['#3b5bfd', '#16a34a', '#d97706', '#dc2626'][i]}"/>`).join('')}${rows(46, `<rect x="10" y="46" width="130" height="7" fill="#3b5bfd"/>`)}`);
+    // the master structure: logo + RESTRICTED, the title, and the 7-column table (no tiles, no status labels)
+    const grid = (x, y, w, rowsN, line, head) => {
+      const cols = [0, .04, .34, .45, .56, .66, .89, 1].map(f => x + f * w);
+      return `<rect x="${x}" y="${y}" width="${w}" height="7" fill="${head}"/>${[...Array(rowsN)].map((_, i) => L(cols[1] + 2, y + 9.5 + i * 7, (cols[2] - cols[1]) * .7)).join('')}
+        ${cols.map(cx => `<rect x="${cx}" y="${y}" width=".5" height="${7 + rowsN * 7}" fill="${line}"/>`).join('')}${[...Array(rowsN + 2)].map((_, i) => `<rect x="${x}" y="${y + (i ? 7 + (i - 1) * 7 : 0)}" width="${w}" height=".5" fill="${line}"/>`).join('')}`;
+    };
+    const top = (x, w, center = false) => `<rect x="${center ? x + w / 2 - 18 : x}" y="8" width="36" height="9" rx="2" fill="#dfe5f2"/><rect x="${center ? x + w / 2 - 12 : x + w - 24}" y="${center ? 19 : 11}" width="24" height="3" rx="1.5" fill="#9aa3b5"/>`;
+    if (id === 'split') return page(`<rect x="8" y="8" width="38" height="94" rx="3" fill="${a}" opacity=".1"/><rect x="8" y="8" width="2.5" height="94" fill="${a}"/><rect x="12" y="12" width="31" height="6" rx="1.5" fill="${a}"/>${[0, 1, 2, 3, 4, 5].map(i => `${L(13, 24 + i * 12, 16)}<rect x="13" y="${28 + i * 12}" width="26" height="2.5" rx="1" fill="#6b7280"/>`).join('')}
+      ${top(52, 90)}<rect x="52" y="22" width="44" height="5" rx="2" fill="${a}"/><rect x="52" y="29" width="90" height="1.2" fill="${a}"/>${grid(52, 34, 90, 9, '#c9cfdb', a)}`);
+    if (id === 'minimal') return page(`${top(10, 130)}<rect x="10" y="24" width="56" height="5" rx="2" fill="#1f2937"/><rect x="10" y="34" width="130" height="1.4" fill="${a}"/>${[0, .34, .45, .56, .66, .89].map(f => `<rect x="${12 + f * 130}" y="36.5" width="10" height="2.4" rx="1" fill="${a}"/>`).join('')}<rect x="10" y="41" width="130" height="1.4" fill="${a}"/>
+      ${[...Array(8)].map((_, i) => `${L(14, 46 + i * 7, 34)}<rect x="10" y="${50 + i * 7}" width="130" height=".4" fill="#e3e6ec"/>`).join('')}`);
+    if (id === 'official') return page(`<rect x="4" y="4" width="142" height="102" rx="2" fill="none" stroke="${a}" stroke-width="1.5"/><rect x="7" y="7" width="136" height="96" fill="none" stroke="${a}" stroke-width=".5"/>${top(10, 130, true)}<rect x="48" y="25" width="54" height="5" rx="2" fill="${a}"/>${grid(12, 35, 126, 9, a, a)}`);
+    return page(`${top(10, 130)}<rect x="45" y="22" width="60" height="6" rx="2" fill="#111827"/><rect x="45" y="29.5" width="60" height=".8" fill="#111827"/>${grid(10, 35, 130, 9, '#111827', '#4f81bd')}`);
   }
   // a form (HR / 3rd-party): logo + Ref. No., headings, text, a signature table
   const page = inner => `<svg viewBox="0 0 120 150" aria-hidden="true"><rect x="1" y="1" width="118" height="148" rx="6" fill="#fff" stroke="#e3e6ec"/>${inner}</svg>`;
@@ -3715,10 +3723,10 @@ const DS_DESC = {
     official: 'A full-page border frame, accent headings and every table framed in the accent colour.',
   },
   register: {
-    classic: 'The standard report: the document control box, status tiles and the register table.',
-    split: 'Document control in a shaded sidebar card next to the status tiles, accent title.',
-    minimal: 'Borderless tiles and table headings with accent rules – clean and light.',
-    official: 'A double border frame, a centred title and a fully ruled register table.',
+    classic: 'Exactly the master LEGAL REGISTER: Document Control, then the register table with its blue header row – nothing added.',
+    split: 'Document Control as a shaded sidebar next to the register table, accent title and header.',
+    minimal: 'The same table without fills: accent rules above and below the header, light hairlines.',
+    official: 'A double border frame, a centred title and every line of the table in the accent colour.',
   },
 };
 const dsDesc = (s, kind) => (kind === 'hr' || kind === 'thirdparty' ? DS_DESC.form[s.id] : kind === 'register' ? DS_DESC.register[s.id] : null) || s.desc;

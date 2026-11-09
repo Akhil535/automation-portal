@@ -1,20 +1,15 @@
-// Compliance snapshot report: one standard, print-ready page per facility (header, logo, RESTRICTED badge, status
-// summary, the LEGAL REGISTER with a status per entry, circular statistics). Used for the on-screen print view and
-// for the PDF download (printed by Microsoft Edge / Google Chrome in headless mode - nothing leaves the PC).
+// The LEGAL REGISTER report: the master workbook's Document Control and LEGAL REGISTER sheets as a print-ready page
+// (on-screen print view and PDF download, printed by Microsoft Edge / Google Chrome in headless mode - nothing
+// leaves the PC). Nothing is added to the master structure: no summary tiles, scores or status labels.
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { FIXED } from './config.js';
-import { documentHeader } from './mailer.js';
-import { registerHealth } from './master.js';
 import { imageSize } from './imagesize.js';
 
 const h = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
-const day = v => (ISO.test(v || '') ? new Date(v + 'T00:00:00Z').toLocaleDateString('en-GB', { timeZone: 'UTC', day: '2-digit', month: 'short', year: 'numeric' }) : (v || '—'));
-const STATUS = { expired: ['Expired', '#c0262d', '#fdecec'], expiring: ['Expires ≤ 30 days', '#b45309', '#fff4e0'], valid: ['Valid', '#15803d', '#e7f6ec'], lifetime: ['Lifetime · no expiry', '#15803d', '#e7f6ec'],
-  'no-expiry': ['No expiry date', '#536373', '#eef2f6'], missing: ['No dates', '#7c3aed', '#f1ecfe'], fixed: ['Fixed law', '#536373', '#eef2f6'] };
 
 /** Logo bytes -> data URL (or ''). */
 export function logoDataUrl(buf) {
@@ -24,87 +19,96 @@ export function logoDataUrl(buf) {
 }
 
 /**
- * Report HTML. data: { cfg, items, logo (data URL), circulars: { total, latest, lastCheck }, printButton }
+ * The LEGAL REGISTER report – exactly the master workbook's structure, nothing added:
+ *   page 1: the DOCUMENT CONTROLLER sheet (facility title, "A. Document Control" and its 6 rows)
+ *   page 2+: the LEGAL REGISTER sheet (logo with RESTRICTED at the right, the title, and the table with the master's
+ *            7 columns: SL NO · NAME OF DEPARTMENT · ISSUED DATE · EXPIRY DATE · DUE DATE · RESPONSIBLE PERSON ·
+ *            COMPLIANCE – dates as dd/mm/yyyy, empty dates as in the master "______").
+ * Style 1 (master format) looks like the workbook (blue header row, Times New Roman headings, bold centred cells,
+ * thin black lines); styles 2-4 change only the presentation of this same structure.
  */
-/** The document style for the snapshot: the same 4 looks, accent colour, font and watermark as the Word documents. */
 function styleCss(style) {
-  if (!style) return '';
-  const a = /^#[0-9a-f]{6}$/i.test(style.accent || '') ? style.accent : '#1F3864';
-  const font = style.font ? `body { font-family: "${style.font.replace(/"/g, '')}", "Segoe UI", Arial, sans-serif; }` : '';
-  const base = `.top { border-bottom-color: ${a}; } h2 { color: ${a}; } table.reg th { background: ${a}; } .bar i { background: ${a}; } .btn { background: ${a}; }`;
+  const a = /^#[0-9a-f]{6}$/i.test(style?.accent || '') ? style.accent : '#1F3864';
+  const font = style?.font ? `body, table.reg td, .dc td { font-family: "${style.font.replace(/"/g, '')}", Calibri, Arial, sans-serif; }` : '';
   const looks = {
     classic: '',
-    split: `.grid { grid-template-columns: .95fr 1.7fr; } .grid > div:first-child { background: color-mix(in srgb, ${a} 9%, #fff); border-left: 5px solid ${a}; border-radius: 10px; padding: 10px 12px; }
-      .top { border-bottom-width: 0; } .top h1 { color: ${a}; }`,
-    minimal: `.top { border-bottom: 1px solid ${a}; } table.reg th { background: transparent; color: ${a}; border-bottom: 2px solid ${a}; }
-      .tile { border: 0; border-top: 3px solid; border-radius: 0; background: #f8fafc; } .badge { border-width: 1px; }`,
-    official: `body { border: 4px double ${a}; padding: 16px 18px; } .top { flex-direction: column; text-align: center; border-bottom: 2px solid ${a}; }
-      .top > div { flex-direction: column; } table.reg th { text-align: center; } table.reg td { border: 1px solid #d6dce6; }`,
+    // 2 · Executive Split: Document Control as a shaded sidebar next to the register (one page)
+    split: `.sheets { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 18px; align-items: start; }
+      .sheet.dc-sheet { page-break-after: auto; break-after: auto; background: color-mix(in srgb, ${a} 8%, #fff); border-left: 5px solid ${a}; border-radius: 8px; padding: 12px; }
+      .dc { width: 100%; } .dc th.t { background: ${a}; color: #fff; font-size: 13px; } .dc td { display: block; border: 0; padding: 2px 0; } .dc td.k { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: #5b6474; background: none; padding-top: 8px; }
+      .dc tr { display: block; } .dc, .dc tbody { display: block; min-width: 0; } .dc th { display: block; border: 0; white-space: normal; overflow-wrap: anywhere; } .dc th.t { border-radius: 6px; padding: 8px; line-height: 1.25; }
+      .lr-title { color: ${a}; text-decoration: none; text-align: left; font-size: 26px; border-bottom: 3px solid ${a}; padding-bottom: 4px; }
+      table.reg th { background: ${a}; color: #fff; }`,
+    // 3 · Corporate Minimalist: no fills, accent rules and hairlines, light typography
+    minimal: `.lr-title { text-decoration: none; font-family: "Segoe UI", Arial, sans-serif; font-weight: 700; font-size: 24px; text-align: left; letter-spacing: .02em; }
+      table.reg, table.reg th, table.reg td, .dc, .dc th, .dc td { border-left: 0 !important; border-right: 0 !important; }
+      table.reg th { background: none; color: ${a}; font-family: "Segoe UI", Arial, sans-serif; font-size: 11px; letter-spacing: .06em; border-top: 2px solid ${a}; border-bottom: 2px solid ${a}; }
+      table.reg td { border-color: #e3e6ec; font-weight: 600; } .dc th.t { background: none; color: ${a}; border-bottom: 2px solid ${a}; } .dc td { border-color: #e3e6ec; } .dc td.k { background: none; color: #5b6474; }`,
+    // 4 · Compact Official: a double frame, centred title, accent header, every line in the accent colour
+    official: `body { border: 4px double ${a}; padding: 18px 20px; } .lr-top { justify-content: center; flex-direction: column; align-items: center; gap: 6px; }
+      .lr-title { color: ${a}; text-decoration: none; letter-spacing: .08em; } table.reg th { background: ${a}; color: #fff; } table.reg, table.reg th, table.reg td, .dc, .dc th, .dc td { border-color: ${a}; }
+      .dc th.t { background: ${a}; color: #fff; }`,
   };
-  const mark = style.watermark ? `body::after { content: "${String(style.watermark).replace(/["\\<>]/g, '')}"; position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 90px; font-weight: 800; color: rgba(120, 130, 150, .09); white-space: nowrap; pointer-events: none; z-index: 9; }` : '';
-  return `${font}${base}${looks[style.id] || ''}${mark}`;
+  const mark = style?.watermark ? `body::after { content: "${String(style.watermark).replace(/["\\<>]/g, '')}"; position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 90px; font-weight: 800; color: rgba(120, 130, 150, .09); white-space: nowrap; pointer-events: none; z-index: 9; }` : '';
+  return `${font}${looks[style?.id] || ''}${mark}`;
 }
 
-export function reportHtml({ cfg, items, logo = '', circulars = {}, printButton = false, style = null }) {
+export function reportHtml({ cfg, items, logo = '', printButton = false, style = null }) {
   const d = cfg.documentControl.values;
-  const hl = registerHealth(items);
-  const pending = hl.expired + hl.expiring + hl.missing;
-  const pct = hl.total ? Math.round((hl.valid / hl.total) * 100) : 0;
-  const tile = (n, label, color) => `<div class="tile" style="border-top-color:${color}"><b style="color:${color}">${n}</b><span>${label}</span></div>`;
-  const rows = items.map(i => {
-    const [label, fg, bg] = STATUS[i.status] || STATUS.fixed;
-    return `<tr class="${i.fixed ? 'fixed' : ''}"><td class="c">${h(i.sl)}</td><td class="n">${h(i.name)}</td>
-      <td><span class="pill" style="color:${fg};background:${bg}">${label}</span></td>
-      <td class="d">${h(day(i.issued))}</td><td class="d">${i.status === 'lifetime' ? 'Lifetime' : h(day(i.expiry))}</td><td class="d">${i.status === 'lifetime' ? '—' : h(day(i.due))}</td><td>${h(i.responsible)}</td><td>${h(i.compliance)}</td></tr>`;
-  }).join('');
-  const now = new Date().toLocaleString('en-GB', { timeZone: 'Asia/Dubai', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${h(d.facilityTitle)} - Compliance Snapshot</title>
+  const blank = cfg.master?.noDate || '______';
+  const date = v => (ISO.test(v || '') ? `${v.slice(8, 10)}/${v.slice(5, 7)}/${v.slice(0, 4)}` : v && !/^_+$/.test(v) ? h(v) : blank);
+  const dmy = v => (ISO.test(v || '') ? `${v.slice(8, 10)}/${v.slice(5, 7)}/${v.slice(0, 4)}` : h(v || ''));
+  const rows = items.map(i => `<tr><td>${h(i.sl)}</td><td class="n">${h(i.name)}</td><td>${date(i.issued)}</td><td>${date(i.expiry)}</td><td>${date(i.due)}</td><td>${h(i.responsible || '')}</td><td>${h(i.compliance || '')}</td></tr>`).join('');
+  const dcRow = (k, v, dir = '') => `<tr><td class="k">${h(k)}</td><td${dir}>${v}</td></tr>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${h(d.facilityTitle)}</title>
 <style>
-  @page { size: A4 landscape; margin: 12mm 12mm 14mm; }
-  * { box-sizing: border-box; } body { font: 11.5px/1.45 "Segoe UI", Arial, sans-serif; color: #15232b; margin: 0; padding: 18px; }
+  @page { size: A4 landscape; margin: 12mm; }
+  * { box-sizing: border-box; } body { font: 12px/1.35 Calibri, "Segoe UI", Arial, sans-serif; color: #000; margin: 0; padding: 16px; }
   @media print { body { padding: 0; } .noprint { display: none !important; } }
-  .top { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 3px solid #0f766e; padding-bottom: 10px; margin-bottom: 12px; }
-  .top img { max-height: 62px; max-width: 260px; object-fit: contain; }
-  .top h1 { font-size: 18px; margin: 0; } .top .sub { color: #5f6f7f; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; font-weight: 700; }
-  .badge { border: 2px solid #c0262d; color: #c0262d; border-radius: 6px; padding: 3px 10px; font-weight: 800; font-size: 12px; white-space: nowrap; }
-  .grid { display: grid; grid-template-columns: 1.05fr 1.6fr; gap: 16px; align-items: start; margin-bottom: 12px; }
-  .grid table { min-width: 0 !important; width: 100%; margin: 0 !important; }
-  .tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
-  .tile { border: 1px solid #e3e8ef; border-top: 4px solid; border-radius: 8px; padding: 8px 10px; }
-  .tile b { display: block; font-size: 22px; line-height: 1.1; } .tile span { color: #5f6f7f; font-size: 10.5px; font-weight: 600; }
-  .score { margin-top: 8px; font-size: 11px; color: #5f6f7f; } .bar { height: 8px; border-radius: 9px; background: #eef2f6; overflow: hidden; margin-top: 4px; } .bar i { display: block; height: 100%; background: linear-gradient(90deg,#0f766e,#22c55e); }
-  h2 { font-size: 13px; margin: 6px 0; color: #0f766e; text-transform: uppercase; letter-spacing: .05em; }
-  table.reg { border-collapse: collapse; width: 100%; } table.reg th { background: #0f766e; color: #fff; text-align: left; padding: 6px 7px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }
-  table.reg td { border-bottom: 1px solid #e3e8ef; padding: 6px 7px; vertical-align: top; } table.reg td.c { text-align: center; color: #5f6f7f; } table.reg td.n { font-weight: 600; } table.reg td.d { white-space: nowrap; }
-  table.reg tr.fixed td { color: #5f6f7f; background: #f7f9fc; } table.reg tr { page-break-inside: avoid; break-inside: avoid; }
-  /* clean page breaks: the table header repeats on every page, headings stay with what follows, blocks never split */
-  table.reg thead { display: table-header-group; } table.reg tfoot { display: table-footer-group; }
-  h1, h2, .sub { page-break-after: avoid; break-after: avoid; }
-  .top, .grid, .tiles, .tile, .score, .foot, .grid table { page-break-inside: avoid; break-inside: avoid; }
-  h2 + table.reg tbody tr:first-child { page-break-before: avoid; break-before: avoid; }
-  .pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-weight: 700; font-size: 10px; white-space: nowrap; }
-  .foot { margin-top: 10px; color: #5f6f7f; font-size: 10px; display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid #e3e8ef; padding-top: 6px; }
-  .btn { position: fixed; top: 14px; right: 16px; padding: 7px 14px; border-radius: 8px; border: 0; background: #0f766e; color: #fff; font: 600 13px "Segoe UI"; cursor: pointer; }
+  .btn { position: fixed; top: 14px; right: 16px; padding: 7px 14px; border-radius: 8px; border: 0; background: #1f3864; color: #fff; font: 600 13px "Segoe UI"; cursor: pointer; }
+  /* DOCUMENT CONTROLLER sheet */
+  .sheet.dc-sheet { page-break-after: always; break-after: page; }
+  .dc { border-collapse: collapse; width: 60%; min-width: 420px; }
+  .dc th, .dc td { border: 1px solid #000; padding: 6px 9px; vertical-align: middle; }
+  .dc th.t { font: 700 16px "Times New Roman", serif; text-align: center; background: #4f81bd; }
+  .dc th.s { font: 700 13px "Times New Roman", serif; text-align: left; }
+  .dc td.k { font-weight: 700; width: 45%; }
+  /* LEGAL REGISTER sheet */
+  .lr-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 6px; }
+  .lr-top img { max-height: 70px; max-width: 320px; object-fit: contain; }
+  .lr-class { font-weight: 700; white-space: nowrap; }
+  .lr-title { font: 700 25px "Times New Roman", serif; text-decoration: underline; text-align: center; margin: 4px 0 10px; page-break-after: avoid; break-after: avoid; }
+  table.reg { border-collapse: collapse; width: 100%; table-layout: fixed; }
+  table.reg col.c1 { width: 3.0%; } table.reg col.c2 { width: 29.6%; } table.reg col.c3 { width: 11.2%; } table.reg col.c4 { width: 11.3%; }
+  table.reg col.c5 { width: 10.3%; } table.reg col.c6 { width: 22.8%; } table.reg col.c7 { width: 12.8%; }
+  table.reg th, table.reg td { border: 1px solid #000; padding: 6px 5px; text-align: center; vertical-align: middle; }
+  table.reg th { font: 700 12px "Times New Roman", serif; background: #4f81bd; }
+  table.reg td { font-weight: 700; font-size: 12px; overflow-wrap: anywhere; }
+  table.reg td:nth-child(1), table.reg td:nth-child(3), table.reg td:nth-child(4), table.reg td:nth-child(5) { white-space: nowrap; overflow-wrap: normal; }
+  @media screen { body { min-width: 1000px; } }
+  table.reg thead { display: table-header-group; } table.reg tr { page-break-inside: avoid; break-inside: avoid; }
   ${styleCss(style)}
 </style></head><body>
 ${printButton ? '<button class="btn noprint" onclick="print()">Print / Save as PDF</button>' : ''}
-<div class="top">
-  <div style="display:flex;align-items:center;gap:14px">${logo ? `<img src="${logo}" alt="">` : ''}<div><div class="sub">${h(FIXED.registerTitle)} · Compliance snapshot</div><h1>${h(d.facilityTitle)}</h1></div></div>
-  <span class="badge" dir="auto">${h(FIXED.classification)}</span>
+<div class="sheets">
+  <section class="sheet dc-sheet">
+    <table class="dc">
+      <tr><th class="t" colspan="2">${h(d.facilityTitle)}</th></tr>
+      <tr><th class="s" colspan="2">A. Document Control</th></tr>
+      ${dcRow('Document Number', h(d.documentNumber))}${dcRow('Date of Release', dmy(d.releaseDate))}${dcRow('Document Approver', h(d.approver))}
+      ${dcRow('Document Author(s)', h(d.authors))}${dcRow('Version No.', h(d.version))}${dcRow('Document Classification', h(d.classification), ' dir="auto"')}
+    </table>
+  </section>
+  <section class="sheet lr-sheet">
+    <div class="lr-top">${logo ? `<img src="${logo}" alt="">` : '<span></span>'}<span class="lr-class" dir="auto">${h(FIXED.classification)}</span></div>
+    <h1 class="lr-title">${h(FIXED.registerTitle)}</h1>
+    <table class="reg">
+      <colgroup><col class="c1"><col class="c2"><col class="c3"><col class="c4"><col class="c5"><col class="c6"><col class="c7"></colgroup>
+      <thead><tr><th>SL NO</th><th>NAME OF DEPARTMENT</th><th>ISSUED DATE</th><th>EXPIRY DATE</th><th>DUE DATE</th><th>RESPONSIBLE PERSON</th><th>COMPLIANCE</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </section>
 </div>
-<div class="grid">
-  <div>${documentHeader(cfg)}</div>
-  <div>
-    <h2>Compliance status</h2>
-    <div class="tiles">${tile(hl.total, 'Total entries', '#0f766e')}${tile(hl.valid, 'Valid', '#15803d')}${tile(hl.expiring, 'Expire ≤ 30 days', '#b45309')}${tile(hl.expired, 'Expired', '#c0262d')}${tile(pending, 'Pending action', '#7c3aed')}</div>
-    <div class="score">${pct}% of facility entries valid${hl['no-expiry'] ? ` · ${hl['no-expiry']} without expiry date` : ''} · 6 federal laws fixed
-      <div class="bar"><i style="width:${pct}%"></i></div></div>
-    <div class="score">DoH circulars in the register: <b>${h(circulars.total ?? '–')}</b>${circulars.latest ? ` (latest ${h(circulars.latest)})` : ''} · last DoH check: <b>${h(circulars.lastCheck || 'never')}</b></div>
-  </div>
-</div>
-<h2>LEGAL REGISTER</h2>
-<table class="reg"><thead><tr><th>SL</th><th>Name of department</th><th>Status</th><th>Issued</th><th>Expiry</th><th>Due</th><th>Responsible person</th><th>Compliance</th></tr></thead><tbody>${rows}</tbody></table>
-<div class="foot"><span>${h(d.documentNumber)} · Version ${h(d.version)} · Date of Release ${h(day(d.releaseDate))}</span><span>Generated ${h(now)} (Asia/Dubai) by the Legal Register Portal</span><span dir="auto">${h(FIXED.classification)}</span></div>
 </body></html>`;
 }
 
