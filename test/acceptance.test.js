@@ -776,6 +776,23 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
     assert.ok(adminList.list.some(f => f.id === mgrId) && adminList.list.some(f => f.id === 'br2'), 'admin sees every facility');
     assert.equal((await fetch(`${base}/api/status?f=${mgrId}`, { headers: { Cookie: adminCookie } })).status, 200);
     assert.equal((await fetch(`${base}/api/log`, { headers: { Cookie: adminCookie } })).status, 200);
+
+    // audit trail: what the user did on the facility, with exact times – for administrators only
+    assert.equal((await fetch(`${base}/api/facilities/${mgrId}/activity`, nb)).status, 403, 'users cannot read the audit trail');
+    const act = await (await fetch(`${base}/api/facilities/${mgrId}/activity?user=newbie`, { headers: { Cookie: adminCookie } })).json();
+    const acts = act.items.map(e => e.action);
+    assert.ok(act.items.every(e => e.user === 'newbie' && !Number.isNaN(Date.parse(e.at)) && e.at.includes('T')), 'one user, exact timestamps');
+    assert.ok(acts.some(a => /^Asked to change the facility details: “New phone number 0501112222”/.test(a)), acts.join(' | '));
+    assert.ok(acts.includes('Downloaded the facility pack (ZIP)'), 'downloads are recorded');
+    assert.ok(acts.includes('Signed in'), 'sign-ins are recorded');
+    assert.ok(act.items.some(e => e.result !== 'ok'), 'blocked / refused attempts are recorded too');
+    const auditFile = fs.readFileSync(path.join((await import('../src/config.js')).dir((await import('../src/config.js')).loadGlobalConfig(), 'data'), 'audit.jsonl'), 'utf8');
+    assert.ok(!/Newbie-Pass-2026|Admin-Pass-2026|Viewer-Own-Pass-9|Temp-Pass-12345/.test(auditFile), 'no passwords in the audit trail');
+    assert.equal((await post(`/api/facilities/${mgrId}/change-request`, { note: 'Please change the facility name' }, newbieCookie)).status, 200);
+    assert.equal((await post(`/api/facilities/${mgrId}/decline`, { reason: 'Send the trade licence first' }, newbieCookie)).status, 403, 'only admins decline');
+    assert.equal((await post(`/api/facilities/${mgrId}/decline`, { reason: 'Send the trade licence first' }, adminCookie)).status, 200);
+    const dec = (await (await fetch(`${base}/api/facilities`, nb)).json()).list.find(f => f.id === mgrId);
+    assert.equal(dec.changeRequest, null); assert.equal(dec.changeDeclined.reason, 'Send the trade licence first', 'the user sees the answer');
     assert.equal((await fetch(`${base}/api/facilities/${mgrId}`, { method: 'DELETE', headers: { Cookie: adminCookie } })).status, 200, 'admin removes it');
     assert.equal((await fetch(`${base}/api/facilities/${secondId}`, { method: 'DELETE', headers: { Cookie: adminCookie } })).status, 200);
     assert.equal((await put('/api/facilities-template', { id: null }, adminCookie)).status, 200);

@@ -69,12 +69,13 @@ async function loadFacilities() {
     <td>${healthBar(f.health)}</td>
     <td class="small">${f.lock ? `<span class="tag warn">${esc(f.lock)}</span>` : '<span class="tag ok">Ready</span>'}
       ${f.editUnlock ? `<br><span class="tag warn" title="Allowed by ${esc(f.editUnlock.by)}">✎ Edits allowed until ${fmt(f.editUnlock.until)}</span>` : f.detailsLocked ? '<br><span class="tag na"><i class=i-lock></i> Details locked</span>' : ''}
-      ${f.changeRequest ? `<div class="chg-req"><b>Change requested by ${esc(f.changeRequest.by)}</b> · ${fmt(f.changeRequest.at)}<br>“${esc(f.changeRequest.note)}”</div>` : ''}</td>
+      ${f.changeRequest ? `<div class="chg-req"><b>Change requested by ${esc(f.changeRequest.by)}</b> · ${fmt(f.changeRequest.at)}<br>“${esc(f.changeRequest.note)}”${me?.role === 'admin' ? `<button type="button" class="link-btn small chg-review" data-activity="${esc(f.id)}" data-user="${esc(f.changeRequest.by)}"><i class=i-eye></i> Review activity &amp; decide</button>` : ''}</div>` : ''}</td>
     <td class="num">${f.lastSuccess ? fmt(f.lastSuccess) : 'Never'}</td><td>${f.lastStatus ? tagFor(f.lastStatusCode, f.lastStatus) : '–'}</td>
     <td><div class="row-actions">
       ${f.finalized && !f.editUnlock ? `<button class="icon-btn" data-admin data-unlock="${esc(f.id)}" title="Let this facility's users change its details for 24 hours">${f.changeRequest ? '✓ Allow edits (24 h)' : 'Allow edits'}</button>` : ''}
       ${f.editUnlock ? `<button class="icon-btn" data-admin data-relock="${esc(f.id)}"><i class=i-lock></i> Lock again</button>` : ''}
       ${!f.finalized && f.createdBy ? `<button class="icon-btn" data-admin data-relock="${esc(f.id)}" title="Lock its details now (otherwise they lock when its policies are created)"><i class=i-lock></i> Lock details</button>` : ''}
+      <button class="icon-btn" data-admin data-activity="${esc(f.id)}" data-user="${esc(f.changeRequest?.by || f.createdBy || '')}" title="What this facility's users did – with exact times">Activity</button>
       ${f.id === facility ? '' : `<button class="icon-btn" data-open="${esc(f.id)}">Open</button>`}
       <button class="icon-btn" data-write data-edit="${esc(f.id)}">Edit</button>
       <button class="icon-btn del" data-admin data-del="${esc(f.id)}" ${f.isDefault ? 'disabled title="The default facility cannot be removed"' : ''}>Delete</button>
@@ -86,6 +87,7 @@ async function loadFacilities() {
     try { const r = await apiGlobal(`/api/facilities/${encodeURIComponent(b.dataset.unlock)}/unlock`, { method: 'POST', body: JSON.stringify({ hours: 24 }) }); toast(`Edits allowed until ${fmt(r.until)} – then the details lock again by themselves`); await loadFacilities(); }
     catch (e) { toast(`<i class=i-alert></i> ${esc(e.message)}`); }
   });
+  $$('#fac-tbl [data-activity]').forEach(b => b.onclick = () => openActivity(b.dataset.activity, b.dataset.user));
   $$('#fac-tbl [data-relock]').forEach(b => b.onclick = async () => {
     try { await apiGlobal(`/api/facilities/${encodeURIComponent(b.dataset.relock)}/lock`, { method: 'POST', body: '{}' }); toast('Details locked again'); await loadFacilities(); }
     catch (e) { toast(`<i class=i-alert></i> ${esc(e.message)}`); }
@@ -108,7 +110,9 @@ function renderFacLock() {
   for (const sel of ['#pp-form', '#pp-assets', '#doc-form', '#profile-form']) { const el = $(sel); if (el) el.inert = locked; }
   const html = locked
     ? `<span class="fl-ic" aria-hidden="true"><i class=i-lock></i></span><div><b>${esc(LOCK_WARNING)}</b>
-        <span>${f.changeRequest ? `Your change request was sent on ${fmt(f.changeRequest.at)} – an administrator will allow the edit.` : 'Need to correct something? Send a change request – an administrator allows the edit.'}</span></div>
+        <span>${f.changeRequest ? `Your change request was sent on ${fmt(f.changeRequest.at)} – an administrator will allow the edit.`
+          : f.changeDeclined ? `Your change request of ${fmt(f.changeDeclined.at)} was declined on ${fmt(f.changeDeclined.declinedAt)}${f.changeDeclined.reason ? `: “${esc(f.changeDeclined.reason)}”` : ''}. You can send a new request.`
+          : 'Need to correct something? Send a change request – an administrator allows the edit.'}</span></div>
         <button type="button" class="btn small" data-chg-req>${f.changeRequest ? 'Update the request' : 'Request a change'}</button>`
     : open ? `<span class="fl-ic" aria-hidden="true">✎</span><div><b>An administrator allowed edits until ${fmt(f.editUnlock.until)}.</b><span>After that the details lock again by themselves.</span></div>` : '';
   for (const [host, id, where] of [['#pp-steps', 'fac-lock-pol', 'beforebegin'], ['#fac-settings', 'fac-lock-set', 'afterbegin']]) {
@@ -138,6 +142,73 @@ $('#lk-send').onclick = async () => {
     $('#lk-msg').textContent = 'Sent – an administrator will allow the edit. You will see it here when they do.';
     await loadFacilities();
   } catch (e) { $('#lk-msg').textContent = e.message; }
+};
+
+/**
+ * Administrators: a facility's audit trail – what its users did, with exact times (policies / documents created,
+ * downloads, checklist and register changes, facility details, sign-ins) – next to a pending change request, so the
+ * request can be checked against the activity before edits are allowed or the request is declined.
+ */
+const ACT_ICON = { account: 'user', facility: 'building', policies: 'doc', hr: 'doc', download: 'download', checklist: 'target', register: 'book', admin: 'gear', other: 'clock' };
+let actState = null;
+async function openActivity(fid, user) {
+  const dlg = $('#act-dlg');
+  actState = { fid, user: user || '', who: user ? 'user' : 'all', area: '', data: null };
+  $$('#act-who [data-who]').forEach(b => b.classList.toggle('on', b.dataset.who === actState.who));
+  $('#act-who [data-who="user"]').hidden = !user;
+  $$('#act-area [data-area]').forEach(b => b.classList.toggle('on', !b.dataset.area));
+  $('#act-list').innerHTML = '<p class="muted small"><span class="spin"></span> Loading the activity…</p>';
+  $('#act-req').innerHTML = '';
+  if (!dlg.open) dlg.showModal();
+  await loadActivity();
+}
+async function loadActivity() {
+  const s = actState;
+  try {
+    s.data = await apiGlobal(`/api/facilities/${encodeURIComponent(s.fid)}/activity?limit=300${s.who === 'user' && s.user ? `&user=${encodeURIComponent(s.user)}` : ''}`);
+  } catch (e) { $('#act-list').innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
+  renderActivity();
+}
+function renderActivity() {
+  const { data: d, area } = actState;
+  const f = d.facility, cr = d.changeRequest;
+  $('#act-title').textContent = `Activity · ${f.name}`;
+  $('#act-sub').innerHTML = `${esc(f.code)}${f.createdBy ? ` · created by <b>${esc(f.createdBy)}</b>` : ''}${f.createdAt ? ` on ${fmt(f.createdAt)}` : ''}${f.finalizedAt ? ` · details locked since ${fmt(f.finalizedAt)}` : ''}`;
+  $('#act-req').innerHTML = cr ? `<div class="act-request"><span class="act-req-ic" aria-hidden="true"><i class=i-lock></i></span><div>
+      <b>Change requested by ${esc(cr.by)}</b><small class="muted">${fmt(cr.at)}</small>
+      <p class="act-reason">“${esc(cr.note)}”</p>
+      <small class="muted">Check the activity below – e.g. whether policies were already created or downloaded with the current details – before you allow the edit.</small></div></div>`
+    : d.editUnlock && Date.parse(d.editUnlock.until) > Date.now() ? `<div class="act-request open"><span class="act-req-ic" aria-hidden="true">✎</span><div><b>Edits allowed until ${fmt(d.editUnlock.until)}</b><small class="muted">by ${esc(d.editUnlock.by)}</small></div></div>` : '';
+  $('#act-allow').hidden = !cr; $('#act-relock').hidden = !cr;
+  const want = area ? area.split(',') : null;
+  const items = d.items.filter(e => !want || want.includes(e.area));
+  // a short summary of what the user did – the things an administrator checks first
+  const count = re => d.items.filter(e => e.result === 'ok' && re.test(e.action)).length;
+  const sum = [[count(/^Created the policies/), 'policy packs created'], [count(/^Created the (HR|3rd-party) documents/), 'document sets created'], [d.items.filter(e => e.area === 'download' && e.result === 'ok').length, 'downloads'],
+    [count(/^(Changed facility details|Changed policy details|Uploaded the|Changed document control)/), 'details changes'], [d.items.filter(e => /^blocked/.test(e.result)).length, 'blocked attempts']];
+  const day = iso => new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+  let last = '';
+  $('#act-list').innerHTML = `<div class="act-sum">${sum.map(([n, l]) => `<span><b>${n}</b>${l}</span>`).join('')}</div>` + (items.map(e => {
+    const dd = day(e.at), head = dd !== last ? `<div class="act-day">${dd}</div>` : '';
+    last = dd;
+    const t = new Date(e.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return `${head}<div class="act-row ${e.result === 'ok' ? '' : 'bad'}" role="listitem">
+      <span class="act-ic" aria-hidden="true"><i class=i-${ACT_ICON[e.area] || 'clock'}></i></span>
+      <div class="act-what"><b>${esc(e.action)}</b><small class="muted">${esc(e.user)}${e.role ? ` (${esc(e.role)})` : ''}${e.ip ? ` · ${esc(e.ip)}` : ''}</small></div>
+      <span class="act-res">${e.result === 'ok' ? '' : `<span class="tag warn">${esc(e.result)}</span>`}<time datetime="${esc(e.at)}" title="${esc(e.at)}">${t}</time></span></div>`;
+  }).join('') || '<p class="muted small">No activity recorded yet. (Actions are recorded from now on.)</p>');
+}
+$$('#act-who [data-who]').forEach(b => b.onclick = () => { actState.who = b.dataset.who; $$('#act-who [data-who]').forEach(x => x.classList.toggle('on', x === b)); loadActivity(); });
+$$('#act-area [data-area]').forEach(b => b.onclick = () => { actState.area = b.dataset.area; $$('#act-area [data-area]').forEach(x => x.classList.toggle('on', x === b)); renderActivity(); });
+$('#act-allow').onclick = async () => {
+  try { const r = await apiGlobal(`/api/facilities/${encodeURIComponent(actState.fid)}/unlock`, { method: 'POST', body: JSON.stringify({ hours: 24 }) }); toast(`Edits allowed until ${fmt(r.until)} – then the details lock again by themselves`); $('#act-dlg').close(); await loadFacilities(); }
+  catch (e) { toast(`<i class=i-alert></i> ${esc(e.message)}`); }
+};
+$('#act-relock').onclick = async () => {
+  const reason = prompt('Decline the request – the details stay locked.\n\nReason shown to the user (optional):', '');
+  if (reason === null) return;
+  try { await apiGlobal(`/api/facilities/${encodeURIComponent(actState.fid)}/decline`, { method: 'POST', body: JSON.stringify({ reason }) }); toast('Request declined – the details stay locked'); $('#act-dlg').close(); await loadFacilities(); }
+  catch (e) { toast(`<i class=i-alert></i> ${esc(e.message)}`); }
 };
 
 /** Stacked bar + counts of a facility's register entries by status. */

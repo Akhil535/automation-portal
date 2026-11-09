@@ -1197,6 +1197,18 @@
     <p class="small muted" id="lk-msg" role="status"></p>
   </form>
 </dialog>
+<dialog id="act-dlg" class="act-dlg" aria-labelledby="act-title">
+  <form method="dialog">
+    <header class="act-head"><div><h2 id="act-title">Activity</h2><p class="muted small" id="act-sub"></p></div><button class="icon-btn" value="close" aria-label="Close">✕</button></header>
+    <div id="act-req"></div>
+    <div class="act-tools">
+      <div class="viewswitch" id="act-who" role="group" aria-label="Show"><button type="button" data-who="user" class="on">This user</button><button type="button" data-who="all">Everyone on this facility</button></div>
+      <div class="viewswitch" id="act-area" role="group" aria-label="Kind"><button type="button" data-area="" class="on">All</button><button type="button" data-area="facility">Facility details</button><button type="button" data-area="policies,hr">Documents</button><button type="button" data-area="download">Downloads</button><button type="button" data-area="checklist,register">Checklist &amp; register</button></div>
+    </div>
+    <div class="act-list" id="act-list" role="list"></div>
+    <div class="btn-row act-foot"><button class="btn" value="close">Close</button><button type="button" class="btn" id="act-relock" hidden><i class=i-lock></i> Decline – keep locked</button><button type="button" class="btn primary" id="act-allow" hidden>✓ Allow edits (24 h)</button></div>
+  </form>
+</dialog>
 <dialog id="welcome-dlg" class="welcome-dlg" aria-labelledby="wl-title" aria-describedby="wl-text">
   <form method="dialog">
     <div class="wl-glow" aria-hidden="true"></div>

@@ -22,6 +22,7 @@ import { MODULE_KEYS, buildPackage, packageTree } from './src/package.js';
 import { allowedSet, checkFreeRows, freeRegisterRows, maskMaster, checkChecklistItem, checkTrialApply, checklistFree, claim, claimUpload, maskChecklist, createdFacilities, facilityAllowance, isTrial, planInfo, setTrialLimits, trialLimits, upgradeError, upgradeUrl } from './src/plans.js';
 import { addForms, addItem, checklistXlsx, crossCheck, formFile, formsStatus, formsZip, generateForms, getChecklist, pdfState, prewarmPdfs, saveDocSettings, GROUPS, importMasterChecklist, listForms, masterChecklist, removeForm, removeItem, resetChecklist, updateItem } from './src/hrforms.js';
 import { documentHeader, sendMail } from './src/mailer.js';
+import { describe as describeAction, readAudit, record as recordAudit } from './src/audit.js';
 import { lockReason, readLogo, readRegister } from './src/xlsx.js';
 import { imageSize } from './src/policy.js';
 import { htmlToPdf, logoDataUrl, reportHtml } from './src/report.js';
@@ -39,6 +40,26 @@ const app = express();
 app.disable('x-powered-by');
 const jsonSmall = express.json({ limit: '1mb' });
 app.use((req, res, next) => (['/api/policies/preview', '/api/policies/picture-detect'].includes(req.path) ? next() : jsonSmall(req, res, next))); // these carry pictures
+
+// Audit trail: every meaningful action (sign-ins, facility details, policies / HR documents, downloads, checklist and
+// LEGAL REGISTER changes, change requests) is recorded when its response is sent – who, when, which facility, result.
+app.use((req, res, next) => {
+  res.on('finish', () => {
+    try {
+      const d = describeAction(req);
+      const login = req.path === '/api/auth/login';
+      if (!d || (res.statusCode === 401 && !login)) return;
+      const user = req.user?.username || (login ? String(req.body?.username || '').trim().slice(0, 60) : '');
+      if (!user) return;
+      const fm = req.path.match(/^\/api\/facilities\/([^/]+)/);
+      const facility = login ? null : (fm && !['upload', 'check-path'].includes(fm[1]) ? fm[1] : null) || req.query.f || req.facOverride || loadFacilities().default || null;
+      const st = res.statusCode;
+      const result = st < 400 ? 'ok' : st === 402 ? 'blocked – Premium' : st === 423 ? 'blocked – details locked' : st === 403 ? 'not allowed' : 'failed';
+      recordAudit({ user, role: req.user?.role || null, facility, area: d.area, action: login && st >= 400 ? 'Sign-in failed' : d.action, result, ip: clientIp(req) });
+    } catch (e) { console.log(`audit: ${e.message}`); }
+  });
+  next();
+});
 
 // ===================================================================================================
 // Security: sign-in with username + password + 2FA, sessions, roles (RBAC), facility scoping
@@ -92,7 +113,7 @@ const NEW_PACK = new Set(['/api/policies', '/api/policies/preview', '/api/polici
 function requiredRole(req) {
   const p = req.path, m = req.method;
   if (p.startsWith('/api/account/') || p === '/api/me' || p === '/api/plan' || p === '/api/plan/request') return 'viewer';
-  if (/^\/api\/facilities\/[^/]+\/(unlock|lock)$/.test(p)) return 'admin'; // unlocking a facility's details
+  if (/^\/api\/facilities\/[^/]+\/(unlock|lock|activity|decline)$/.test(p)) return 'admin'; // unlocking a facility's details
   if (m === 'DELETE') return 'admin'; // deleting (entries, items, pictures, facilities, users…) is for administrators only
   if (p === '/api/plans' || p === '/api/welcome') return m === 'GET' ? 'viewer' : 'admin';
   if (p === '/api/assistant/ask') return 'viewer'; // everyone may ask (read-only answers)
@@ -319,7 +340,7 @@ function facilitySummary(f, def) {
   const last = store.data.runs[0];
   return {
     id: f.id, code: f.code, name: f.name, title: f.title, isDefault: f.id === def, registerPath: cfg.register.path, createdBy: f.createdBy || null, createdAt: f.createdAt || null,
-    finalized: finalized(f), detailsLocked: detailsLocked(f), editUnlock: editsAllowed(f) ? f.editUnlock : null, changeRequest: f.changeRequest || null,
+    finalized: finalized(f), detailsLocked: detailsLocked(f), editUnlock: editsAllowed(f) ? f.editUnlock : null, changeRequest: f.changeRequest || null, changeDeclined: f.changeDeclined || null,
     lastSuccess: store.meta.lastSuccess || null, lastStatus: last?.statusLabel || null, lastStatusCode: last?.status || null,
     lock: cfg.register.path ? lockReason(cfg.register.path) : 'No master register linked',
   };
@@ -383,6 +404,30 @@ app.post('/api/facilities/:id/change-request', wrap(async (req, res) => {
     sendMail(loadConfig(), `Facility change requested: ${f.name} (${f.code})`, `<p><b>${h(req.user.username)}</b> asks to change the details of <b>${h(f.name)}</b> (${h(f.code)}):</p><p>${h(note)}</p><p>Allow edits in Admin console → Facilities.</p>`, admins)
       .catch(e => console.log(`change request notice not sent: ${e.message}`));
   }
+  res.json({ ok: true });
+}));
+/**
+ * Administrators: the activity of a facility's users, newest first – to check what was done (policies created,
+ * downloads, checklist and register changes…) before allowing a change of its details. ?user= one user only.
+ */
+app.get('/api/facilities/:id/activity', wrap(async (req, res) => {
+  const f = loadFacilities().list.find(x => x.id === req.params.id);
+  if (!f) throw new Error('Facility not found');
+  const user = req.query.user ? String(req.query.user) : null;
+  const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 150));
+  const items = readAudit({ facility: f.id, user, limit });
+  // the user's sign-ins belong to no facility – they show when the user was in the portal
+  const logins = user ? readAudit({ user, limit: 400 }).filter(e => e.area === 'account').slice(0, 30) : [];
+  const all = [...items, ...logins].sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, limit);
+  res.json({ facility: { id: f.id, name: f.name, code: f.code, createdBy: f.createdBy || null, createdAt: f.createdAt || null, finalizedAt: f.finalizedAt || f.policyPrep?.lastGenerated || null },
+    changeRequest: f.changeRequest || null, editUnlock: f.editUnlock || null, items: all });
+}));
+/** Administrators: turn a change request down – the details stay locked; the user sees the answer. */
+app.post('/api/facilities/:id/decline', wrap(async (req, res) => {
+  const f = loadFacilities().list.find(x => x.id === req.params.id);
+  if (!f) throw new Error('Facility not found');
+  const reason = String(req.body?.reason || '').trim().slice(0, 300);
+  updateFacility(f.id, { changeRequest: null, changeDeclined: f.changeRequest ? { ...f.changeRequest, declinedBy: req.user.username, declinedAt: new Date().toISOString(), reason } : null });
   res.json({ ok: true });
 }));
 /** Administrators: allow the facility's users to edit its details for a while (default 24 h), or lock it again. */
