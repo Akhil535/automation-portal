@@ -54,7 +54,7 @@
       <div class="sb-label sb-admin-label" data-admin>Administration</div>
       <button data-tab="admin" data-adm="masters" data-admin><svg class="ico" viewBox="0 0 24 24"><path d="M8 3h9l4 4v11a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M3 7v12a2 2 0 0 0 2 2h10M12 11h5M12 15h5"/></svg>Policy templates</button>
       <button data-tab="admin" data-adm="facilities" data-admin><svg class="ico" viewBox="0 0 24 24"><path d="M4 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M16 9h2a2 2 0 0 1 2 2v10M2 21h20M8 7h4M8 11h4M8 15h4"/></svg>Facilities</button>
-      <button data-tab="admin" data-adm="users" data-admin><svg class="ico" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M16 3.1a4 4 0 0 1 0 7.8M22 21a7 7 0 0 0-4-6.3"/></svg>Users &amp; access<span class="sb-badge" id="sb-pending" hidden></span></button>
+      <button data-tab="admin" data-adm="users" data-admin><svg class="ico" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M16 3.1a4 4 0 0 1 0 7.8M22 21a7 7 0 0 0-4-6.3"/></svg>Users &amp; access<span class="sb-badge" id="sb-pending" hidden></span><span class="sb-badge req" id="sb-requests" hidden title="Facility change requests waiting"></span></button>
       <button data-tab="admin" data-adm="schedule" data-admin><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M12 14v3l2 1"/></svg>Schedule &amp; email</button>
       <button data-tab="admin" data-adm="logs" data-admin><svg class="ico" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>Activity log</button>
     </nav>
@@ -694,6 +694,11 @@
       </div>
 
       <div id="users-panel" class="sub settings" data-admin>
+        <div class="panel pend-panel req-panel" id="requests-panel" hidden>
+          <h2>Facility change requests <span class="pend-count" id="requests-count"></span></h2>
+          <p class="muted small">Users whose facility details are locked asked for a change. Open a request to read the reason next to everything the user did (policies created, downloads, checklist and register changes, with exact times) – then allow edits for 24 hours or decline.</p>
+          <div class="pend-list" id="requests-list"></div>
+        </div>
         <div class="panel pend-panel" id="pending-panel" hidden>
           <h2>Access requests <span class="pend-count" id="pending-count"></span></h2>
           <p class="muted small">People who created an account on the sign-in page. Choose their role and facilities, then approve – they can sign in straight away and set up two-factor authentication. Declining deletes the request.</p>

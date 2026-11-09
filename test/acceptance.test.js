@@ -789,6 +789,12 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
     const auditFile = fs.readFileSync(path.join((await import('../src/config.js')).dir((await import('../src/config.js')).loadGlobalConfig(), 'data'), 'audit.jsonl'), 'utf8');
     assert.ok(!/Newbie-Pass-2026|Admin-Pass-2026|Viewer-Own-Pass-9|Temp-Pass-12345/.test(auditFile), 'no passwords in the audit trail');
     assert.equal((await post(`/api/facilities/${mgrId}/change-request`, { note: 'Please change the facility name' }, newbieCookie)).status, 200);
+    // Users & access: the user's pending request and work history across facilities
+    const ua = await (await fetch(`${base}/api/users/${asked.id}/activity`, { headers: { Cookie: adminCookie } })).json();
+    assert.equal(ua.user.username, 'newbie');
+    assert.deepEqual(ua.requests.map(r => [r.facility.id, r.changeRequest.note]), [[mgrId, 'Please change the facility name']], 'the pending request with its reason');
+    assert.ok(ua.items.length && ua.items.every(e => e.user === 'newbie'), 'their work history');
+    assert.equal((await fetch(`${base}/api/users/${asked.id}/activity`, nb)).status, 403, 'administrators only');
     assert.equal((await post(`/api/facilities/${mgrId}/decline`, { reason: 'Send the trade licence first' }, newbieCookie)).status, 403, 'only admins decline');
     assert.equal((await post(`/api/facilities/${mgrId}/decline`, { reason: 'Send the trade licence first' }, adminCookie)).status, 200);
     const dec = (await (await fetch(`${base}/api/facilities`, nb)).json()).list.find(f => f.id === mgrId);

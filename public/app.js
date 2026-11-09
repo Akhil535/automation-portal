@@ -93,7 +93,48 @@ async function loadFacilities() {
     catch (e) { toast(`<i class=i-alert></i> ${esc(e.message)}`); }
   });
   renderFacLock();
+  renderRequests();
 }
+
+/** Administrators: facility change requests waiting – a panel in Users & access and a badge in the menu. */
+let usersCache = [];
+function renderRequests() {
+  if (me?.role !== 'admin') return;
+  const reqs = facilities.filter(f => f.changeRequest).sort((a, b) => (a.changeRequest.at < b.changeRequest.at ? 1 : -1));
+  const badge = $('#sb-requests'); if (badge) { badge.hidden = !reqs.length; badge.textContent = reqs.length; }
+  const panel = $('#requests-panel'); if (!panel) return;
+  panel.hidden = !reqs.length; $('#requests-count').textContent = reqs.length;
+  $('#requests-list').innerHTML = reqs.map(f => {
+    const cr = f.changeRequest, u = usersCache.find(x => x.username === cr.by);
+    return `<article class="pend req-card" data-fid="${esc(f.id)}">
+      <span class="avatar">${esc(cr.by).slice(0, 1).toUpperCase()}</span>
+      <div class="pend-who"><b>${esc(cr.by)} <span class="muted small">asks to change</span> ${esc(f.name)} <span class="pp-code">${esc(f.code)}</span></b><small>Sent ${fmt(cr.at)}${f.finalizedAt ? '' : ''}</small><p>“${esc(cr.note)}”</p></div>
+      <div class="pend-act"><button type="button" class="btn primary small" data-req-review="${esc(f.id)}" data-user="${esc(cr.by)}"><i class=i-eye></i> Review activity &amp; decide</button>${u ? `<button type="button" class="btn small" data-req-history="${esc(u.id)}"><i class=i-clock></i> ${esc(cr.by)}'s work history</button>` : ''}</div>
+    </article>`;
+  }).join('');
+  $$('#requests-list [data-req-review]').forEach(b => b.onclick = () => openActivity(b.dataset.reqReview, b.dataset.user));
+  $$('#requests-list [data-req-history]').forEach(b => b.onclick = () => openUserActivity(b.dataset.reqHistory));
+}
+
+// Live: a new change request (or an answer to one) shows up without reloading – the facility list is checked every
+// 20 seconds while the portal is open and visible; it is only redrawn when a request / lock actually changed.
+let reqSig = null;
+const requestSig = list => list.map(f => `${f.id}:${f.changeRequest?.at || ''}:${f.editUnlock?.until || ''}:${f.changeDeclined?.declinedAt || ''}:${f.detailsLocked ? 1 : 0}`).join('|');
+setInterval(async () => {
+  if (!me || document.hidden || document.querySelector('dialog[open]')) return;
+  try {
+    const r = await apiGlobal('/api/facilities');
+    const sig = requestSig(r.list);
+    if (reqSig === null) { reqSig = sig; return; }
+    if (sig === reqSig) return;
+    const before = new Set(facilities.filter(f => f.changeRequest).map(f => `${f.id}@${f.changeRequest.at}`));
+    reqSig = sig;
+    await loadFacilities();
+    const fresh = facilities.filter(f => f.changeRequest && !before.has(`${f.id}@${f.changeRequest.at}`));
+    if (me.role === 'admin' && fresh.length) toast(`<i class=i-lock></i> New facility change request from ${esc(fresh[0].changeRequest.by)} (${esc(fresh[0].name)}) – see Users &amp; access`);
+    if (me.role === 'admin' && $('#users-panel')?.classList.contains('active')) loadUsersPanel();
+  } catch { /* offline for a moment – next round */ }
+}, 20000);
 
 /**
  * Facility details lock (non-administrators): once the policies are created, the facility's name, code, contacts,
@@ -151,9 +192,21 @@ $('#lk-send').onclick = async () => {
  */
 const ACT_ICON = { account: 'user', facility: 'building', policies: 'doc', hr: 'doc', download: 'download', checklist: 'target', register: 'book', admin: 'gear', other: 'clock' };
 let actState = null;
+/** One user's work history across all facilities, with their pending requests (from Users & access). */
+async function openUserActivity(uid) {
+  actState = { mode: 'user', uid, area: '', data: null };
+  $('#act-who').hidden = true;
+  $$('#act-area [data-area]').forEach(b => b.classList.toggle('on', !b.dataset.area));
+  $('#act-list').innerHTML = '<p class="muted small"><span class="spin"></span> Loading the work history…</p>';
+  $('#act-req').innerHTML = ''; $('#act-title').textContent = 'Activity'; $('#act-sub').textContent = '';
+  $('#act-allow').hidden = $('#act-relock').hidden = true;
+  if (!$('#act-dlg').open) $('#act-dlg').showModal();
+  await loadActivity();
+}
 async function openActivity(fid, user) {
   const dlg = $('#act-dlg');
-  actState = { fid, user: user || '', who: user ? 'user' : 'all', area: '', data: null };
+  actState = { mode: 'facility', fid, user: user || '', who: user ? 'user' : 'all', area: '', data: null };
+  $('#act-who').hidden = false;
   $$('#act-who [data-who]').forEach(b => b.classList.toggle('on', b.dataset.who === actState.who));
   $('#act-who [data-who="user"]').hidden = !user;
   $$('#act-area [data-area]').forEach(b => b.classList.toggle('on', !b.dataset.area));
@@ -165,11 +218,13 @@ async function openActivity(fid, user) {
 async function loadActivity() {
   const s = actState;
   try {
-    s.data = await apiGlobal(`/api/facilities/${encodeURIComponent(s.fid)}/activity?limit=300${s.who === 'user' && s.user ? `&user=${encodeURIComponent(s.user)}` : ''}`);
+    s.data = s.mode === 'user' ? await apiGlobal(`/api/users/${encodeURIComponent(s.uid)}/activity?limit=300`)
+      : await apiGlobal(`/api/facilities/${encodeURIComponent(s.fid)}/activity?limit=300${s.who === 'user' && s.user ? `&user=${encodeURIComponent(s.user)}` : ''}`);
   } catch (e) { $('#act-list').innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
   renderActivity();
 }
 function renderActivity() {
+  if (actState.mode === 'user') return renderUserActivity();
   const { data: d, area } = actState;
   const f = d.facility, cr = d.changeRequest;
   $('#act-title').textContent = `Activity · ${f.name}`;
@@ -180,6 +235,10 @@ function renderActivity() {
       <small class="muted">Check the activity below – e.g. whether policies were already created or downloaded with the current details – before you allow the edit.</small></div></div>`
     : d.editUnlock && Date.parse(d.editUnlock.until) > Date.now() ? `<div class="act-request open"><span class="act-req-ic" aria-hidden="true">✎</span><div><b>Edits allowed until ${fmt(d.editUnlock.until)}</b><small class="muted">by ${esc(d.editUnlock.by)}</small></div></div>` : '';
   $('#act-allow').hidden = !cr; $('#act-relock').hidden = !cr;
+  renderActivityList(d, area, null);
+}
+/** The timeline: a short summary, then every action by day (newest first) with the exact time. */
+function renderActivityList(d, area, facNames) {
   const want = area ? area.split(',') : null;
   const items = d.items.filter(e => !want || want.includes(e.area));
   // a short summary of what the user did – the things an administrator checks first
@@ -194,22 +253,38 @@ function renderActivity() {
     const t = new Date(e.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     return `${head}<div class="act-row ${e.result === 'ok' ? '' : 'bad'}" role="listitem">
       <span class="act-ic" aria-hidden="true"><i class=i-${ACT_ICON[e.area] || 'clock'}></i></span>
-      <div class="act-what"><b>${esc(e.action)}</b><small class="muted">${esc(e.user)}${e.role ? ` (${esc(e.role)})` : ''}${e.ip ? ` · ${esc(e.ip)}` : ''}</small></div>
+      <div class="act-what"><b>${esc(e.action)}</b><small class="muted">${esc(e.user)}${e.role ? ` (${esc(e.role)})` : ''}${facNames && e.facility ? ` · <b>${esc(facNames[e.facility] || e.facility)}</b>` : ''}${e.ip ? ` · ${esc(e.ip)}` : ''}</small></div>
       <span class="act-res">${e.result === 'ok' ? '' : `<span class="tag warn">${esc(e.result)}</span>`}<time datetime="${esc(e.at)}" title="${esc(e.at)}">${t}</time></span></div>`;
   }).join('') || '<p class="muted small">No activity recorded yet. (Actions are recorded from now on.)</p>');
 }
 $$('#act-who [data-who]').forEach(b => b.onclick = () => { actState.who = b.dataset.who; $$('#act-who [data-who]').forEach(x => x.classList.toggle('on', x === b)); loadActivity(); });
 $$('#act-area [data-area]').forEach(b => b.onclick = () => { actState.area = b.dataset.area; $$('#act-area [data-area]').forEach(x => x.classList.toggle('on', x === b)); renderActivity(); });
-$('#act-allow').onclick = async () => {
-  try { const r = await apiGlobal(`/api/facilities/${encodeURIComponent(actState.fid)}/unlock`, { method: 'POST', body: JSON.stringify({ hours: 24 }) }); toast(`Edits allowed until ${fmt(r.until)} – then the details lock again by themselves`); $('#act-dlg').close(); await loadFacilities(); }
+/** Users & access: one user's requests (each with Allow / Decline) above their work history across all facilities. */
+function renderUserActivity() {
+  const { data: d, area } = actState, u = d.user;
+  $('#act-title').textContent = `Activity · ${u.username}`;
+  $('#act-sub').innerHTML = `${esc(ROLE_LABEL[u.role] || u.role)}${u.role !== 'admin' && u.plan ? ` · ${u.plan === 'trial' ? 'Free trial' : 'Premium'}` : ''}${u.email ? ` · ${esc(u.email)}` : ''}${u.createdAt ? ` · account since ${fmt(u.createdAt)}` : ''}${u.lastLogin ? ` · last sign-in ${fmt(u.lastLogin)}` : ''}`;
+  $('#act-req').innerHTML = d.requests.map(r => `<div class="act-request"><span class="act-req-ic" aria-hidden="true"><i class=i-lock></i></span><div>
+      <b>Change requested for ${esc(r.facility.name)} <span class="pp-code">${esc(r.facility.code)}</span></b><small class="muted">${fmt(r.changeRequest.at)}</small>
+      <p class="act-reason">“${esc(r.changeRequest.note)}”</p>
+      <div class="btn-row"><button type="button" class="btn small" data-decline="${esc(r.facility.id)}"><i class=i-lock></i> Decline – keep locked</button><button type="button" class="btn small primary" data-allow="${esc(r.facility.id)}">✓ Allow edits (24 h)</button></div></div></div>`).join('')
+    + d.declined.map(r => `<p class="small muted act-declined">Earlier request for ${esc(r.facility.code)} (“${esc(r.changeDeclined.note)}”) was declined on ${fmt(r.changeDeclined.declinedAt)} by ${esc(r.changeDeclined.declinedBy)}${r.changeDeclined.reason ? `: “${esc(r.changeDeclined.reason)}”` : ''}.</p>`).join('');
+  $$('#act-req [data-allow]').forEach(b => b.onclick = () => allowEdits(b.dataset.allow));
+  $$('#act-req [data-decline]').forEach(b => b.onclick = () => declineRequest(b.dataset.decline));
+  renderActivityList(d, area, d.facilities);
+}
+async function allowEdits(fid) {
+  try { const r = await apiGlobal(`/api/facilities/${encodeURIComponent(fid)}/unlock`, { method: 'POST', body: JSON.stringify({ hours: 24 }) }); toast(`Edits allowed until ${fmt(r.until)} – then the details lock again by themselves`); $('#act-dlg').close(); await loadFacilities(); if (me?.role === 'admin') loadUsersPanel(); }
   catch (e) { toast(`<i class=i-alert></i> ${esc(e.message)}`); }
-};
-$('#act-relock').onclick = async () => {
+}
+async function declineRequest(fid) {
   const reason = prompt('Decline the request – the details stay locked.\n\nReason shown to the user (optional):', '');
   if (reason === null) return;
-  try { await apiGlobal(`/api/facilities/${encodeURIComponent(actState.fid)}/decline`, { method: 'POST', body: JSON.stringify({ reason }) }); toast('Request declined – the details stay locked'); $('#act-dlg').close(); await loadFacilities(); }
+  try { await apiGlobal(`/api/facilities/${encodeURIComponent(fid)}/decline`, { method: 'POST', body: JSON.stringify({ reason }) }); toast('Request declined – the details stay locked'); $('#act-dlg').close(); await loadFacilities(); if (me?.role === 'admin') loadUsersPanel(); }
   catch (e) { toast(`<i class=i-alert></i> ${esc(e.message)}`); }
-};
+}
+$('#act-allow').onclick = () => allowEdits(actState.fid);
+$('#act-relock').onclick = () => declineRequest(actState.fid);
 
 /** Stacked bar + counts of a facility's register entries by status. */
 function healthBar(h) {
@@ -1687,13 +1762,15 @@ async function loadUsersPanel() {
   const { users: all } = await apiGlobal('/api/users');
   renderPending(all);
   const users = all.filter(x => x.status !== 'pending');
+  usersCache = users; renderRequests();
+  const reqOf = x => facilities.filter(f => f.changeRequest?.by === x.username);
   const facName = id => { const f = facilities.find(x => x.id === id); return f ? `${f.code} – ${f.name}` : `${id} (removed)`; };
   const scope = x => x.role === 'admin' ? '<span class="scope all" title="Administrators see and manage every facility">All facilities · full control</span>'
     : x.facilities.includes('*') ? '<span class="scope all">All facilities</span>'
     : x.facilities.length ? `<div class="scope-list">${x.facilities.map(id => `<span class="scope">${esc(facName(id))}</span>`).join('')}</div>`
     : '<span class="scope none">No facility – sees nothing</span>';
   $('#users-tbl tbody').innerHTML = users.map(x => `<tr>
-    <td><b>${esc(x.username)}${x.id === me.id ? '<span class="users-me">you</span>' : ''}</b><span class="muted small" title="${esc(x.email || '')}">${esc(x.email || 'no e-mail')}</span></td>
+    <td><b>${esc(x.username)}${x.id === me.id ? '<span class="users-me">you</span>' : ''}</b><span class="muted small" title="${esc(x.email || '')}">${esc(x.email || 'no e-mail')}</span>${reqOf(x).length ? `<button type="button" class="req-pill" data-act="review" data-uid="${x.id}" title="${esc(reqOf(x).map(f => `${f.code}: “${f.changeRequest.note}”`).join('\n'))}"><i class=i-lock></i> Facility change requested · review</button>` : ''}</td>
     <td><select data-uid="${x.id}" data-f="role">${['admin', 'manager', 'viewer'].map(r => `<option value="${r}"${r === x.role ? ' selected' : ''}>${ROLE_LABEL[r]}</option>`).join('')}</select></td>
     <td>${x.role === 'admin' ? '<span class="tag ok">Premium</span>' : `<select data-uid="${x.id}" data-f="plan" aria-label="Plan"><option value="trial"${x.plan === 'trial' ? ' selected' : ''}>Free trial</option><option value="premium"${x.plan === 'premium' ? ' selected' : ''}>Premium</option></select>${x.plan === 'trial' ? '<br><span class="muted small">Trial limits apply</span>' : ''}${x.premiumRequest ? '<br><span class="tag warn">Asked for Premium</span>' : ''}`}</td>
     <td class="small">${scope(x)}${x.role === 'admin' ? '' : `<button type="button" class="link-btn small scope-edit" data-act="access" data-uid="${x.id}">Change access</button>`}</td>
@@ -1701,6 +1778,7 @@ async function loadUsersPanel() {
     <td class="num">${x.lastLogin ? fmt(x.lastLogin) : 'Never'}</td>
     <td><details class="menu user-manage"><summary class="btn small">Manage ▾</summary><div class="menu-pop right">
       ${x.locked ? `<button class="icon-btn" data-act="unlock" data-uid="${x.id}">Unlock</button>` : ''}
+      <button class="icon-btn" data-act="history" data-uid="${x.id}"><i class=i-clock></i> Activity history</button>
       <button class="icon-btn" data-act="reset-pw" data-uid="${x.id}">Reset password</button>
       <button class="icon-btn" data-act="reset-2fa" data-uid="${x.id}">Reset 2FA</button>
       ${x.id === me.id ? '' : `<button class="icon-btn del" data-act="delete" data-uid="${x.id}">Delete account</button>`}
@@ -1720,6 +1798,7 @@ async function loadUsersPanel() {
       if (act === 'delete') { if (!confirm(`Delete the account "${u.username}"?`)) return; await apiGlobal(`/api/users/${u.id}`, { method: 'DELETE' }); }
       if (act === 'unlock') await apiGlobal(`/api/users/${u.id}`, { method: 'PUT', body: JSON.stringify({ unlock: true }) });
       if (act === 'access') { await editAccess(u); return; }
+      if (act === 'history' || act === 'review') { b.closest('details')?.removeAttribute('open'); openUserActivity(u.id); return; }
       if (act === 'reset-2fa') { if (!confirm(`Reset two-factor authentication for "${u.username}"? They will scan a new QR code at their next sign-in.`)) return; await apiGlobal(`/api/users/${u.id}`, { method: 'PUT', body: JSON.stringify({ resetTwoFactor: true }) }); }
       if (act === 'reset-pw') {
         const pw = genPassword();

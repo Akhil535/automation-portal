@@ -422,6 +422,20 @@ app.get('/api/facilities/:id/activity', wrap(async (req, res) => {
   res.json({ facility: { id: f.id, name: f.name, code: f.code, createdBy: f.createdBy || null, createdAt: f.createdAt || null, finalizedAt: f.finalizedAt || f.policyPrep?.lastGenerated || null },
     changeRequest: f.changeRequest || null, editUnlock: f.editUnlock || null, items: all });
 }));
+/**
+ * Administrators: one user's work history across every facility (newest first) and their facility change requests –
+ * shown from Users & access, to check a request against what the user actually did.
+ */
+app.get('/api/users/:id/activity', wrap(async (req, res) => {
+  const u = loadUsers().users.find(x => x.id === req.params.id);
+  if (!u) throw Object.assign(new Error('User not found'), { status: 404 });
+  const facs = loadFacilities().list;
+  const requests = facs.filter(f => f.changeRequest?.by === u.username).map(f => ({ facility: { id: f.id, name: f.name, code: f.code }, changeRequest: f.changeRequest }));
+  const declined = facs.filter(f => f.changeDeclined?.by === u.username).map(f => ({ facility: { id: f.id, name: f.name, code: f.code }, changeDeclined: f.changeDeclined }));
+  const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 300));
+  res.json({ user: { id: u.id, username: u.username, role: u.role, plan: u.plan || null, email: u.email || '', createdAt: u.createdAt || null, lastLogin: u.lastLogin || null },
+    facilities: Object.fromEntries(facs.map(f => [f.id, `${f.code} – ${f.name}`])), requests, declined, items: readAudit({ user: u.username, limit }) });
+}));
 /** Administrators: turn a change request down – the details stay locked; the user sees the answer. */
 app.post('/api/facilities/:id/decline', wrap(async (req, res) => {
   const f = loadFacilities().list.find(x => x.id === req.params.id);
