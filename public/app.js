@@ -1036,7 +1036,7 @@ function applyTheme(t) {
   document.documentElement.dataset.theme = t;
   $$('[data-theme-set]').forEach(b => b.classList.toggle('active', b.dataset.themeSet === t));
 }
-if (store.get('ui-look') !== 'teal') { store.set('ui-look', 'teal'); store.set('ui-theme', 'light'); } // the Clinical Teal look starts light
+if (store.get('ui-look') !== 'echo') { store.set('ui-look', 'echo'); store.set('ui-theme', 'light'); } // the new Echo look starts light (once)
 applyTheme(store.get('ui-theme') || 'light');
 $$('[data-theme-set]').forEach(b => b.onclick = () => { store.set('ui-theme', b.dataset.themeSet); store.set('theme', b.dataset.themeSet); applyTheme(b.dataset.themeSet); });
 
