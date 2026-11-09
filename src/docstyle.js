@@ -192,6 +192,53 @@ function lightRevisionTable(xml, accent, { frame = false } = {}) {
   }
   return xml.slice(0, rev.s) + t + xml.slice(rev.e);
 }
+/** A paragraph that keeps with the next one (keepNext goes right after pStyle in the paragraph properties). */
+function keepWithNext(p) {
+  if (/<w:keepNext\/>/.test(p)) return p;
+  if (/<w:pPr>/.test(p)) return p.replace(/<w:pPr>(\s*<w:pStyle [^>]*\/>)?/, (m, st) => `<w:pPr>${st || ''}<w:keepNext/>`);
+  if (/<w:pPr\/>/.test(p)) return p.replace('<w:pPr/>', '<w:pPr><w:keepNext/></w:pPr>');
+  return p.replace(/^(<w:p(?:\s[^>]*)?>)/, '$1<w:pPr><w:keepNext/></w:pPr>');
+}
+/**
+ * The revision table never breaks apart: no row splits over two pages, every row keeps with the next one, the last
+ * row keeps with the signature / stamp line under it, and the header row repeats if the table is ever longer than a
+ * page. So the table header, its rows and the signature + stamp land on the same page (no header alone at the
+ * bottom of a page). A paragraph heading right before the table stays with it too.
+ */
+export function keepRevisionTogether(xml) {
+  const b0 = xml.indexOf('<w:body>');
+  if (b0 < 0) return xml;
+  const blocks = childrenOf(xml, b0 + 8, xml.length, ['w:p', 'w:tbl', 'w:sdt']);
+  const tbls = blocks.filter(b => b.tag === 'w:tbl');
+  const rev = [...tbls].reverse().find(t => { const tx = textOf(xml.slice(t.s, t.e)); return /version/i.test(tx) && /review|approv/i.test(tx); });
+  if (!rev) return xml;
+  let t = xml.slice(rev.s, rev.e);
+  // A floating (positioned) table ignores "keep together" and Word splits it anywhere – the masters' revision tables
+  // are floating: it becomes a normal table, centred like before.
+  t = t.replace(/<w:tblPr>([\s\S]*?)<\/w:tblPr>/, (m, inner) => {
+    if (!/<w:tblpPr\b/.test(inner)) return m;
+    inner = inner.replace(/<w:tblpPr\b[^>]*\/>/, '').replace(/<w:tblOverlap\b[^>]*\/>/, '').replace(/<w:jc\b[^>]*\/>/, '');
+    const w = inner.match(/<w:tblW\b[^>]*\/>/);
+    inner = w ? inner.replace(w[0], `${w[0]}<w:jc w:val="center"/>`) : inner.replace(/(<w:tblStyle\b[^>]*\/>)?/, `$1<w:jc w:val="center"/>`);
+    return `<w:tblPr>${inner}</w:tblPr>`;
+  });
+  const rows = childrenOf(t, t.indexOf('>') + 1, t.length, ['w:tr', 'w:tblPr', 'w:tblGrid']).filter(r => r.tag === 'w:tr');
+  let out = '', at = 0;
+  rows.forEach((r, i) => {
+    let row = t.slice(r.s, r.e);
+    const trPr = row.match(/<w:trPr>[\s\S]*?<\/w:trPr>/)?.[0] || '';
+    const add = (/<w:cantSplit\/>/.test(trPr) ? '' : '<w:cantSplit/>') + (i === 0 && !/<w:tblHeader\/>/.test(trPr) ? '<w:tblHeader/>' : '');
+    if (add) row = trPr ? row.replace('<w:trPr>', `<w:trPr>${add}`) : row.replace(/^(<w:tr(?:\s[^>]*)?>)/, `$1<w:trPr>${add}</w:trPr>`);
+    row = row.replace(/<w:p(?=[\s>])(?:(?!<w:p[\s>])[\s\S])*?<\/w:p>/g, keepWithNext);
+    out += t.slice(at, r.s) + row; at = r.e;
+  });
+  t = out + t.slice(at);
+  // the paragraph right before the table (e.g. a "Revision History" heading) keeps with it
+  const i = blocks.indexOf(rev), prev = blocks[i - 1];
+  let head = xml.slice(0, rev.s);
+  if (prev && prev.tag === 'w:p' && textOf(xml.slice(prev.s, prev.e)).trim()) head = xml.slice(0, prev.s) + keepWithNext(xml.slice(prev.s, prev.e)) + xml.slice(prev.e, rev.s);
+  return head + t + xml.slice(rev.e);
+}
 function pageBorder(xml, color) {
   const pg = `<w:pgBorders w:offsetFrom="page">${['top', 'left', 'bottom', 'right'].map(s => `<w:${s} w:val="double" w:sz="6" w:space="24" w:color="${color}"/>`).join('')}</w:pgBorders>`;
   return xml.replace(/<w:sectPr(?:\s[^>]*)?>[\s\S]*?<\/w:sectPr>/g, sp => {
@@ -282,11 +329,20 @@ function layoutOfficial(xml, meta, accent, font) {
 export async function applyDocStyle(buffer, style, { kind = 'policy' } = {}) {
   const st = { ...effectiveStyle(null), ...(style || {}) };
   const id = styleById(st.id).id, accent = st.accent || DEFAULT_ACCENT, font = st.font || '', mark = st.watermark || '';
-  if (id === 'classic' && !font && !mark) return buffer;
   const zip = await JSZip.loadAsync(buffer);
   let xml = await zip.file('word/document.xml').async('string');
   const b0 = xml.indexOf('<w:body>');
   if (b0 < 0) return buffer;
+  // every style (Modern Classic too): the revision table, its rows and the signature + stamp stay on one page
+  if (kind === 'policy') {
+    const kept = keepRevisionTogether(xml);
+    if (id === 'classic' && !font && !mark) {
+      if (kept === xml) return buffer;
+      zip.file('word/document.xml', kept);
+      return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+    }
+    xml = kept;
+  } else if (id === 'classic' && !font && !mark) return buffer;
 
   if (id !== 'classic') {
     const blocks = childrenOf(xml, b0 + 8, xml.length, ['w:p', 'w:tbl', 'w:sdt']);

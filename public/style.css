@@ -4382,3 +4382,7 @@ dialog::backdrop { background: rgba(12, 12, 15, .5) !important; backdrop-filter:
 .ds-brand-act { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 @media (max-width: 760px) { .ds-brand { grid-template-columns: 1fr; } .ds-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
 @media (max-width: 420px) { .ds-grid { grid-template-columns: 1fr; } }
+
+/* v35b · admin style cards: a neutral tier label (no lock – administrators can use every style) */
+.ds-prem.tier { color: var(--ink); background: var(--panel); border: 1px solid var(--line); }
+.ds-prem.tier.free { color: #fff; background: #15803d; border-color: #15803d; }

@@ -76,7 +76,12 @@ export function reportHtml({ cfg, items, logo = '', circulars = {}, printButton 
   h2 { font-size: 13px; margin: 6px 0; color: #0f766e; text-transform: uppercase; letter-spacing: .05em; }
   table.reg { border-collapse: collapse; width: 100%; } table.reg th { background: #0f766e; color: #fff; text-align: left; padding: 6px 7px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }
   table.reg td { border-bottom: 1px solid #e3e8ef; padding: 6px 7px; vertical-align: top; } table.reg td.c { text-align: center; color: #5f6f7f; } table.reg td.n { font-weight: 600; } table.reg td.d { white-space: nowrap; }
-  table.reg tr.fixed td { color: #5f6f7f; background: #f7f9fc; } table.reg tr { page-break-inside: avoid; }
+  table.reg tr.fixed td { color: #5f6f7f; background: #f7f9fc; } table.reg tr { page-break-inside: avoid; break-inside: avoid; }
+  /* clean page breaks: the table header repeats on every page, headings stay with what follows, blocks never split */
+  table.reg thead { display: table-header-group; } table.reg tfoot { display: table-footer-group; }
+  h1, h2, .sub { page-break-after: avoid; break-after: avoid; }
+  .top, .grid, .tiles, .tile, .score, .foot, .grid table { page-break-inside: avoid; break-inside: avoid; }
+  h2 + table.reg tbody tr:first-child { page-break-before: avoid; break-before: avoid; }
   .pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-weight: 700; font-size: 10px; white-space: nowrap; }
   .foot { margin-top: 10px; color: #5f6f7f; font-size: 10px; display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid #e3e8ef; padding-top: 6px; }
   .btn { position: fixed; top: 14px; right: 16px; padding: 7px 14px; border-radius: 8px; border: 0; background: #0f766e; color: #fff; font: 600 13px "Segoe UI"; cursor: pointer; }

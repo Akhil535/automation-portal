@@ -988,6 +988,13 @@ test('10i. policy preparation: templates are filled for a facility (ID, dates, n
     if (sid === 'official') assert.ok(/<w:pgBorders[\s\S]*?w:color="123456"/.test(sx), 'official: page frame');
   }
   assert.ok((await DS.applyDocStyle(filledBuf, { id: 'classic', accent: '#123456' })).equals(filledBuf), 'Modern Classic without branding: unchanged');
+  // page breaks: the revision table is a normal (not floating) table whose rows never split and keep together
+  const floating = '<w:tbl><w:tblPr><w:tblpPr w:vertAnchor="text" w:tblpY="199"/><w:tblW w:w="9000" w:type="dxa"/></w:tblPr><w:tblGrid><w:gridCol w:w="9000"/></w:tblGrid>'
+    + '<w:tr><w:tc><w:p><w:r><w:t>Version number</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>Reviewed No Changes</w:t></w:r></w:p></w:tc></w:tr></w:tbl>';
+  const kept = DS.keepRevisionTogether(`<w:document><w:body><w:p><w:r><w:t>Revision History</w:t></w:r></w:p>${floating}<w:p/><w:sectPr/></w:body></w:document>`);
+  assert.ok(!/tblpPr/.test(kept) && /<w:jc w:val="center"\/>/.test(kept), 'floating revision table made a normal centred table');
+  assert.equal((kept.match(/<w:cantSplit\/>/g) || []).length, 2, 'no row splits over two pages'); assert.ok(kept.includes('<w:tblHeader/>'), 'header row repeats');
+  assert.equal((kept.match(/<w:keepNext\/>/g) || []).length, 3, 'heading and rows keep together with the signature line');
   assert.equal(DS.effectiveStyle('split', { trial: true }).id, 'classic', 'free trial: Modern Classic only');
   // The locked template itself is untouched.
   const { dir, loadGlobalConfig } = await import('../src/config.js');

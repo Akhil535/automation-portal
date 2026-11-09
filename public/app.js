@@ -3609,12 +3609,24 @@ function renderDocStyles() {
   // administrators: the default style and the branding
   const adm = $('#ds-admin-cards');
   if (adm && me?.role === 'admin') {
+    // administrators are never locked: every style can be previewed, exported (Word / PDF), set as the default and
+    // used for the facility open now; the tier label only says who else gets it (free trial or Premium accounts)
     adm.innerHTML = d.styles.map(s => `<article class="ds-card${d.settings.default === s.id ? ' on' : ''}">
-      <div class="ds-thumb">${dsThumb(s.id, a)}${s.premium ? '<span class="ds-prem"><i class=i-lock></i> Premium</span>' : '<span class="ds-prem free">Free trial too</span>'}${d.settings.default === s.id ? '<span class="ds-on">★ Default</span>' : ''}</div>
+      <div class="ds-thumb">${dsThumb(s.id, a)}<span class="ds-prem tier${s.premium ? '' : ' free'}" title="${s.premium ? 'Users on Premium can choose it; free-trial users see Get Premium' : 'Every user, the free trial too'}">${s.premium ? 'Premium users' : 'All users'}</span>${d.settings.default === s.id ? '<span class="ds-on">★ Default</span>' : ''}</div>
       <div class="ds-meta"><b>${s.no} · ${esc(s.name)}</b><small>${esc(s.desc)}</small></div>
       <div class="ds-act"><a class="btn small" href="${preview(s.id)}" target="_blank" rel="noopener"><i class=i-eye></i> Preview</a>
+        <a class="btn small" href="${preview(s.id)}&download=1"><i class=i-download></i> PDF</a>
         <a class="btn small" href="${preview(s.id)}&format=docx&download=1"><i class=i-download></i> Word</a>
-        ${d.settings.default === s.id ? '<span class="tag ok">Default</span>' : `<button type="button" class="btn small primary" data-ds-default="${s.id}">Set as default</button>`}</div></article>`).join('');
+        ${d.settings.default === s.id ? '<span class="tag ok">Default</span>' : `<button type="button" class="btn small primary" data-ds-default="${s.id}">Set as default</button>`}
+        ${d.effective === s.id ? '<span class="tag ok">Used for this facility</span>' : `<button type="button" class="btn small" data-ds-use="${s.id}">Use for this facility</button>`}</div></article>`).join('');
+    $$('#ds-admin-cards [data-ds-use]').forEach(b => b.onclick = async () => {
+      try {
+        const r = await api('/api/doc-styles/facility', { method: 'PUT', body: JSON.stringify({ style: b.dataset.dsUse }) }); dsData.choice = r.choice; dsData.effective = r.effective; renderDocStyles();
+        toast(r.effective === b.dataset.dsUse ? `This facility now uses ${esc(d.styles.find(x => x.id === r.effective).name)} – create its documents again to apply it`
+          : 'Saved – but this facility belongs to a free-trial account, so its documents stay on Modern Classic until that account is Premium');
+      }
+      catch (e) { toast(`<i class=i-alert></i> ${esc(e.message)}`); }
+    });
     const f = $('#ds-brand');
     f.elements.accent.value = a; f.elements.accentText.value = a;
     f.elements.font.innerHTML = d.fonts.map(x => `<option value="${esc(x)}"${x === d.settings.font ? ' selected' : ''}>${x ? esc(x) : 'As in the master documents'}</option>`).join('');
