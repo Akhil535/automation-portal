@@ -762,8 +762,16 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
     assert.deepEqual([...P.claim(nbUser, 'policies', [5, 1, 9])], ['1'], 'only the included ones of a request');
     assert.equal((await put('/api/plans', { trial: { policies: -1 } }, newbieCookie)).status, 403, 'only admins set the limits');
     assert.equal((await put('/api/plans', { trial: { policies: -1 } }, adminCookie)).status, 400);
+    // document styles: 2-4 are Premium; only administrators set the default and branding
+    assert.equal((await put(`/api/doc-styles/facility${q}`, { style: 'split' }, newbieCookie)).status, 402, 'custom document styles are Premium');
+    assert.equal((await put(`/api/doc-styles/facility${q}`, { style: 'classic' }, newbieCookie)).status, 200, 'Modern Classic on the trial');
+    assert.equal((await put('/api/policies/settings' + q, { docStyle: 'official' }, newbieCookie)).status !== 402 && (await (await fetch(`${base}/api/doc-styles${q}`, nb)).json()).effective, 'classic', 'the style cannot be set around the Premium check');
+    assert.equal((await put('/api/doc-styles', { accent: '#112233' }, newbieCookie)).status, 403, 'only administrators set the branding');
+    assert.equal((await put('/api/doc-styles', { accent: 'red' }, adminCookie)).status, 400);
     assert.equal((await put(`/api/users/${asked.id}`, { plan: 'premium' }, adminCookie)).status, 200);
     assert.equal((await (await fetch(`${base}/api/plan`, nb)).json()).plan, 'premium');
+    assert.equal((await put(`/api/doc-styles/facility${q}`, { style: 'official' }, newbieCookie)).status, 200, 'Premium: any document style');
+    assert.equal((await (await fetch(`${base}/api/doc-styles${q}`, nb)).json()).effective, 'official');
     assert.equal((await fetch(`${base}/api/register/download${q}`, nb)).status, 200, 'premium: register download');
     const zp = await JSZip.loadAsync(Buffer.from(await (await fetch(`${base}/api/package.zip${q}&modules=register,policies&type=word`, nb)).arrayBuffer()));
     assert.ok(zp.file('Manager Clinic/Legal Register & Reports/MGR LEGAL REGISTER.xlsx'), Object.keys(zp.files).join(', '));
@@ -963,6 +971,24 @@ test('10i. policy preparation: templates are filled for a facility (ID, dates, n
   const hdr = await out.file('word/header1.xml').async('string');
   assert.ok(/r:embed="rIdLrp\d+"/.test(hdr), 'logo replaced in the page header');
   assert.ok(/<w:jc w:val="center"\/>[\s\S]*rIdLrp/.test(hdr), 'logo centred');
+  // Document styles: the same filled policy in the 4 looks – every value kept, each style's layout applied
+  const DS = await import('../src/docstyle.js');
+  const filledBuf = await out.generateAsync({ type: 'nodebuffer' });
+  const textIn = async b => ((await (await JSZip.loadAsync(b)).file('word/document.xml').async('string')).match(/<w:t(?:\s[^>]*)?>[^<]*<\/w:t>/g) || []).map(x => x.replace(/<[^>]+>/g, '')).join('');
+  const plain = await textIn(filledBuf);
+  const keep = [plain.match(/Policy ID([A-Z0-9]{2,8} \/ ADHICS - PO07)/)?.[1], plain.match(/Due for Revision on(\d\d\/\d\d\/\d{4})/)?.[1]].filter(Boolean);
+  assert.equal(keep.length, 2, 'the filled policy has its Policy ID and due date');
+  for (const sid of ['split', 'minimal', 'official']) {
+    const sb = await DS.applyDocStyle(filledBuf, { id: sid, accent: '#123456', font: '', watermark: sid === 'minimal' ? 'CONFIDENTIAL' : '' });
+    const sz = await JSZip.loadAsync(sb), sx = await sz.file('word/document.xml').async('string'), txt = await textIn(sb);
+    for (const v of keep) assert.ok(txt.includes(v), `${sid}: ${v} kept`);
+    assert.ok(!/<w:rPr><w:color[^>]*\/><w:(b|bCs|rFonts|i|caps)[\s/>]/.test(sx), `${sid}: run properties in the order Word expects`);
+    if (sid === 'split') assert.ok(/Policy details/i.test(txt) && /w:color="123456"/.test(sx), 'split: details sidebar');
+    if (sid === 'minimal') assert.ok((await sz.file('word/header1.xml').async('string')).includes('string="CONFIDENTIAL"'), 'minimal: watermark');
+    if (sid === 'official') assert.ok(/<w:pgBorders[\s\S]*?w:color="123456"/.test(sx), 'official: page frame');
+  }
+  assert.ok((await DS.applyDocStyle(filledBuf, { id: 'classic', accent: '#123456' })).equals(filledBuf), 'Modern Classic without branding: unchanged');
+  assert.equal(DS.effectiveStyle('split', { trial: true }).id, 'classic', 'free trial: Modern Classic only');
   // The locked template itself is untouched.
   const { dir, loadGlobalConfig } = await import('../src/config.js');
   const stored = path.join(dir(loadGlobalConfig(), 'data'), 'policy-templates', t.file);

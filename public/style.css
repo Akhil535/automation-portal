@@ -4353,3 +4353,32 @@ dialog::backdrop { background: rgba(12, 12, 15, .5) !important; backdrop-filter:
 .auth-art.la { overflow-y: auto !important; }
 @media (max-height: 820px) and (min-width: 1101px) { .auth-art.la .la-facts { display: none !important; } }
 @media (max-width: 1100px) { .hiw-login .hiw-stage { grid-template-columns: 1fr; } .hiw-login .hiw-art { justify-self: center; } }
+
+/* v35 · document styles: 4 style cards (users pick one; administrators set the default and the branding) */
+.ds-pick { margin: 4px 0 16px; padding: 16px; border-radius: var(--r); background: var(--panel-2); border: 1px solid var(--line); }
+.ds-pick-head { margin-bottom: 12px; }
+.ds-pick-head b { display: block; font-size: 16px; font-weight: 800; }
+.ds-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+.ds-card { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 18px; background: var(--panel); border: 1.5px solid var(--line); box-shadow: var(--shadow); transition: border-color .2s, transform .2s, box-shadow .2s; }
+.ds-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+.ds-card.on { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent), var(--shadow); }
+.ds-thumb { position: relative; display: grid; place-items: center; padding: 12px; border-radius: 12px; background: linear-gradient(160deg, var(--panel-2), color-mix(in srgb, var(--brand) 8%, var(--panel-2))); }
+.ds-thumb svg { width: 100%; max-width: 132px; height: auto; filter: drop-shadow(0 6px 12px rgba(20, 22, 31, .12)); }
+.ds-card.locked .ds-thumb svg { filter: grayscale(.35) drop-shadow(0 6px 12px rgba(20, 22, 31, .12)); opacity: .8; }
+.ds-prem { position: absolute; top: 8px; left: 8px; display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 800;
+  color: #2b1700; background: linear-gradient(135deg, #fde68a, #f59e0b); }
+.ds-prem.free { color: #fff; background: #15803d; }
+.ds-on { position: absolute; top: 8px; right: 8px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; color: var(--brand-ink); background: var(--brand); }
+.ds-meta { display: flex; flex-direction: column; gap: 4px; min-height: 76px; }
+.ds-meta b { font-size: 14px; font-weight: 800; }
+.ds-meta small { font-size: 12px; color: var(--muted); line-height: 1.45; }
+.ds-act { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: auto; }
+.ds-act .premium-btn { white-space: normal; text-align: center; line-height: 1.25; }
+.ds-brand { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 16px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); align-items: end; }
+.ds-brand label { display: flex; flex-direction: column; gap: 6px; font-weight: 700; font-size: 14px; }
+.ds-color { display: flex; gap: 8px; align-items: center; }
+.ds-color input[type="color"] { width: 44px; height: 40px; padding: 2px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; }
+.ds-color input[name="accentText"] { flex: 1; min-width: 0; text-transform: uppercase; }
+.ds-brand-act { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+@media (max-width: 760px) { .ds-brand { grid-template-columns: 1fr; } .ds-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
+@media (max-width: 420px) { .ds-grid { grid-template-columns: 1fr; } }

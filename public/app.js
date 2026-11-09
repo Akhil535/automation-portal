@@ -1907,6 +1907,7 @@ async function loadPolicies() {
   clearTimeout(ppTimer);
   try { pp = await api('/api/policies'); } catch (e) { $('#pp-tpl-msg').innerHTML = `<div class="alert bad">${esc(e.message)}</div>`; return; }
   renderPolicies();
+  if (!dsData || !pp.job?.running) loadDocStyles();
   if (pp.job?.running) ppTimer = setTimeout(loadPolicies, 1500);
 }
 
@@ -3548,3 +3549,90 @@ $$('#checklist [data-goto]').forEach(b => { b.onclick = () => showTab(b.dataset.
 
 // Training / 3rd-party dates and details not applied yet: the browser asks before the page is left.
 window.addEventListener('beforeunload', e => { if (document.querySelector('.doc-dates.dirty')) { e.preventDefault(); e.returnValue = ''; } });
+
+// ===================================================================================================
+// Document styles: the 4 looks of the generated Word / PDF documents. Administrators choose the default and the
+// branding (accent colour, font, watermark); users choose their facility's style – styles 2-4 are Premium (on the
+// free trial they are shown with "Get Premium to Unlock Custom Templates"). Any style can be previewed as a PDF.
+// ===================================================================================================
+var dsData = null; // var: the policies page may load during start-up
+/** A small page schematic of each style (accent = the chosen colour). */
+function dsThumb(id, a = '#1F3864') {
+  const L = (x, y, w, o = 1) => `<rect x="${x}" y="${y}" width="${w}" height="3" rx="1.5" fill="#cfd5df" opacity="${o}"/>`;
+  const lines = (x, y, n, w) => Array.from({ length: n }, (_, i) => L(x, y + i * 7, i % 3 === 2 ? w * 0.6 : w)).join('');
+  const page = inner => `<svg viewBox="0 0 120 150" aria-hidden="true"><rect x="1" y="1" width="118" height="148" rx="6" fill="#fff" stroke="#e3e6ec"/>${inner}</svg>`;
+  if (id === 'split') return page(`<rect x="44" y="8" width="32" height="7" rx="2" fill="#dfe5f2"/><rect x="10" y="20" width="60" height="5" rx="2" fill="${a}"/>
+    <rect x="10" y="30" width="34" height="62" rx="3" fill="${a}" opacity=".12"/><rect x="43" y="30" width="2" height="62" fill="${a}"/>${[0, 1, 2, 3, 4].map(i => `<rect x="14" y="${35 + i * 11}" width="16" height="2.5" rx="1" fill="${a}" opacity=".7"/>${L(14, 39 + i * 11, 24)}`).join('')}
+    <rect x="50" y="32" width="26" height="4" rx="2" fill="${a}"/>${lines(50, 41, 7, 58)}${lines(10, 100, 6, 100)}`);
+  if (id === 'minimal') return page(`<rect x="44" y="8" width="32" height="7" rx="2" fill="#dfe5f2"/><rect x="10" y="21" width="70" height="6" rx="2" fill="#1f2937"/>
+    <rect x="10" y="32" width="100" height="1.6" fill="${a}"/>${[0, 1].map(r => [0, 1, 2].map(c => `<rect x="${10 + c * 34}" y="${37 + r * 13}" width="14" height="2.5" rx="1" fill="${a}"/>${L(10 + c * 34, 41 + r * 13, 26)}`).join('')).join('')}<rect x="10" y="62" width="100" height="1.6" fill="${a}"/>
+    <rect x="10" y="70" width="24" height="4" rx="2" fill="${a}"/>${lines(10, 79, 8, 100)}`);
+  if (id === 'official') return page(`<rect x="5" y="5" width="110" height="140" rx="2" fill="none" stroke="${a}" stroke-width="1.5"/><rect x="8" y="8" width="104" height="134" rx="1" fill="none" stroke="${a}" stroke-width=".6"/>
+    <rect x="44" y="13" width="32" height="7" rx="2" fill="#dfe5f2"/><rect x="25" y="25" width="70" height="5" rx="2" fill="${a}"/>
+    <rect x="13" y="35" width="94" height="7" fill="${a}"/><rect x="13" y="42" width="94" height="9" fill="none" stroke="${a}" stroke-width=".8"/>${[1, 2, 3].map(i => `<rect x="${13 + i * 23.5}" y="35" width=".8" height="16" fill="#fff" opacity=".7"/>`).join('')}
+    <rect x="13" y="58" width="24" height="4" rx="2" fill="${a}"/>${lines(13, 67, 9, 94)}`);
+  return page(`<rect x="44" y="8" width="32" height="7" rx="2" fill="#dfe5f2"/><rect x="24" y="20" width="72" height="44" fill="none" stroke="#9aa3b5" stroke-width=".8"/>
+    <rect x="24" y="20" width="72" height="6" fill="#e9edf5"/>${[0, 1, 2, 3, 4].map(i => `<rect x="24" y="${26 + i * 7.6}" width="72" height=".6" fill="#9aa3b5"/>${L(28, 29 + i * 7.6, 22)}${L(62, 29 + i * 7.6, 26)}`).join('')}<rect x="59" y="26" width=".6" height="38" fill="#9aa3b5"/>
+    <rect x="10" y="72" width="24" height="4" rx="2" fill="#2f5597"/>${lines(10, 81, 8, 100)}`);
+}
+async function loadDocStyles() {
+  try { dsData = await api('/api/doc-styles'); } catch { return; }
+  renderDocStyles();
+}
+function renderDocStyles() {
+  const d = dsData; if (!d) return;
+  const a = d.settings.accent;
+  const preview = id => u(`/api/doc-styles/preview?style=${id}`);
+  // users: their facility's style
+  const box = $('#ds-user-cards');
+  if (box) {
+    const ro = me?.role === 'viewer';
+    box.innerHTML = d.styles.map(s => {
+      const locked = s.premium && !d.premium, on = d.effective === s.id;
+      return `<article class="ds-card${on ? ' on' : ''}${locked ? ' locked' : ''}" data-ds="${s.id}">
+        <div class="ds-thumb">${dsThumb(s.id, a)}${locked ? '<span class="ds-prem"><i class=i-lock></i> Premium</span>' : ''}${on ? '<span class="ds-on">✓ In use</span>' : ''}</div>
+        <div class="ds-meta"><b>${s.no} · ${esc(s.name)}</b><small>${esc(s.desc)}</small></div>
+        <div class="ds-act">
+          <a class="btn small" href="${preview(s.id)}" target="_blank" rel="noopener" title="PO01 in this style as a PDF (takes a few seconds)"><i class=i-eye></i> Preview</a>
+          ${locked ? '<button type="button" class="btn small premium-btn" data-up>Get Premium to Unlock Custom Templates</button>'
+            : on ? '<span class="tag ok">Selected</span>' : `<button type="button" class="btn small primary" data-ds-use="${s.id}"${ro ? ' disabled' : ''}>Use this style</button>`}
+        </div></article>`;
+    }).join('');
+    $$('#ds-user-cards [data-ds-use]').forEach(b => b.onclick = async () => {
+      try {
+        const r = await api('/api/doc-styles/facility', { method: 'PUT', body: JSON.stringify({ style: b.dataset.dsUse }) });
+        dsData.choice = r.choice; dsData.effective = r.effective; renderDocStyles();
+        toast(`Document style: ${esc(d.styles.find(x => x.id === r.effective).name)} – create the policies again to apply it to the Word / PDF files`);
+      } catch (e) { if (!/Premium/i.test(e.message)) toast(`<i class=i-alert></i> ${esc(e.message)}`); } // (402: the upgrade gateway opens by itself)
+    });
+  }
+  // administrators: the default style and the branding
+  const adm = $('#ds-admin-cards');
+  if (adm && me?.role === 'admin') {
+    adm.innerHTML = d.styles.map(s => `<article class="ds-card${d.settings.default === s.id ? ' on' : ''}">
+      <div class="ds-thumb">${dsThumb(s.id, a)}${s.premium ? '<span class="ds-prem"><i class=i-lock></i> Premium</span>' : '<span class="ds-prem free">Free trial too</span>'}${d.settings.default === s.id ? '<span class="ds-on">★ Default</span>' : ''}</div>
+      <div class="ds-meta"><b>${s.no} · ${esc(s.name)}</b><small>${esc(s.desc)}</small></div>
+      <div class="ds-act"><a class="btn small" href="${preview(s.id)}" target="_blank" rel="noopener"><i class=i-eye></i> Preview</a>
+        <a class="btn small" href="${preview(s.id)}&format=docx&download=1"><i class=i-download></i> Word</a>
+        ${d.settings.default === s.id ? '<span class="tag ok">Default</span>' : `<button type="button" class="btn small primary" data-ds-default="${s.id}">Set as default</button>`}</div></article>`).join('');
+    const f = $('#ds-brand');
+    f.elements.accent.value = a; f.elements.accentText.value = a;
+    f.elements.font.innerHTML = d.fonts.map(x => `<option value="${esc(x)}"${x === d.settings.font ? ' selected' : ''}>${x ? esc(x) : 'As in the master documents'}</option>`).join('');
+    f.elements.watermark.value = d.settings.watermark || '';
+    $$('#ds-admin-cards [data-ds-default]').forEach(b => b.onclick = () => saveDocStyleSettings({ default: b.dataset.dsDefault }));
+  }
+}
+async function saveDocStyleSettings(body) {
+  try {
+    const r = await api('/api/doc-styles', { method: 'PUT', body: JSON.stringify(body) });
+    dsData.settings = r.settings; await loadDocStyles();
+    $('#ds-brand-msg').textContent = 'Saved – new documents use it; create the documents again to update existing ones.';
+    toast('Document styles saved');
+  } catch (e) { $('#ds-brand-msg').textContent = e.message; }
+}
+if ($('#ds-brand')) {
+  const f = $('#ds-brand');
+  f.elements.accent.oninput = () => { f.elements.accentText.value = f.elements.accent.value.toUpperCase(); };
+  f.elements.accentText.oninput = () => { if (/^#[0-9a-f]{6}$/i.test(f.elements.accentText.value)) f.elements.accent.value = f.elements.accentText.value; };
+  f.onsubmit = e => { e.preventDefault(); saveDocStyleSettings({ accent: f.elements.accentText.value || f.elements.accent.value, font: f.elements.font.value, watermark: f.elements.watermark.value }); };
+}

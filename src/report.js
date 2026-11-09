@@ -26,7 +26,26 @@ export function logoDataUrl(buf) {
 /**
  * Report HTML. data: { cfg, items, logo (data URL), circulars: { total, latest, lastCheck }, printButton }
  */
-export function reportHtml({ cfg, items, logo = '', circulars = {}, printButton = false }) {
+/** The document style for the snapshot: the same 4 looks, accent colour, font and watermark as the Word documents. */
+function styleCss(style) {
+  if (!style) return '';
+  const a = /^#[0-9a-f]{6}$/i.test(style.accent || '') ? style.accent : '#1F3864';
+  const font = style.font ? `body { font-family: "${style.font.replace(/"/g, '')}", "Segoe UI", Arial, sans-serif; }` : '';
+  const base = `.top { border-bottom-color: ${a}; } h2 { color: ${a}; } table.reg th { background: ${a}; } .bar i { background: ${a}; } .btn { background: ${a}; }`;
+  const looks = {
+    classic: '',
+    split: `.grid { grid-template-columns: .95fr 1.7fr; } .grid > div:first-child { background: color-mix(in srgb, ${a} 9%, #fff); border-left: 5px solid ${a}; border-radius: 10px; padding: 10px 12px; }
+      .top { border-bottom-width: 0; } .top h1 { color: ${a}; }`,
+    minimal: `.top { border-bottom: 1px solid ${a}; } table.reg th { background: transparent; color: ${a}; border-bottom: 2px solid ${a}; }
+      .tile { border: 0; border-top: 3px solid; border-radius: 0; background: #f8fafc; } .badge { border-width: 1px; }`,
+    official: `body { border: 4px double ${a}; padding: 16px 18px; } .top { flex-direction: column; text-align: center; border-bottom: 2px solid ${a}; }
+      .top > div { flex-direction: column; } table.reg th { text-align: center; } table.reg td { border: 1px solid #d6dce6; }`,
+  };
+  const mark = style.watermark ? `body::after { content: "${String(style.watermark).replace(/["\\<>]/g, '')}"; position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 90px; font-weight: 800; color: rgba(120, 130, 150, .09); white-space: nowrap; pointer-events: none; z-index: 9; }` : '';
+  return `${font}${base}${looks[style.id] || ''}${mark}`;
+}
+
+export function reportHtml({ cfg, items, logo = '', circulars = {}, printButton = false, style = null }) {
   const d = cfg.documentControl.values;
   const hl = registerHealth(items);
   const pending = hl.expired + hl.expiring + hl.missing;
@@ -61,6 +80,7 @@ export function reportHtml({ cfg, items, logo = '', circulars = {}, printButton 
   .pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-weight: 700; font-size: 10px; white-space: nowrap; }
   .foot { margin-top: 10px; color: #5f6f7f; font-size: 10px; display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid #e3e8ef; padding-top: 6px; }
   .btn { position: fixed; top: 14px; right: 16px; padding: 7px 14px; border-radius: 8px; border: 0; background: #0f766e; color: #fff; font: 600 13px "Segoe UI"; cursor: pointer; }
+  ${styleCss(style)}
 </style></head><body>
 ${printButton ? '<button class="btn noprint" onclick="print()">Print / Save as PDF</button>' : ''}
 <div class="top">

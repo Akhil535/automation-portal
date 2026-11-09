@@ -307,6 +307,21 @@
       </div>
     </div>
 
+    <!-- Administrators: the 4 document styles – default, branding, previews -->
+    <div class="panel ds-admin" id="ds-admin" data-admin>
+      <div class="sec-head">
+        <div><h2>Document styles</h2>
+          <p class="sec-sub">Four looks for every generated Word and PDF document – policies, HR and 3rd-party documents and the LEGAL REGISTER snapshot. Choose the default for all facilities and the branding; facilities on Premium can pick their own style.</p></div>
+      </div>
+      <div class="ds-grid" id="ds-admin-cards"></div>
+      <form class="ds-brand" id="ds-brand">
+        <label>Accent colour<span class="ds-color"><input type="color" name="accent" value="#1F3864"><input name="accentText" maxlength="7" pattern="#[0-9A-Fa-f]{6}" aria-label="Accent colour code"></span></label>
+        <label>Font<select name="font"></select></label>
+        <label>Watermark <small class="muted">(optional – e.g. CONFIDENTIAL)</small><input name="watermark" maxlength="40" placeholder="No watermark"></label>
+        <div class="ds-brand-act"><button class="btn primary" type="submit">Save styles &amp; branding</button><span class="muted small" id="ds-brand-msg" role="status"></span></div>
+      </form>
+    </div>
+
     <!-- Wizard step 1: details -->
     <form class="panel pw-pane" data-pane="1" id="pp-form">
       <div class="pw-title"><span class="pw-num">1</span><div><h2>Policy details</h2><p class="muted small">Entered once – used in every policy.</p></div></div>
@@ -363,6 +378,10 @@
     <!-- Wizard step 3: create -->
     <div class="panel pw-pane" data-pane="3">
       <div class="pw-title"><span class="pw-num">3</span><div><h2>Create the policies</h2><p class="muted small">Every policy is filled in and saved as Word and PDF.</p></div></div>
+      <section class="ds-pick" aria-labelledby="ds-pick-title">
+        <div class="ds-pick-head"><div><b id="ds-pick-title">Document style</b><small class="muted">The look of your policies, HR and 3rd-party documents (Word and PDF). Preview any style as a PDF of PO01.</small></div></div>
+        <div class="ds-grid" id="ds-user-cards"></div>
+      </section>
       <div id="pp-need"></div>
       <div class="pw-create">
         <button class="btn primary big" id="pp-generate" data-write><i class=i-gear></i> Create all policies</button>

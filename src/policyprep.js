@@ -15,6 +15,7 @@ import { docToDocx, kindOf, readDocument } from './docparse.js';
 import { imageSize } from './imagesize.js';
 import { cleanLogo, isPageScan, pickLogo, resizeImage, splitSignStamp } from './logoclean.js';
 import { parseFacilityDocument } from './policy.js';
+import { applyDocStyle, effectiveStyle, STYLES, trialFacility } from './docstyle.js';
 
 const APP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PDF_SCRIPT = path.join(APP, 'scripts', 'word-to-pdf.ps1');
@@ -521,6 +522,9 @@ export function prepSettings(cfg) {
     facilityName: facilityDisplayName(cfg), code: cfg._facility.code,
     assets: Object.fromEntries(['logo', 'signature', 'stamp', 'combined'].map(k => [k, !!assetPath(cfg, k)])),
     usesFacilityLogo: !p.logo && !!cfg._facility.logo,
+    // document style: the facility's choice (empty = the administrator's default) and what its documents get
+    docStyleChoice: p.docStyle || '',
+    docStyle: effectiveStyle(p.docStyle, { trial: trialFacility(cfg._facility) }),
   };
 }
 const isBaselineFacility = cfg => { const b = templateLock()?.baseline; return !!b?.name && b.name.toUpperCase() === facilityDisplayName(cfg).toUpperCase(); };
@@ -539,6 +543,10 @@ export function saveSettings(id, body = {}) {
     const e = String(body.contactEmail).trim();
     if (e && !/^[\w.+-]+@[\w-]+(\.[\w-]+)+$/.test(e)) throw new Error('Contact e-mail is not a valid address');
     next.contactEmail = e;
+  }
+  if (body.docStyle !== undefined) { // checked for Premium by the server
+    if (body.docStyle && !STYLES.some(x => x.id === body.docStyle)) throw new Error('Unknown document style');
+    next.docStyle = body.docStyle || '';
   }
   if (body.versions) next.versions = Object.fromEntries(Object.entries(body.versions).filter(([, v]) => /^\d+\.\d$/.test(v)));
   if (body.descriptions) next.descriptions = Object.fromEntries(Object.entries(body.descriptions).map(([k, v]) => [k, String(v).slice(0, 300)]));
@@ -1116,7 +1124,10 @@ export async function fillPolicy(templateBuffer, tpl, s, pics = {}, opts = {}) {
     if (before.length !== after.length) mismatches.push(`layout: ${after.length} tables instead of the master's ${before.length}`);
     else before.forEach((b, i) => { if (b !== after[i]) mismatches.push(`layout: table ${i + 1} is ${after[i]} (rows x columns) instead of the master's ${b}`); });
   }
-  return { buffer, version, report: { filled: [...filled], missing: wanted.filter(k => !filled.has(k)), nameReplaced, contactsReplaced, leftovers: [...leftovers], mismatches } };
+  // 5. The document style (Modern Classic, Executive Split, Corporate Minimalist, Compact Official) – applied to the
+  //    filled, checked document; only the presentation changes. Forms keep their layout (frame, colours, watermark).
+  const styled = opts.style === false ? buffer : await applyDocStyle(buffer, opts.style || s.docStyle, { kind: opts.styleKind || 'policy' });
+  return { buffer: styled, version, report: { filled: [...filled], missing: wanted.filter(k => !filled.has(k)), nameReplaced, contactsReplaced, leftovers: [...leftovers], mismatches, style: (opts.style || s.docStyle)?.id || 'classic' } };
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -1136,7 +1147,7 @@ export const outputDirs = cfg => {
  * pics: { logo|signature|stamp|combined: data URL } - for a new facility; otherwise the facility's saved pictures.
  * Returns { buffer, type: 'pdf'|'docx', report, file }.
  */
-export async function previewPolicy(id, { no, form = {}, pics = {}, newFacility = false, format = 'pdf' } = {}) {
+export async function previewPolicy(id, { no, form = {}, pics = {}, newFacility = false, format = 'pdf', style = null } = {}) {
   const cfg = loadConfig(id);
   const lock = templateLock();
   const t = listTemplates().find(x => x.no === Number(no)) || listTemplates()[0];
@@ -1164,9 +1175,10 @@ export async function previewPolicy(id, { no, form = {}, pics = {}, newFacility 
   const p = {};
   for (const k of ['logo', 'signature', 'stamp', 'combined']) p[k] = pics[k] ? await printReady(k, await fromData(k, pics[k])) : (stored[k] || null);
   const m = masterFor(t, s.versions?.[t.no] || (MAJOR_REVISION.includes(t.no) ? '2.0' : '1.0'));
-  const { buffer, report } = await fillPolicy(fs.readFileSync(path.join(templatesDir(), m.file)), m, s, p);
+  // style: preview one of the document styles (any style may be previewed; only Premium can use 2-4)
+  const { buffer, report } = await fillPolicy(fs.readFileSync(path.join(templatesDir(), m.file)), m, s, p, style ? { style: { ...s.docStyle, id: style } } : {});
   report.master = m.usedVersion;
-  const file = `${s.code} - PO${String(t.no).padStart(2, '0')} - PREVIEW`;
+  const file = `${s.code} - PO${String(t.no).padStart(2, '0')} - PREVIEW${style ? ` - ${style.toUpperCase()}` : ''}`;
   if (format === 'docx') return { buffer, type: 'docx', report, file: `${file}.docx` };
   const tmp = fs.mkdtempSync(path.join(path.resolve(dir(loadGlobalConfig(), 'data')), 'preview-'));
   try {

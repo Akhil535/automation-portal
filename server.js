@@ -22,6 +22,7 @@ import { MODULE_KEYS, buildPackage, packageTree } from './src/package.js';
 import { allowedSet, checkFreeRows, freeRegisterRows, maskMaster, checkChecklistItem, checkTrialApply, checklistFree, claim, claimUpload, maskChecklist, createdFacilities, facilityAllowance, isTrial, planInfo, setTrialLimits, trialLimits, upgradeError, upgradeUrl } from './src/plans.js';
 import { addForms, addItem, checklistXlsx, crossCheck, formFile, formsStatus, formsZip, generateForms, getChecklist, pdfState, prewarmPdfs, saveDocSettings, GROUPS, importMasterChecklist, listForms, masterChecklist, removeForm, removeItem, resetChecklist, updateItem } from './src/hrforms.js';
 import { documentHeader, sendMail } from './src/mailer.js';
+import { FONTS, STYLES, saveStyleSettings, styleById, styleSettings } from './src/docstyle.js';
 import { describe as describeAction, readAudit, record as recordAudit } from './src/audit.js';
 import { lockReason, readLogo, readRegister } from './src/xlsx.js';
 import { imageSize } from './src/policy.js';
@@ -116,6 +117,7 @@ function requiredRole(req) {
   if (/^\/api\/facilities\/[^/]+\/(unlock|lock|activity|decline)$/.test(p)) return 'admin'; // unlocking a facility's details
   if (m === 'DELETE') return 'admin'; // deleting (entries, items, pictures, facilities, users…) is for administrators only
   if (p === '/api/plans' || p === '/api/welcome') return m === 'GET' ? 'viewer' : 'admin';
+  if (p === '/api/doc-styles' && m !== 'GET') return 'admin'; // the default document style and branding
   if (p === '/api/assistant/ask') return 'viewer'; // everyone may ask (read-only answers)
   if (p === '/api/assistant/key') return 'admin';
   if (p.startsWith('/api/users')) return 'admin';
@@ -539,7 +541,8 @@ app.put('/api/policies/templates/:no/paragraphs', wrap(async (req, res) => {
   const b = req.body || {};
   res.json(await saveMasterEdits(req.params.no, b.version, { edits: b.edits || [], inserts: b.inserts || [], deletes: b.deletes || [] }, req.user?.username));
 }));
-app.put('/api/policies/settings', wrap(async (req, res) => { const r = saveSettings(facId(req), req.body || {}); prewarmPdfs(facId(req)); res.json(r); }));
+// (a document style is set only with PUT /api/doc-styles/facility, which checks Premium)
+app.put('/api/policies/settings', wrap(async (req, res) => { const { docStyle, ...body } = req.body || {}; const r = saveSettings(facId(req), body); prewarmPdfs(facId(req)); res.json(r); }));
 /** One drop for all pictures (any mix of photos, PDF, Word): each found picture goes to its slot - logo, signature, stamp. */
 app.post('/api/policies/picture-detect', express.json({ limit: '60mb' }), wrap(async (req, res) => {
   const files = (req.body?.files || []).map(f => { const m = /^data:[^;]*;base64,(.+)$/.exec(f.data || ''); return m ? { name: String(f.name || 'upload'), buffer: Buffer.from(m[1], 'base64') } : null; }).filter(Boolean);
@@ -933,7 +936,7 @@ async function snapshot(req, printButton) {
   let circulars = {};
   try { const snap = await readRegister(cfg.register.path, cfg.register); circulars = { total: snap.records.length, latest: snap.records.at(-1)?.number }; } catch { /* locked */ }
   if (store.meta.lastSuccess) circulars.lastCheck = new Date(store.meta.lastSuccess).toLocaleString('en-GB', { timeZone: 'Asia/Dubai', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-  return { cfg, html: reportHtml({ cfg, items, logo: logoDataUrl(buf), circulars, printButton }) };
+  return { cfg, html: reportHtml({ cfg, items, logo: logoDataUrl(buf), circulars, printButton, style: prepSettings(cfg).docStyle }) };
 }
 const exportName = (cfg, ext) => `${cfg.facility.code} LEGAL REGISTER ${new Date(Date.now() + 4 * 3600e3).toISOString().slice(0, 10)}.${ext}`;
 
@@ -945,6 +948,31 @@ app.get('/api/export/pdf', wrap(async (req, res) => {
   const { cfg, html } = await snapshot(req, false);
   const pdf = await htmlToPdf(html);
   res.type('application/pdf').set('Content-Disposition', `attachment; filename="${exportName(cfg, 'pdf')}"`).send(pdf);
+}));
+
+// ---------------------------------------------------------------------------------------------------
+// Document styles (Modern Classic · Executive Split · Corporate Minimalist · Compact Official) for the Word / PDF
+// policies, HR and 3rd-party documents and the LEGAL REGISTER snapshot. Administrators set the default and the
+// branding (accent colour, font, watermark); each facility can choose its style – styles 2-4 are Premium.
+// ---------------------------------------------------------------------------------------------------
+app.get('/api/doc-styles', wrap(async (req, res) => {
+  const s = prepSettings(loadConfig(fac(req)));
+  res.json({ styles: STYLES, fonts: FONTS, settings: styleSettings(), choice: s.docStyleChoice, effective: s.docStyle.id, premium: !isTrial(req.user) });
+}));
+app.put('/api/doc-styles', wrap(async (req, res) => res.json({ settings: saveStyleSettings(req.body || {}) })));
+app.put('/api/doc-styles/facility', wrap(async (req, res) => {
+  const style = String(req.body?.style || '');
+  if (style && styleById(style).id !== style) throw new Error('Unknown document style');
+  if (style && styleById(style).premium && isTrial(req.user)) throw upgradeError('Get Premium to Unlock Custom Templates');
+  const s = saveSettings(facId(req), { docStyle: style });
+  res.json({ choice: s.docStyleChoice, effective: s.docStyle.id });
+}));
+/** A preview of policy PO01 (or ?no=) in a style, as PDF (or ?format=docx) – any style can be previewed. */
+app.get('/api/doc-styles/preview', wrap(async (req, res) => {
+  const style = styleById(String(req.query.style || '')).id;
+  const r = await previewPolicy(facId(req), { no: Number(req.query.no) || undefined, style, format: req.query.format === 'docx' ? 'docx' : 'pdf' });
+  res.type(r.type === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    .set('Content-Disposition', `${req.query.download ? 'attachment' : 'inline'}; filename="${r.file.replace(/[^\w .-]/g, '')}"`).send(r.buffer);
 }));
 
 app.get('/api/runs', wrap(async (req, res) => res.json(new Store(cfgOf(req)).data.runs.slice(0, 200))));

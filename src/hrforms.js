@@ -492,7 +492,7 @@ async function fillFresh(cfg, def, master, s, pics, extra = {}) {
     people: def.policy ? master.people || {} : {}, labels: master.labels || [], emails: [], phones: [],
   };
   const sForm = def.policy ? s : { ...s, versions: {} };
-  const filled = await fillPolicy(buffer, tpl, sForm, { logo: pics.logo || null }, { logoBox: HR_LOGO_BOX });
+  const filled = await fillPolicy(buffer, tpl, sForm, { logo: pics.logo || null }, { logoBox: HR_LOGO_BOX, styleKind: 'form' });
   filled.buffer = await addHeaderRef(await centreLogoOnPage(filled.buffer), refNo);
 
   // 3. Read back: no facility name other than this facility's may remain.
