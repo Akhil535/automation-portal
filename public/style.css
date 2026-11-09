@@ -4446,3 +4446,9 @@ button.ds-thumb { width: 100%; border: 0; cursor: zoom-in; font: inherit; color:
 .ds-sec:not([open]) > summary .btn::before { content: 'Change style'; }
 .ds-sec > summary .btn { font-size: 0 !important; }
 .ds-sec > summary .btn::before, .ds-sec > summary .btn::after { font-size: 12px; }
+
+/* v35f · the fixed default: the master document format */
+.ds-defaults { flex-wrap: nowrap; align-items: flex-start; }
+.ds-defaults > div { display: flex; flex-direction: column; gap: 4px; }
+.ds-defaults > div b { font-size: 14px; font-weight: 800; }
+.ds-def-ic { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 16px; color: var(--brand-ink); background: var(--brand); }

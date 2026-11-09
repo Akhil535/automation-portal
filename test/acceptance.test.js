@@ -772,13 +772,14 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
     assert.equal((await (await fetch(`${base}/api/plan`, nb)).json()).plan, 'premium');
     assert.equal((await put(`/api/doc-styles/facility${q}`, { style: 'official' }, newbieCookie)).status, 200, 'Premium: any document style');
     assert.equal((await (await fetch(`${base}/api/doc-styles${q}`, nb)).json()).effective, 'official');
-    // per kind: an HR default set by the administrator applies to every facility without its own choice
-    assert.equal((await put('/api/doc-styles', { defaults: { hr: 'minimal', thirdparty: 'split' } }, adminCookie)).status, 200);
+    // the default is always the master format (every kind); other styles only where a facility chose one
+    assert.equal((await put('/api/doc-styles', { defaults: { hr: 'minimal' } }, adminCookie)).status, 400, 'the default cannot be changed');
+    assert.equal((await put('/api/doc-styles', { default: 'classic', watermark: '' }, adminCookie)).status, 200, 'branding still saved');
     let dsx = await (await fetch(`${base}/api/doc-styles${q}`, nb)).json();
-    assert.deepEqual([dsx.settings.defaults.hr, dsx.effectives.hr, dsx.effectives.thirdparty, dsx.effectives.policies], ['minimal', 'minimal', 'split', 'official']);
+    assert.deepEqual([dsx.settings.defaults.hr, dsx.effectives.hr, dsx.effectives.thirdparty, dsx.effectives.register, dsx.effectives.policies], ['classic', 'classic', 'classic', 'classic', 'official'], 'no choice → master format; the chosen policies style stays');
     assert.equal((await put(`/api/doc-styles/facility${q}`, { style: 'official', kind: 'hr' }, newbieCookie)).status, 200, 'own choice for HR documents');
     dsx = await (await fetch(`${base}/api/doc-styles${q}`, nb)).json();
-    assert.equal(dsx.effectives.hr, 'official'); assert.equal(dsx.choices.thirdparty, '');
+    assert.equal(dsx.effectives.hr, 'official'); assert.equal(dsx.choices.thirdparty, ''); assert.equal(dsx.effectives.thirdparty, 'classic');
     assert.equal((await fetch(`${base}/api/doc-styles/apply-all`, nb)).status, 403, 'only administrators re-create everything');
     assert.equal((await fetch(`${base}/api/doc-styles/apply-all`, { headers: { Cookie: adminCookie } })).status, 200);
     assert.equal((await put('/api/doc-styles', { default: 'classic' }, adminCookie)).status, 200, 'back to Modern Classic for every kind');

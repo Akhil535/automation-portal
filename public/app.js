@@ -2069,7 +2069,7 @@ const pmDirty = () => pm && (pm.edits.size || pm.inserts.some(x => x.text.trim()
 async function openMaster(no, version, mode = 'view') {
   pm = { no, version, mode, data: null, edits: new Map(), inserts: [], deletes: new Set(), style: '' };
   // the view follows the default document style; any other style, or the master exactly as stored, can be chosen
-  const names = dsData?.styles || [{ id: 'classic', no: 1, name: 'Modern Classic' }, { id: 'split', no: 2, name: 'Executive Split' }, { id: 'minimal', no: 3, name: 'Corporate Minimalist' }, { id: 'official', no: 4, name: 'Compact Official' }];
+  const names = dsData?.styles || [{ id: 'classic', no: 1, name: 'Master format' }, { id: 'split', no: 2, name: 'Executive Split' }, { id: 'minimal', no: 3, name: 'Corporate Minimalist' }, { id: 'official', no: 4, name: 'Compact Official' }];
   const defName = names.find(s => s.id === (dsData?.settings?.defaults?.policies || dsData?.settings?.default))?.name;
   $('#pm-style').innerHTML = `<option value="">Default style${defName ? ` (${esc(defName)})` : ''}</option>${names.map(s => `<option value="${s.id}">${s.no} · ${esc(s.name)}</option>`).join('')}<option value="raw">The master as stored</option>`;
   $('#pm-style').onchange = () => { pm.style = $('#pm-style').value; pmShow('view'); };
@@ -3594,7 +3594,7 @@ async function useDocStyle(style, kind = 'policies') {
     const r = await api('/api/doc-styles/facility', { method: 'PUT', body: JSON.stringify({ style, kind }) });
     Object.assign(dsData, r); renderDocStyles();
     const name = dsData.styles.find(x => x.id === r.effectives[kind])?.name || '';
-    if (r.effectives[kind] !== style && style) toast('Saved – but this facility belongs to a free-trial account, so its documents stay on Modern Classic until that account is Premium');
+    if (r.effectives[kind] !== style && style) toast('Saved – but this facility belongs to a free-trial account, so its documents stay in the master format until that account is Premium');
     else toast(kind === 'policies' ? `Policies: ${esc(name)} – create the policies again to apply it to the Word / PDF files`
       : `${DS_KIND_NAME[kind]}: ${esc(name)} – every ${DS_KIND_NAME[kind]} file you open or download now uses it`);
   } catch (e) { if (!/Premium/i.test(e.message)) toast(`<i class=i-alert></i> ${esc(e.message)}`); } // (402: the upgrade gateway opens by itself)
@@ -3616,22 +3616,20 @@ function renderDocStyles() {
   // administrators: never locked – preview / export any style, the defaults per kind, branding, re-create all
   const adm = $('#ds-admin-cards');
   if (adm && me?.role === 'admin') {
-    const def = d.settings.defaults || { policies: d.settings.default, hr: d.settings.default, thirdparty: d.settings.default };
-    $('#ds-defaults').innerHTML = `<b>Default style</b><small class="muted">for every facility that has not chosen its own</small>
-      ${Object.entries(d.kinds || DS_KIND_NAME).map(([k, label]) => `<label>${esc(label)}<select data-ds-def="${k}">${d.styles.map(s => `<option value="${s.id}"${def[k] === s.id ? ' selected' : ''}>${s.no} · ${esc(s.name)}</option>`).join('')}</select></label>`).join('')}`;
-    $$('#ds-defaults [data-ds-def]').forEach(sel => sel.onchange = () => saveDocStyleSettings({ defaults: { [sel.dataset.dsDef]: sel.value } }));
-    const isDef = id => Object.values(def).filter(v => v === id).length;
+    // the default is fixed: the master document format, for every section; the other styles only where chosen
+    $('#ds-defaults').innerHTML = `<span class="ds-def-ic" aria-hidden="true">★</span><div><b>Default for every section: the master document format</b>
+      <small class="muted">Policies, HR documents, 3rd-party documents and the LEGAL REGISTER report are always made in the master format (style 1) – unless a facility explicitly chooses another style for that section. Styles 2–4 are optional customisations.</small></div>`;
+    const isDef = id => id === 'classic';
     adm.innerHTML = d.styles.map(s => `<article class="ds-card${isDef(s.id) ? ' on' : ''}">
-      <div class="ds-thumb" data-ds-pv="${s.id}" data-kind="policies" role="button" tabindex="0" title="Preview">${dsThumb(s.id, a)}<span class="ds-prem tier${s.premium ? '' : ' free'}" title="${s.premium ? 'Users on Premium can choose it; free-trial users see Get Premium' : 'Every user, the free trial too'}">${s.premium ? 'Premium users' : 'All users'}</span>${isDef(s.id) ? `<span class="ds-on">★ Default${isDef(s.id) < Object.keys(def).length ? ` · ${Object.entries(def).filter(([, v]) => v === s.id).map(([k]) => ({ policies: 'Policies', hr: 'HR', thirdparty: '3rd-party', register: 'Register' })[k]).join(', ')}` : ''}</span>` : ''}</div>
+      <div class="ds-thumb" data-ds-pv="${s.id}" data-kind="policies" role="button" tabindex="0" title="Preview">${dsThumb(s.id, a)}<span class="ds-prem tier${s.premium ? '' : ' free'}" title="${s.premium ? 'Optional: users on Premium can choose it; free-trial users see Get Premium' : 'Every user, the free trial too'}">${s.premium ? 'Optional · Premium' : 'All users'}</span>${isDef(s.id) ? '<span class="ds-on">★ Default · all sections</span>' : ''}</div>
       <div class="ds-meta"><b>${s.no} · ${esc(s.name)}</b><small>${esc(s.desc)}</small></div>
       <div class="ds-act">
         ${['policies', 'hr', 'thirdparty', 'register'].map(k => `<button type="button" class="btn small" data-ds-pv="${s.id}" data-kind="${k}" title="Preview ${esc(DS_KIND_SAMPLE[k])}"><i class=i-eye></i> ${{ policies: 'Policy', hr: 'HR', thirdparty: '3rd-party', register: 'Register' }[k]}</button>`).join('')}
-        ${isDef(s.id) === Object.keys(def).length ? '<span class="tag ok">Default for all</span>' : `<button type="button" class="btn small primary" data-ds-default="${s.id}">Set as default for all</button>`}
+        ${isDef(s.id) ? '<span class="tag ok">★ Default for all sections</span>' : ''}
         ${eff.policies === s.id ? '<span class="tag ok">This facility\'s policies</span>' : `<button type="button" class="btn small" data-ds-use="${s.id}">Use for this facility</button>`}
       </div></article>`).join('');
     $$('#ds-admin-cards [data-ds-use]').forEach(b => b.onclick = () => useDocStyle(b.dataset.dsUse, 'policies'));
     $$('#ds-admin-cards [data-ds-pv]').forEach(b => b.onclick = () => openStylePreview(b.dataset.kind, b.dataset.dsPv));
-    $$('#ds-admin-cards [data-ds-default]').forEach(b => b.onclick = () => saveDocStyleSettings({ default: b.dataset.dsDefault }));
     renderApplyAll();
     const f = $('#ds-brand');
     f.elements.accent.value = a; f.elements.accentText.value = a;
@@ -3730,13 +3728,11 @@ function renderStyleCards(el, kind) {
         <button type="button" class="btn small" data-ds-open="${s.id}"><i class=i-eye></i> Preview</button>
         ${locked ? '<button type="button" class="btn small premium-btn" data-up>Get Premium to Unlock Custom Templates</button>'
           : on ? '<span class="tag ok">Selected</span>' : `<button type="button" class="btn small primary" data-ds-use="${s.id}"${ro ? ' disabled' : ''}>Use this style</button>`}
-        ${me?.role === 'admin' ? (d.settings.defaults?.[kind] === s.id ? `<span class="tag na">★ Default for ${esc(DS_KIND_LABEL[kind])}</span>`
-          : `<button type="button" class="btn small" data-ds-setdef="${s.id}" title="Every facility without its own choice gets it">★ Set as default for ${esc(DS_KIND_LABEL[kind])}</button>`) : ''}
+        ${s.id === 'classic' ? '<span class="tag na">★ Default</span>' : ''}
       </div></article>`;
   }).join('');
   el.querySelectorAll('[data-ds-open]').forEach(b => b.onclick = () => openStylePreview(kind, b.dataset.dsOpen));
   el.querySelectorAll('[data-ds-use]').forEach(b => b.onclick = () => useDocStyle(b.dataset.dsUse, kind));
-  el.querySelectorAll('[data-ds-setdef]').forEach(b => b.onclick = () => saveDocStyleSettings({ defaults: { [kind]: b.dataset.dsSetdef } }));
   // the section stays as the user left it (open by default; a collapsed one stays collapsed)
   const sec = el.closest('details.ds-sec');
   if (sec && !sec.dataset.bound) {

@@ -21,7 +21,7 @@ export function trialFacility(f) {
 }
 
 export const STYLES = [
-  { id: 'classic', no: 1, name: 'Modern Classic', premium: false, desc: 'The standard layout: the details box at the top, key-value fields and the revision table at the end.' },
+  { id: 'classic', no: 1, name: 'Master format', master: true, premium: false, desc: 'The master documents exactly as designed (Modern Classic): the details box at the top, key-value fields and the revision table at the end. Always the default.' },
   { id: 'split', no: 2, name: 'Executive Split', premium: true, desc: 'Page 1 in two columns: a sidebar with Policy ID, dates, facility and approver, the objectives and scope beside it.' },
   { id: 'minimal', no: 3, name: 'Corporate Minimalist', premium: true, desc: 'A clean borderless top grid, accent-coloured labels and headings, full-width text and a light revision table.' },
   { id: 'official', no: 4, name: 'Compact Official', premium: true, desc: 'A full-page border frame, a centred title and a horizontal summary table of the policy details.' },
@@ -30,14 +30,17 @@ export const FONTS = ['', 'Calibri', 'Arial', 'Segoe UI', 'Cambria', 'Georgia', 
 const DEFAULT_ACCENT = '#1F3864';
 export const styleById = id => STYLES.find(s => s.id === id) || STYLES[0];
 
-/** The three kinds of documents; each has its own default style (and each facility its own choice). */
+/** The kinds of documents; each facility can choose a style per kind. */
 export const KINDS = { policies: 'Policies', hr: 'HR documents', thirdparty: '3rd-party documents', register: 'LEGAL REGISTER snapshot' };
 const okStyle = v => STYLES.some(s => s.id === v);
-/** The administrator's settings: the default style per kind, accent colour, font, watermark. */
+/**
+ * The administrator's settings: accent colour, font, watermark. The default style is ALWAYS the master format
+ * (Modern Classic) for every kind of document – the other styles are used only where a facility chose one.
+ */
+export const MASTER_STYLE = 'classic';
 export function styleSettings() {
   const g = loadGlobalConfig().docStyles || {};
-  const base = okStyle(g.default) ? g.default : 'classic';
-  const defaults = Object.fromEntries(Object.keys(KINDS).map(k => [k, okStyle(g.defaults?.[k]) ? g.defaults[k] : base]));
+  const defaults = Object.fromEntries(Object.keys(KINDS).map(k => [k, MASTER_STYLE]));
   return {
     default: defaults.policies, defaults,
     accent: /^#[0-9a-f]{6}$/i.test(g.accent || '') ? g.accent.toUpperCase() : DEFAULT_ACCENT,
@@ -48,21 +51,18 @@ export function styleSettings() {
 export function saveStyleSettings(body = {}) {
   const cfg = loadGlobalConfig();
   const cur = styleSettings();
-  const next = { ...cur, defaults: { ...cur.defaults } };
-  // default: every kind at once (the policies' style); defaults: { policies, hr, thirdparty } one by one
-  if (body.default !== undefined) { if (!okStyle(body.default)) throw new Error('Unknown document style'); for (const k of Object.keys(KINDS)) next.defaults[k] = body.default; }
-  if (body.defaults) for (const [k, v] of Object.entries(body.defaults)) {
-    if (!KINDS[k]) throw new Error('Unknown kind of document');
-    if (!okStyle(v)) throw new Error('Unknown document style');
-    next.defaults[k] = v;
+  const next = { accent: cur.accent, font: cur.font, watermark: cur.watermark };
+  // the default is fixed: the master format for every kind of document
+  const notMaster = v => v !== undefined && v !== MASTER_STYLE;
+  if (notMaster(body.default) || Object.values(body.defaults || {}).some(notMaster)) {
+    throw Object.assign(new Error('The master document format is always the default – choose another style for a facility instead'), { status: 400 });
   }
-  next.default = next.defaults.policies;
   if (body.accent !== undefined) { if (!/^#[0-9a-f]{6}$/i.test(body.accent)) throw new Error('Accent colour: use a colour like #1F3864'); next.accent = body.accent.toUpperCase(); }
   if (body.font !== undefined) { if (!FONTS.includes(body.font)) throw new Error('Choose one of the listed fonts'); next.font = body.font; }
   if (body.watermark !== undefined) next.watermark = String(body.watermark).replace(/[<>&"]/g, '').trim().slice(0, 40);
-  cfg.docStyles = next;
+  cfg.docStyles = next; // (older settings with other defaults are dropped here)
   saveConfig(cfg);
-  return next;
+  return styleSettings();
 }
 /**
  * The style a facility's documents get: its own choice, else the default. Premium styles need a Premium account –
@@ -70,7 +70,7 @@ export function saveStyleSettings(body = {}) {
  */
 export function effectiveStyle(choice, { trial = false, kind = 'policies' } = {}) {
   const g = styleSettings();
-  let id = okStyle(choice) ? choice : g.defaults[kind] || g.default;
+  let id = okStyle(choice) ? choice : MASTER_STYLE; // no choice: the master format, top priority
   if (trial && styleById(id).premium) id = 'classic';
   return { id, accent: g.accent, font: g.font, watermark: g.watermark };
 }
