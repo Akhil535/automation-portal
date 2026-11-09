@@ -455,18 +455,23 @@ async function masterPageCounts(masters) {
 }
 
 /** A master as it is (Word file, or PDF made by Word) – for viewing and for editing in Word. */
-export async function masterFile(no, version, format = 'pdf') {
+export async function masterFile(no, version, format = 'pdf', style = null) {
   const { v, file } = variantOf(no, version);
-  if (format === 'docx') return { buffer: fs.readFileSync(file), name: v.original || v.file, type: 'docx' };
+  // style: { id, accent, font, watermark } – the master shown in a document style (the Word file for editing and
+  // uploading back is always the master itself)
+  if (format === 'docx' && !style) return { buffer: fs.readFileSync(file), name: v.original || v.file, type: 'docx' };
+  const raw = fs.readFileSync(file);
+  const source = style ? await applyDocStyle(raw, style, { kind: 'policy' }) : raw;
+  if (format === 'docx') return { buffer: source, name: `${path.basename(v.file, '.docx')} - ${style.id}.docx`, type: 'docx' };
   const viewDir = path.join(templatesDir(), '_view');
   fs.mkdirSync(viewDir, { recursive: true });
-  const hash = sha256(fs.readFileSync(file)).slice(0, 16);
+  const hash = sha256(Buffer.concat([raw, Buffer.from(JSON.stringify(style || {}))])).slice(0, 16);
   const pdfFile = path.join(viewDir, `${path.basename(v.file, '.docx')}-${hash}.pdf`);
   if (!fs.existsSync(pdfFile)) {
     const tmp = path.join(viewDir, `src-${hash}`);
     fs.mkdirSync(path.join(tmp, 'w'), { recursive: true });
     const src = path.join(tmp, 'w', 'master.docx');
-    fs.writeFileSync(src, fs.readFileSync(file));
+    fs.writeFileSync(src, source);
     await wordToPdf([{ in: src, out: pdfFile }]);
     fs.rmSync(tmp, { recursive: true, force: true });
     if (!fs.existsSync(pdfFile)) throw new Error('The master could not be shown as PDF (Microsoft Word is needed)');
@@ -523,8 +528,15 @@ export function prepSettings(cfg) {
     assets: Object.fromEntries(['logo', 'signature', 'stamp', 'combined'].map(k => [k, !!assetPath(cfg, k)])),
     usesFacilityLogo: !p.logo && !!cfg._facility.logo,
     // document style: the facility's choice (empty = the administrator's default) and what its documents get
+    // per kind of document: the facility's choice (empty = the administrator's default) and what it gets
     docStyleChoice: p.docStyle || '',
-    docStyle: effectiveStyle(p.docStyle, { trial: trialFacility(cfg._facility) }),
+    docStyleChoices: { policies: p.docStyle || '', hr: p.docStyles?.hr || '', thirdparty: p.docStyles?.thirdparty || '' },
+    docStyle: effectiveStyle(p.docStyle, { trial: trialFacility(cfg._facility), kind: 'policies' }),
+    docStyles: {
+      policies: effectiveStyle(p.docStyle, { trial: trialFacility(cfg._facility), kind: 'policies' }),
+      hr: effectiveStyle(p.docStyles?.hr, { trial: trialFacility(cfg._facility), kind: 'hr' }),
+      thirdparty: effectiveStyle(p.docStyles?.thirdparty, { trial: trialFacility(cfg._facility), kind: 'thirdparty' }),
+    },
   };
 }
 const isBaselineFacility = cfg => { const b = templateLock()?.baseline; return !!b?.name && b.name.toUpperCase() === facilityDisplayName(cfg).toUpperCase(); };
@@ -547,6 +559,13 @@ export function saveSettings(id, body = {}) {
   if (body.docStyle !== undefined) { // checked for Premium by the server
     if (body.docStyle && !STYLES.some(x => x.id === body.docStyle)) throw new Error('Unknown document style');
     next.docStyle = body.docStyle || '';
+  }
+  if (body.docStyles) { // { hr, thirdparty }: the forms' styles (policies: docStyle)
+    next.docStyles = { ...(cur.docStyles || {}) };
+    for (const [k, v] of Object.entries(body.docStyles)) {
+      if (!['hr', 'thirdparty'].includes(k) || (v && !STYLES.some(x => x.id === v))) throw new Error('Unknown document style');
+      next.docStyles[k] = v || '';
+    }
   }
   if (body.versions) next.versions = Object.fromEntries(Object.entries(body.versions).filter(([, v]) => /^\d+\.\d$/.test(v)));
   if (body.descriptions) next.descriptions = Object.fromEntries(Object.entries(body.descriptions).map(([k, v]) => [k, String(v).slice(0, 300)]));
@@ -1341,12 +1360,26 @@ export function generatePolicies(id, { pdf = true, only } = {}) {
       megabytes: Number((job.results.reduce((n, r) => n + (r.bytes || 0), 0) / 1e6).toFixed(1)),
     };
     validation.failed.push(...templates.filter(t => !job.results.some(r => r.no === t.no)).map(t => `PO${String(t.no).padStart(2, '0')}`));
+    // the style the policies were made in (the portal says when the style changed since)
+    try { fs.writeFileSync(path.join(dirs.base, 'style.json'), JSON.stringify({ ...s.docStyle, at: finished })); } catch { /* informative only */ }
     Object.assign(job, { running: false, finished, step: 'Done', validation });
   })().catch(e => Object.assign(job, { running: false, finished: new Date().toISOString(), step: 'Failed', problems: [...job.problems, e.message] }));
   return job;
 }
 
 /** Generated files of a facility (from the folders). */
+/**
+ * The style the facility's policies were last made in, and whether that is still the style they get now (style,
+ * accent, font and watermark). Policies made before styles existed count as Modern Classic without branding.
+ */
+export function generatedStyle(cfg) {
+  if (!generatedFiles(cfg).word.length) return null;
+  let made = null;
+  try { made = JSON.parse(fs.readFileSync(path.join(outputDirs(cfg).base, 'style.json'), 'utf8')); } catch { made = { id: 'classic', accent: '', font: '', watermark: '' }; }
+  const now = prepSettings(cfg).docStyle;
+  const same = made.id === now.id && (now.id === 'classic' && !now.font && !now.watermark ? true : made.accent === now.accent && (made.font || '') === (now.font || '') && (made.watermark || '') === (now.watermark || ''));
+  return { made: made.id, at: made.at || null, now: now.id, current: same };
+}
 export function generatedFiles(cfg) {
   const d = outputDirs(cfg);
   const list = f => (fs.existsSync(f) ? fs.readdirSync(f).filter(x => !x.startsWith('~$')) : []);

@@ -447,9 +447,9 @@ export async function fillForm(id, key, opts = {}) {
   const need = formNeeds(def, master, s, pics, dates);
   if (need.length) throw Object.assign(new Error(`Still needed for the ${def.title}: ${need.join(', ')}`), { status: 409, need });
   const generated = def.policy ? generatedPolicy(cfg, def.policy) : null;
-  const memoKey = sha256(Buffer.from(JSON.stringify([id, key, master.sha, s, pics.logo ? sha256(pics.logo.buffer) : '', generated && fs.statSync(generated).mtimeMs, dates, ds.details?.[key] || null])));
+  const memoKey = sha256(Buffer.from(JSON.stringify([id, key, master.sha, s, pics.logo ? sha256(pics.logo.buffer) : '', generated && fs.statSync(generated).mtimeMs, dates, ds.details?.[key] || null, opts.style || null])));
   if (!fillMemo.has(memoKey)) {
-    const r = await fillFresh(cfg, def, master, s, pics, { dates, details: { ...info.details, ...(ds.details?.[key] || {}) }, masterDetails: info.details });
+    const r = await fillFresh(cfg, def, master, s, pics, { dates, details: { ...info.details, ...(ds.details?.[key] || {}) }, masterDetails: info.details, style: opts.style || null });
     const z = await JSZip.loadAsync(r.buffer); // content fingerprint: the same content always gives the same PDF
     const parts = await Promise.all(Object.keys(z.files).sort().filter(f => !z.files[f].dir).map(async f => `${f}:${sha256(await z.file(f).async('nodebuffer'))}`));
     r.hash = sha256(Buffer.from(parts.join('|')));
@@ -492,7 +492,9 @@ async function fillFresh(cfg, def, master, s, pics, extra = {}) {
     people: def.policy ? master.people || {} : {}, labels: master.labels || [], emails: [], phones: [],
   };
   const sForm = def.policy ? s : { ...s, versions: {} };
-  const filled = await fillPolicy(buffer, tpl, sForm, { logo: pics.logo || null }, { logoBox: HR_LOGO_BOX, styleKind: 'form' });
+  // the form's document style: HR forms and 3rd-party forms each have their own (s.docStyles, or a preview's choice)
+  const formStyle = extra.style || s.docStyles?.[def.group === 'thirdparty' ? 'thirdparty' : 'hr'] || s.docStyle;
+  const filled = await fillPolicy(buffer, tpl, sForm, { logo: pics.logo || null }, { logoBox: HR_LOGO_BOX, styleKind: 'form', style: formStyle });
   filled.buffer = await addHeaderRef(await centreLogoOnPage(filled.buffer), refNo);
 
   // 3. Read back: no facility name other than this facility's may remain.
@@ -639,6 +641,24 @@ export async function pdfState(id) {
 }
 
 /** One form as Word or PDF. */
+/**
+ * A preview of a form in a document style (style: { id, accent, font, watermark }), as PDF or Word. The PDF is made in
+ * a temporary folder – the facility's own PDFs (and their cache) are never touched.
+ */
+export async function previewForm(id, key, style, format = 'pdf') {
+  const r = await fillForm(id, key, { style });
+  const name = `${r.file} - ${style?.id || 'style'}`;
+  if (format === 'docx') return { buffer: r.buffer, type: 'docx', name: `${name}.docx` };
+  const tmp = fs.mkdtempSync(path.join(path.resolve(dir(loadGlobalConfig(), 'data')), 'preview-'));
+  try {
+    fs.mkdirSync(path.join(tmp, 'w'));
+    const w = path.join(tmp, 'w', 'form.docx'), out = path.join(tmp, 'w', 'form.pdf');
+    fs.writeFileSync(w, r.buffer);
+    const res = await wordToPdf([{ in: w, out }]);
+    if (!fs.existsSync(out)) throw new Error(`Preview PDF not created: ${res.results?.[0]?.error || res.error || 'Microsoft Word is needed'}`);
+    return { buffer: fs.readFileSync(out), type: 'pdf', name: `${name}.pdf` };
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+}
 export async function formFile(id, key, format = 'pdf') {
   const cfg = loadConfig(id);
   const r = await fillForm(id, key, { cfg });

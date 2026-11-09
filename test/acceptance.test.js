@@ -772,6 +772,16 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
     assert.equal((await (await fetch(`${base}/api/plan`, nb)).json()).plan, 'premium');
     assert.equal((await put(`/api/doc-styles/facility${q}`, { style: 'official' }, newbieCookie)).status, 200, 'Premium: any document style');
     assert.equal((await (await fetch(`${base}/api/doc-styles${q}`, nb)).json()).effective, 'official');
+    // per kind: an HR default set by the administrator applies to every facility without its own choice
+    assert.equal((await put('/api/doc-styles', { defaults: { hr: 'minimal', thirdparty: 'split' } }, adminCookie)).status, 200);
+    let dsx = await (await fetch(`${base}/api/doc-styles${q}`, nb)).json();
+    assert.deepEqual([dsx.settings.defaults.hr, dsx.effectives.hr, dsx.effectives.thirdparty, dsx.effectives.policies], ['minimal', 'minimal', 'split', 'official']);
+    assert.equal((await put(`/api/doc-styles/facility${q}`, { style: 'official', kind: 'hr' }, newbieCookie)).status, 200, 'own choice for HR documents');
+    dsx = await (await fetch(`${base}/api/doc-styles${q}`, nb)).json();
+    assert.equal(dsx.effectives.hr, 'official'); assert.equal(dsx.choices.thirdparty, '');
+    assert.equal((await fetch(`${base}/api/doc-styles/apply-all`, nb)).status, 403, 'only administrators re-create everything');
+    assert.equal((await fetch(`${base}/api/doc-styles/apply-all`, { headers: { Cookie: adminCookie } })).status, 200);
+    assert.equal((await put('/api/doc-styles', { default: 'classic' }, adminCookie)).status, 200, 'back to Modern Classic for every kind');
     assert.equal((await fetch(`${base}/api/register/download${q}`, nb)).status, 200, 'premium: register download');
     const zp = await JSZip.loadAsync(Buffer.from(await (await fetch(`${base}/api/package.zip${q}&modules=register,policies&type=word`, nb)).arrayBuffer()));
     assert.ok(zp.file('Manager Clinic/Legal Register & Reports/MGR LEGAL REGISTER.xlsx'), Object.keys(zp.files).join(', '));
@@ -996,6 +1006,14 @@ test('10i. policy preparation: templates are filled for a facility (ID, dates, n
   assert.equal((kept.match(/<w:cantSplit\/>/g) || []).length, 2, 'no row splits over two pages'); assert.ok(kept.includes('<w:tblHeader/>'), 'header row repeats');
   assert.equal((kept.match(/<w:keepNext\/>/g) || []).length, 3, 'heading and rows keep together with the signature line');
   assert.equal(DS.effectiveStyle('split', { trial: true }).id, 'classic', 'free trial: Modern Classic only');
+  // forms keep their content and get the style's look: heading bands, light or accent-framed tables
+  const formDoc = await (async () => { const z = new JSZip(); z.file('word/document.xml', '<w:document><w:body><w:p><w:pPr><w:spacing w:after="0"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Employee Agreement</w:t></w:r></w:p><w:tbl><w:tblPr><w:tblW w:w="5000" w:type="dxa"/><w:tblLook w:val="04A0"/></w:tblPr><w:tblGrid><w:gridCol w:w="5000"/></w:tblGrid><w:tr><w:tc><w:p><w:r><w:t>Name</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p/><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:left="1440" w:right="1440"/></w:sectPr></w:body></w:document>'); return z.generateAsync({ type: 'nodebuffer' }); })();
+  const fx = async sid => (await JSZip.loadAsync(await DS.applyDocStyle(formDoc, { id: sid, accent: '#123456' }, { kind: 'form' }))).file('word/document.xml').async('string');
+  const fSplit = await fx('split'), fOff = await fx('official'), fMin = await fx('minimal');
+  assert.ok(/<w:pPr><w:pBdr><w:left [^>]*w:color="123456"\/><\/w:pBdr><w:shd [^>]*\/><w:spacing/.test(fSplit), 'split form: heading band (in the order Word expects)');
+  assert.ok(/<w:tblBorders>[\s\S]*w:color="123456"[\s\S]*<\/w:tblBorders><w:tblLook/.test(fOff) && /<w:pgBorders/.test(fOff), 'official form: accent-framed table and page frame');
+  assert.ok(/<w:tblBorders>[\s\S]*w:color="D9DEE7"/.test(fMin), 'minimal form: light table lines');
+  for (const f of [fSplit, fOff, fMin]) assert.ok(f.includes('Employee Agreement') && f.includes('>Name<'), 'form content unchanged');
   // The locked template itself is untouched.
   const { dir, loadGlobalConfig } = await import('../src/config.js');
   const stored = path.join(dir(loadGlobalConfig(), 'data'), 'policy-templates', t.file);

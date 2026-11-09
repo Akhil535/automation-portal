@@ -313,7 +313,9 @@
         <div><h2>Document styles</h2>
           <p class="sec-sub">Four looks for every generated Word and PDF document – policies, HR and 3rd-party documents and the LEGAL REGISTER snapshot. Choose the default for all facilities and the branding; facilities on Premium can pick their own style.</p></div>
       </div>
+      <div class="ds-defaults" id="ds-defaults"></div>
       <div class="ds-grid" id="ds-admin-cards"></div>
+      <div class="ds-apply" id="ds-apply"></div>
       <form class="ds-brand" id="ds-brand">
         <label>Accent colour<span class="ds-color"><input type="color" name="accent" value="#1F3864"><input name="accentText" maxlength="7" pattern="#[0-9A-Fa-f]{6}" aria-label="Accent colour code"></span></label>
         <label>Font<select name="font"></select></label>
@@ -380,6 +382,7 @@
       <div class="pw-title"><span class="pw-num">3</span><div><h2>Create the policies</h2><p class="muted small">Every policy is filled in and saved as Word and PDF.</p></div></div>
       <section class="ds-pick" aria-labelledby="ds-pick-title">
         <div class="ds-pick-head"><div><b id="ds-pick-title">Document style</b><small class="muted">The look of your policies, HR and 3rd-party documents (Word and PDF). Preview any style as a PDF of PO01.</small></div></div>
+        <div class="ds-note" id="ds-note"></div>
         <div class="ds-grid" id="ds-user-cards"></div>
       </section>
       <div id="pp-need"></div>
@@ -439,7 +442,7 @@
     <div class="hr-gen card" id="hr-gen-box" hidden></div>
 
     <article class="card hr-forms">
-      <header class="hr-sec-head"><div><h2>HR &amp; onboarding forms</h2><p class="muted small" id="hr-forms-sub">Filled for this facility every time you open them</p></div></header>
+      <header class="hr-sec-head"><div><h2>HR &amp; onboarding forms</h2><p class="muted small" id="hr-forms-sub">Filled for this facility every time you open them</p></div><div class="ds-mini" data-ds-kind="hr"></div></header>
       <div class="hr-form-grid" id="hr-form-grid"></div>
       <div class="hr-sync" id="hr-sync"></div>
     </article>
@@ -472,7 +475,7 @@
     </header>
     <div class="pp-for step-for"><img id="tp-logo" alt="" onerror="this.hidden=true"><span>Preparing vendor documents for</span><b id="tp-fac">–</b></div>
     <article class="card">
-      <header class="hr-sec-head"><div><h2>Vendor &amp; service-provider documents</h2><p class="muted small" id="tp-sub">–</p></div></header>
+      <header class="hr-sec-head"><div><h2>Vendor &amp; service-provider documents</h2><p class="muted small" id="tp-sub">–</p></div><div class="ds-mini" data-ds-kind="thirdparty"></div></header>
       <div class="hr-form-grid" id="tp-grid"></div>
       <div id="tp-dates"></div>
     </article>
@@ -1160,6 +1163,7 @@
     <p class="muted small" id="pm-info"></p>
 
     <div class="pm-pane" data-pane="view">
+      <label class="pm-style">Shown in<select id="pm-style" aria-label="Document style of the view"></select></label>
       <iframe id="pm-frame" title="Master policy"></iframe>
       <p class="muted small" id="pm-view-msg"></p>
     </div>

@@ -30,11 +30,16 @@ export const FONTS = ['', 'Calibri', 'Arial', 'Segoe UI', 'Cambria', 'Georgia', 
 const DEFAULT_ACCENT = '#1F3864';
 export const styleById = id => STYLES.find(s => s.id === id) || STYLES[0];
 
-/** The administrator's settings: default style, accent colour, font, watermark. */
+/** The three kinds of documents; each has its own default style (and each facility its own choice). */
+export const KINDS = { policies: 'Policies', hr: 'HR documents', thirdparty: '3rd-party documents' };
+const okStyle = v => STYLES.some(s => s.id === v);
+/** The administrator's settings: the default style per kind, accent colour, font, watermark. */
 export function styleSettings() {
   const g = loadGlobalConfig().docStyles || {};
+  const base = okStyle(g.default) ? g.default : 'classic';
+  const defaults = Object.fromEntries(Object.keys(KINDS).map(k => [k, okStyle(g.defaults?.[k]) ? g.defaults[k] : base]));
   return {
-    default: STYLES.some(s => s.id === g.default) ? g.default : 'classic',
+    default: defaults.policies, defaults,
     accent: /^#[0-9a-f]{6}$/i.test(g.accent || '') ? g.accent.toUpperCase() : DEFAULT_ACCENT,
     font: FONTS.includes(g.font) ? g.font : '',
     watermark: String(g.watermark || '').replace(/[<>&"]/g, '').trim().slice(0, 40),
@@ -43,8 +48,15 @@ export function styleSettings() {
 export function saveStyleSettings(body = {}) {
   const cfg = loadGlobalConfig();
   const cur = styleSettings();
-  const next = { ...cur };
-  if (body.default !== undefined) { if (!STYLES.some(s => s.id === body.default)) throw new Error('Unknown document style'); next.default = body.default; }
+  const next = { ...cur, defaults: { ...cur.defaults } };
+  // default: every kind at once (the policies' style); defaults: { policies, hr, thirdparty } one by one
+  if (body.default !== undefined) { if (!okStyle(body.default)) throw new Error('Unknown document style'); for (const k of Object.keys(KINDS)) next.defaults[k] = body.default; }
+  if (body.defaults) for (const [k, v] of Object.entries(body.defaults)) {
+    if (!KINDS[k]) throw new Error('Unknown kind of document');
+    if (!okStyle(v)) throw new Error('Unknown document style');
+    next.defaults[k] = v;
+  }
+  next.default = next.defaults.policies;
   if (body.accent !== undefined) { if (!/^#[0-9a-f]{6}$/i.test(body.accent)) throw new Error('Accent colour: use a colour like #1F3864'); next.accent = body.accent.toUpperCase(); }
   if (body.font !== undefined) { if (!FONTS.includes(body.font)) throw new Error('Choose one of the listed fonts'); next.font = body.font; }
   if (body.watermark !== undefined) next.watermark = String(body.watermark).replace(/[<>&"]/g, '').trim().slice(0, 40);
@@ -56,9 +68,9 @@ export function saveStyleSettings(body = {}) {
  * The style a facility's documents get: its own choice, else the default. Premium styles need a Premium account –
  * a facility created by a free-trial account always gets Modern Classic (trial: true).
  */
-export function effectiveStyle(choice, { trial = false } = {}) {
+export function effectiveStyle(choice, { trial = false, kind = 'policies' } = {}) {
   const g = styleSettings();
-  let id = STYLES.some(s => s.id === choice) ? choice : g.default;
+  let id = okStyle(choice) ? choice : g.defaults[kind] || g.default;
   if (trial && styleById(id).premium) id = 'classic';
   return { id, accent: g.accent, font: g.font, watermark: g.watermark };
 }
@@ -192,6 +204,30 @@ function lightRevisionTable(xml, accent, { frame = false } = {}) {
   }
   return xml.slice(0, rev.s) + t + xml.slice(rev.e);
 }
+// ---------------------------------------------------------------------------------------------------
+// Forms (HR / 3rd-party): their content and fields stay as they are; each style changes the presentation –
+//   Executive Split: headings as accent bands (a thick accent bar at the left, a light tint behind)
+//   Corporate Minimalist: accent headings, every table with light hairlines
+//   Compact Official: the page frame, accent headings, every table framed in the accent colour
+// ---------------------------------------------------------------------------------------------------
+const AFTER_PBDR = /<w:(tabs|suppressAutoHyphens|kinsoku|wordWrap|overflowPunct|topLinePunct|autoSpaceDE|autoSpaceDN|bidi|adjustRightInd|snapToGrid|spacing|ind|contextualSpacing|mirrorIndents|suppressOverlap|jc|textDirection|textAlignment|textboxTightWrap|outlineLvl|divId|cnfStyle|rPr|sectPr|pPrChange)[\s/>]/;
+function bandHeading(p, accent) {
+  if (!isHeading(p)) return p;
+  const band = `<w:pBdr><w:left w:val="single" w:sz="36" w:space="8" w:color="${accent}"/></w:pBdr><w:shd w:val="clear" w:color="auto" w:fill="${tint(`#${accent}`, 0.9)}"/>`;
+  const withBand = inner => { inner = inner.replace(/<w:pBdr>[\s\S]*?<\/w:pBdr>/, '').replace(/<w:shd [^>]*\/>/, ''); const m = inner.match(AFTER_PBDR); return m ? inner.slice(0, m.index) + band + inner.slice(m.index) : inner + band; };
+  if (/<w:pPr>/.test(p)) return p.replace(/<w:pPr>([\s\S]*?)<\/w:pPr>/, (m, inner) => `<w:pPr>${withBand(inner)}</w:pPr>`);
+  return p.replace(/^(<w:p(?:\s[^>]*)?>)/, `$1<w:pPr>${band}</w:pPr>`).replace('<w:pPr/>', '');
+}
+const isHeading = p => { const t = textOf(p).trim(); return /<w:pStyle w:val="(Heading|Title)[^"]*"/i.test(p) || (!!t && t.length < 70 && /<w:b\/>|<w:b w:val="(1|true)"\/>/.test(p) && !/[.:;,]$/.test(t)); };
+function restyleTables(xml, val, sz, color) {
+  const borders = `<w:tblBorders>${['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map(s => border(s, val, sz, color)).join('')}</w:tblBorders>`;
+  return xml.replace(/<w:tblPr>([\s\S]*?)<\/w:tblPr>/g, (m, inner) => {
+    if (/<w:tblBorders>/.test(inner)) return `<w:tblPr>${inner.replace(/<w:tblBorders>[\s\S]*?<\/w:tblBorders>/, borders)}</w:tblPr>`;
+    const at = inner.match(/<w:(shd|tblLayout|tblCellMar|tblLook|tblCaption|tblDescription|tblPrChange)[\s/>]/);
+    return `<w:tblPr>${at ? inner.slice(0, at.index) + borders + inner.slice(at.index) : inner + borders}</w:tblPr>`;
+  });
+}
+
 /** A paragraph that keeps with the next one (keepNext goes right after pStyle in the paragraph properties). */
 function keepWithNext(p) {
   if (/<w:keepNext\/>/.test(p)) return p;
@@ -353,6 +389,11 @@ export async function applyDocStyle(buffer, style, { kind = 'policy' } = {}) {
       else if (id === 'official') xml = layoutOfficial(xml, meta, accent, font);
     }
     xml = outsideTables(xml, p => colourHeadings(p, hex(accent)));
+    if (kind === 'form') { // forms: the style's own look, the content untouched
+      if (id === 'split') xml = outsideTables(xml, p => bandHeading(p, hex(accent)));
+      if (id === 'minimal') xml = restyleTables(xml, 'single', 4, 'D9DEE7');
+      if (id === 'official') xml = restyleTables(xml, 'single', 8, hex(accent));
+    }
     if (id === 'minimal' || id === 'official') xml = lightRevisionTable(xml, accent, { frame: id === 'official' });
     if (id === 'official') xml = pageBorder(xml, hex(accent));
   }

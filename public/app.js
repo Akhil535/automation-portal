@@ -2066,7 +2066,12 @@ const pmTpl = () => pp.templates.find(x => x.no === pm.no);
 const pmDirty = () => pm && (pm.edits.size || pm.inserts.some(x => x.text.trim()) || pm.deletes.size);
 
 async function openMaster(no, version, mode = 'view') {
-  pm = { no, version, mode, data: null, edits: new Map(), inserts: [], deletes: new Set() };
+  pm = { no, version, mode, data: null, edits: new Map(), inserts: [], deletes: new Set(), style: '' };
+  // the view follows the default document style; any other style, or the master exactly as stored, can be chosen
+  const names = dsData?.styles || [{ id: 'classic', no: 1, name: 'Modern Classic' }, { id: 'split', no: 2, name: 'Executive Split' }, { id: 'minimal', no: 3, name: 'Corporate Minimalist' }, { id: 'official', no: 4, name: 'Compact Official' }];
+  const defName = names.find(s => s.id === (dsData?.settings?.defaults?.policies || dsData?.settings?.default))?.name;
+  $('#pm-style').innerHTML = `<option value="">Default style${defName ? ` (${esc(defName)})` : ''}</option>${names.map(s => `<option value="${s.id}">${s.no} · ${esc(s.name)}</option>`).join('')}<option value="raw">The master as stored</option>`;
+  $('#pm-style').onchange = () => { pm.style = $('#pm-style').value; pmShow('view'); };
   pmHeader();
   $('#pm-msg').textContent = '';
   $('#pm-dlg').showModal();
@@ -2100,8 +2105,8 @@ async function pmShow(mode) {
   if (mode === 'view') {
     $('#pm-view-msg').textContent = 'Preparing the document with Microsoft Word (about 10 seconds the first time)…';
     const fr = $('#pm-frame');
-    fr.onload = () => { $('#pm-view-msg').textContent = 'The master exactly as stored – the facility details are filled in only when policies are generated.'; };
-    fr.src = `/api/policies/templates/${pm.no}/view?${q}&t=${Date.now()}`;
+    fr.onload = () => { $('#pm-view-msg').textContent = pm.style === 'raw' ? 'The master exactly as stored – the facility details are filled in only when policies are generated.' : 'The master in the chosen document style – the facility details are filled in when policies are generated; the Word file for editing stays the master itself.'; };
+    fr.src = `/api/policies/templates/${pm.no}/view?${q}${pm.style ? `&style=${encodeURIComponent(pm.style)}` : ''}&t=${Date.now()}`;
   } else if (mode === 'edit') {
     if (!pm.data) {
       $('#pm-paras').innerHTML = '<li class="muted"><span class="spin"></span> Loading the paragraphs…</li>';
@@ -2831,6 +2836,7 @@ async function loadHr() {
   if (!hrData.checklist.sections.some(s => s.id === hrSection)) hrSection = hrData.checklist.sections[0]?.id;
   renderHr();
   if (me?.role === 'admin') loadHrCross();
+  loadDocStyles(); // the HR documents' style picker
 }
 function renderHr() {
   const d = hrData, c = d.checklist.counts;
@@ -2999,6 +3005,7 @@ async function loadThirdParty() {
   try { hrData = await api('/api/hr'); } catch (e) { $('#tp-grid').innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
   renderThirdParty();
   renderHrForms(); // keeps the PDF refresh going
+  loadDocStyles(); // the 3rd-party documents' style picker
 }
 function renderThirdParty() {
   const d = hrData;
@@ -3579,16 +3586,29 @@ async function loadDocStyles() {
   try { dsData = await api('/api/doc-styles'); } catch { return; }
   renderDocStyles();
 }
+const DS_KIND_NAME = { policies: 'policies', hr: 'HR documents', thirdparty: '3rd-party documents' };
+/** Choose a facility's style for one kind of document (policies / hr / thirdparty). */
+async function useDocStyle(style, kind = 'policies') {
+  try {
+    const r = await api('/api/doc-styles/facility', { method: 'PUT', body: JSON.stringify({ style, kind }) });
+    Object.assign(dsData, r); renderDocStyles();
+    const name = dsData.styles.find(x => x.id === r.effectives[kind])?.name || '';
+    if (r.effectives[kind] !== style && style) toast('Saved – but this facility belongs to a free-trial account, so its documents stay on Modern Classic until that account is Premium');
+    else toast(kind === 'policies' ? `Policies: ${esc(name)} – create the policies again to apply it to the Word / PDF files`
+      : `${DS_KIND_NAME[kind]}: ${esc(name)} – every ${DS_KIND_NAME[kind]} file you open or download now uses it`);
+  } catch (e) { if (!/Premium/i.test(e.message)) toast(`<i class=i-alert></i> ${esc(e.message)}`); } // (402: the upgrade gateway opens by itself)
+}
 function renderDocStyles() {
-  const d = dsData; if (!d) return;
-  const a = d.settings.accent;
-  const preview = id => u(`/api/doc-styles/preview?style=${id}`);
-  // users: their facility's style
+  const d = dsData; if (!d?.styles) return;
+  const a = d.settings.accent, name = id => d.styles.find(s => s.id === id)?.name || id;
+  const preview = (id, kind = 'policies') => u(`/api/doc-styles/preview?style=${id}&kind=${kind}`);
+  const eff = d.effectives || { policies: d.effective };
+  // users: their facility's policy style (step 3 of Prepare policies)
   const box = $('#ds-user-cards');
   if (box) {
     const ro = me?.role === 'viewer';
     box.innerHTML = d.styles.map(s => {
-      const locked = s.premium && !d.premium, on = d.effective === s.id;
+      const locked = s.premium && !d.premium, on = eff.policies === s.id;
       return `<article class="ds-card${on ? ' on' : ''}${locked ? ' locked' : ''}" data-ds="${s.id}">
         <div class="ds-thumb">${dsThumb(s.id, a)}${locked ? '<span class="ds-prem"><i class=i-lock></i> Premium</span>' : ''}${on ? '<span class="ds-on">✓ In use</span>' : ''}</div>
         <div class="ds-meta"><b>${s.no} · ${esc(s.name)}</b><small>${esc(s.desc)}</small></div>
@@ -3598,47 +3618,81 @@ function renderDocStyles() {
             : on ? '<span class="tag ok">Selected</span>' : `<button type="button" class="btn small primary" data-ds-use="${s.id}"${ro ? ' disabled' : ''}>Use this style</button>`}
         </div></article>`;
     }).join('');
-    $$('#ds-user-cards [data-ds-use]').forEach(b => b.onclick = async () => {
-      try {
-        const r = await api('/api/doc-styles/facility', { method: 'PUT', body: JSON.stringify({ style: b.dataset.dsUse }) });
-        dsData.choice = r.choice; dsData.effective = r.effective; renderDocStyles();
-        toast(`Document style: ${esc(d.styles.find(x => x.id === r.effective).name)} – create the policies again to apply it to the Word / PDF files`);
-      } catch (e) { if (!/Premium/i.test(e.message)) toast(`<i class=i-alert></i> ${esc(e.message)}`); } // (402: the upgrade gateway opens by itself)
-    });
+    $$('#ds-user-cards [data-ds-use]').forEach(b => b.onclick = () => useDocStyle(b.dataset.dsUse, 'policies'));
+    // the policies on disk were made in another style (or branding) than they get now
+    const g = d.generated;
+    $('#ds-note').innerHTML = g && !g.current ? `<div class="ds-outdated"><i class=i-alert></i><span>Your policies were created in <b>${esc(name(g.made))}</b>${g.at ? ` (${fmt(g.at)})` : ''}; they now get <b>${esc(name(g.now))}</b>${g.made === g.now ? ' with new branding' : ''}. Create all policies again to update the Word / PDF files.</span>${me?.role !== 'viewer' ? '<button type="button" class="btn small primary" id="ds-regen">Create all policies again</button>' : ''}</div>` : '';
+    $('#ds-regen')?.addEventListener('click', () => $('#pp-generate')?.click());
   }
-  // administrators: the default style and the branding
+  // HR and 3rd-party pages: a compact picker (the forms are filled when opened, so the change shows at once)
+  $$('.ds-mini[data-ds-kind]').forEach(el => {
+    const kind = el.dataset.dsKind, cur = eff[kind] || 'classic', ro = me?.role === 'viewer';
+    el.innerHTML = `<label>Document style<select data-ds-mini="${kind}"${ro ? ' disabled' : ''}>${d.styles.map(s => `<option value="${s.id}"${s.id === cur ? ' selected' : ''}${s.premium && !d.premium ? ' data-locked="1"' : ''}>${s.no} · ${esc(s.name)}${s.premium && !d.premium ? ' – Premium' : ''}</option>`).join('')}</select></label>
+      <a class="btn small" href="${preview(cur, kind)}" target="_blank" rel="noopener" data-ds-prev="${kind}"><i class=i-eye></i> Preview</a>`;
+    const sel = el.querySelector('select');
+    sel.onchange = () => {
+      const opt = sel.selectedOptions[0];
+      el.querySelector('[data-ds-prev]').href = preview(sel.value, kind);
+      if (opt.dataset.locked) { sel.value = cur; showUpgrade?.({ message: 'Get Premium to Unlock Custom Templates' }); return; }
+      useDocStyle(sel.value, kind);
+    };
+  });
+  // administrators: never locked – preview / export any style, the defaults per kind, branding, re-create all
   const adm = $('#ds-admin-cards');
   if (adm && me?.role === 'admin') {
-    // administrators are never locked: every style can be previewed, exported (Word / PDF), set as the default and
-    // used for the facility open now; the tier label only says who else gets it (free trial or Premium accounts)
-    adm.innerHTML = d.styles.map(s => `<article class="ds-card${d.settings.default === s.id ? ' on' : ''}">
-      <div class="ds-thumb">${dsThumb(s.id, a)}<span class="ds-prem tier${s.premium ? '' : ' free'}" title="${s.premium ? 'Users on Premium can choose it; free-trial users see Get Premium' : 'Every user, the free trial too'}">${s.premium ? 'Premium users' : 'All users'}</span>${d.settings.default === s.id ? '<span class="ds-on">★ Default</span>' : ''}</div>
+    const def = d.settings.defaults || { policies: d.settings.default, hr: d.settings.default, thirdparty: d.settings.default };
+    $('#ds-defaults').innerHTML = `<b>Default style</b><small class="muted">for every facility that has not chosen its own</small>
+      ${Object.entries(d.kinds || DS_KIND_NAME).map(([k, label]) => `<label>${esc(label)}<select data-ds-def="${k}">${d.styles.map(s => `<option value="${s.id}"${def[k] === s.id ? ' selected' : ''}>${s.no} · ${esc(s.name)}</option>`).join('')}</select></label>`).join('')}`;
+    $$('#ds-defaults [data-ds-def]').forEach(sel => sel.onchange = () => saveDocStyleSettings({ defaults: { [sel.dataset.dsDef]: sel.value } }));
+    const isDef = id => Object.values(def).filter(v => v === id).length;
+    adm.innerHTML = d.styles.map(s => `<article class="ds-card${isDef(s.id) ? ' on' : ''}">
+      <div class="ds-thumb">${dsThumb(s.id, a)}<span class="ds-prem tier${s.premium ? '' : ' free'}" title="${s.premium ? 'Users on Premium can choose it; free-trial users see Get Premium' : 'Every user, the free trial too'}">${s.premium ? 'Premium users' : 'All users'}</span>${isDef(s.id) ? `<span class="ds-on">★ Default${isDef(s.id) < 3 ? ` · ${Object.entries(def).filter(([, v]) => v === s.id).map(([k]) => ({ policies: 'Policies', hr: 'HR', thirdparty: '3rd-party' })[k]).join(', ')}` : ''}</span>` : ''}</div>
       <div class="ds-meta"><b>${s.no} · ${esc(s.name)}</b><small>${esc(s.desc)}</small></div>
-      <div class="ds-act"><a class="btn small" href="${preview(s.id)}" target="_blank" rel="noopener"><i class=i-eye></i> Preview</a>
+      <div class="ds-act">
+        <a class="btn small" href="${preview(s.id)}" target="_blank" rel="noopener" title="Policy PO01"><i class=i-eye></i> Policy</a>
+        <a class="btn small" href="${preview(s.id, 'hr')}" target="_blank" rel="noopener" title="The first HR form"><i class=i-eye></i> HR</a>
+        <a class="btn small" href="${preview(s.id, 'thirdparty')}" target="_blank" rel="noopener" title="The first 3rd-party form"><i class=i-eye></i> 3rd-party</a>
         <a class="btn small" href="${preview(s.id)}&download=1"><i class=i-download></i> PDF</a>
         <a class="btn small" href="${preview(s.id)}&format=docx&download=1"><i class=i-download></i> Word</a>
-        ${d.settings.default === s.id ? '<span class="tag ok">Default</span>' : `<button type="button" class="btn small primary" data-ds-default="${s.id}">Set as default</button>`}
-        ${d.effective === s.id ? '<span class="tag ok">Used for this facility</span>' : `<button type="button" class="btn small" data-ds-use="${s.id}">Use for this facility</button>`}</div></article>`).join('');
-    $$('#ds-admin-cards [data-ds-use]').forEach(b => b.onclick = async () => {
-      try {
-        const r = await api('/api/doc-styles/facility', { method: 'PUT', body: JSON.stringify({ style: b.dataset.dsUse }) }); dsData.choice = r.choice; dsData.effective = r.effective; renderDocStyles();
-        toast(r.effective === b.dataset.dsUse ? `This facility now uses ${esc(d.styles.find(x => x.id === r.effective).name)} – create its documents again to apply it`
-          : 'Saved – but this facility belongs to a free-trial account, so its documents stay on Modern Classic until that account is Premium');
-      }
-      catch (e) { toast(`<i class=i-alert></i> ${esc(e.message)}`); }
-    });
+        ${isDef(s.id) === 3 ? '<span class="tag ok">Default for all</span>' : `<button type="button" class="btn small primary" data-ds-default="${s.id}">Set as default for all</button>`}
+        ${eff.policies === s.id ? '<span class="tag ok">This facility\'s policies</span>' : `<button type="button" class="btn small" data-ds-use="${s.id}">Use for this facility</button>`}
+      </div></article>`).join('');
+    $$('#ds-admin-cards [data-ds-use]').forEach(b => b.onclick = () => useDocStyle(b.dataset.dsUse, 'policies'));
+    $$('#ds-admin-cards [data-ds-default]').forEach(b => b.onclick = () => saveDocStyleSettings({ default: b.dataset.dsDefault }));
+    renderApplyAll();
     const f = $('#ds-brand');
     f.elements.accent.value = a; f.elements.accentText.value = a;
     f.elements.font.innerHTML = d.fonts.map(x => `<option value="${esc(x)}"${x === d.settings.font ? ' selected' : ''}>${x ? esc(x) : 'As in the master documents'}</option>`).join('');
     f.elements.watermark.value = d.settings.watermark || '';
-    $$('#ds-admin-cards [data-ds-default]').forEach(b => b.onclick = () => saveDocStyleSettings({ default: b.dataset.dsDefault }));
   }
+}
+/** Administrators: re-create every facility's existing policies in the style it now gets (progress shown here). */
+var dsApply = null, dsApplyTimer = 0; // var: may be used during start-up
+function renderApplyAll() {
+  const el = $('#ds-apply'); if (!el) return;
+  const st = dsApply;
+  el.innerHTML = `<div><b>Existing policies</b><small class="muted">HR and 3rd-party documents follow a new style at once (they are filled when opened). The 33 policies are stored files: re-create them for every facility in the style each now gets – each facility keeps the same set of policies.</small></div>
+    ${st?.running ? `<span class="ds-apply-run"><span class="spin"></span> Re-creating${st.current ? ` · ${esc(st.current)}` : ''} – ${st.done.length} done${st.queue.length ? `, ${st.queue.length} waiting` : ''}</span>`
+      : `<button type="button" class="btn primary" id="ds-apply-all"><i class=i-gear></i> Re-create all facilities' policies</button>${st?.done?.length ? `<span class="muted small">Last run: ${st.done.length} ${st.done.length === 1 ? 'facility' : 'facilities'} updated${st.problems?.length ? ` · ${esc(st.problems.join('; '))}` : ''}</span>` : ''}`}`;
+  $('#ds-apply-all')?.addEventListener('click', async () => {
+    if (!confirm("Re-create every facility's existing policies (Word + PDF) in the style it now gets?\n\nIt runs in the background – facilities one after the other.")) return;
+    try { dsApply = await apiGlobal('/api/doc-styles/apply-all', { method: 'POST', body: '{}' }); renderApplyAll(); pollApplyAll(); toast(dsApply.queue.length || dsApply.current ? 'Re-creating the policies in the background' : 'No facility has policies to re-create'); }
+    catch (e) { toast(`<i class=i-alert></i> ${esc(e.message)}`); }
+  });
+}
+function pollApplyAll() {
+  clearTimeout(dsApplyTimer);
+  dsApplyTimer = setTimeout(async () => {
+    try { dsApply = await apiGlobal('/api/doc-styles/apply-all'); } catch { return; }
+    renderApplyAll();
+    if (dsApply.running) pollApplyAll(); else { toast(`Policies re-created for ${dsApply.done.length} ${dsApply.done.length === 1 ? 'facility' : 'facilities'}`); loadDocStyles(); }
+  }, 3000);
 }
 async function saveDocStyleSettings(body) {
   try {
     const r = await api('/api/doc-styles', { method: 'PUT', body: JSON.stringify(body) });
     dsData.settings = r.settings; await loadDocStyles();
-    $('#ds-brand-msg').textContent = 'Saved – new documents use it; create the documents again to update existing ones.';
+    $('#ds-brand-msg').textContent = 'Saved – HR and 3rd-party documents use it at once; re-create the policies to update their files.';
     toast('Document styles saved');
   } catch (e) { $('#ds-brand-msg').textContent = e.message; }
 }

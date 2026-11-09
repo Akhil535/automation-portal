@@ -20,9 +20,10 @@ import { startScheduler } from './src/scheduler.js';
 import { formKind, installedForms } from './src/hrforms.js';
 import { MODULE_KEYS, buildPackage, packageTree } from './src/package.js';
 import { allowedSet, checkFreeRows, freeRegisterRows, maskMaster, checkChecklistItem, checkTrialApply, checklistFree, claim, claimUpload, maskChecklist, createdFacilities, facilityAllowance, isTrial, planInfo, setTrialLimits, trialLimits, upgradeError, upgradeUrl } from './src/plans.js';
+import { previewForm } from './src/hrforms.js';
 import { addForms, addItem, checklistXlsx, crossCheck, formFile, formsStatus, formsZip, generateForms, getChecklist, pdfState, prewarmPdfs, saveDocSettings, GROUPS, importMasterChecklist, listForms, masterChecklist, removeForm, removeItem, resetChecklist, updateItem } from './src/hrforms.js';
 import { documentHeader, sendMail } from './src/mailer.js';
-import { FONTS, STYLES, saveStyleSettings, styleById, styleSettings } from './src/docstyle.js';
+import { FONTS, KINDS, STYLES, effectiveStyle, saveStyleSettings, styleById, styleSettings } from './src/docstyle.js';
 import { describe as describeAction, readAudit, record as recordAudit } from './src/audit.js';
 import { lockReason, readLogo, readRegister } from './src/xlsx.js';
 import { imageSize } from './src/policy.js';
@@ -30,7 +31,7 @@ import { htmlToPdf, logoDataUrl, reportHtml } from './src/report.js';
 import {
   MAJOR_REVISION, addTemplates, assetFile, generatePolicies, generatedFile, generatedFiles, jobState, listTemplates,
   prepSettings, readiness, registerSourcePolicy, removeAsset, removeTemplate, saveAsset, saveSettings, zipGenerated, policyNoOf,
-  detectPictures, lockTemplates, masterFile, masterParagraphs, picturePreview, previewPolicy, saveMasterEdits, templateLock, unlockTemplates,
+  generatedStyle, detectPictures, lockTemplates, masterFile, masterParagraphs, picturePreview, previewPolicy, saveMasterEdits, templateLock, unlockTemplates,
 } from './src/policyprep.js';
 import {
   ROLES, SESSION_COOKIE, SESSION_MAX_AGE, canFacility, changeOwnPassword, createUser, deleteUser, endSession, hasUsers, loadUsers, registerUser,
@@ -118,6 +119,7 @@ function requiredRole(req) {
   if (m === 'DELETE') return 'admin'; // deleting (entries, items, pictures, facilities, users…) is for administrators only
   if (p === '/api/plans' || p === '/api/welcome') return m === 'GET' ? 'viewer' : 'admin';
   if (p === '/api/doc-styles' && m !== 'GET') return 'admin'; // the default document style and branding
+  if (p === '/api/doc-styles/apply-all') return 'admin'; // re-create every facility's policies in its style
   if (p === '/api/assistant/ask') return 'viewer'; // everyone may ask (read-only answers)
   if (p === '/api/assistant/key') return 'admin';
   if (p.startsWith('/api/users')) return 'admin';
@@ -531,7 +533,11 @@ app.post('/api/policies/templates', express.raw({ type: () => true, limit: '50mb
 app.delete('/api/policies/templates/:no', wrap(async (req, res) => res.json({ templates: removeTemplate(req.params.no, req.query.version) })));
 /** A master as it is: PDF to view, or the Word file to edit in Word. */
 app.get('/api/policies/templates/:no/view', wrap(async (req, res) => {
-  const r = await masterFile(req.params.no, req.query.version, req.query.format === 'docx' ? 'docx' : 'pdf');
+  // the view follows the default document style (?style=<id> another style, ?style=raw the master as stored); the
+  // Word file (format=docx without style) is always the master itself – it is edited and uploaded back
+  const q = String(req.query.style || ''), docx = req.query.format === 'docx';
+  const style = q === 'raw' || (docx && !q) ? null : effectiveStyle(q && styleById(q).id === q ? q : null);
+  const r = await masterFile(req.params.no, req.query.version, docx ? 'docx' : 'pdf', style);
   res.set({ 'Content-Type': r.type === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'Content-Disposition': `${r.type === 'pdf' ? 'inline' : 'attachment'}; filename="${r.name.replace(/"/g, '')}"`, 'Cache-Control': 'no-store' }).send(r.buffer);
 }));
@@ -955,25 +961,68 @@ app.get('/api/export/pdf', wrap(async (req, res) => {
 // policies, HR and 3rd-party documents and the LEGAL REGISTER snapshot. Administrators set the default and the
 // branding (accent colour, font, watermark); each facility can choose its style – styles 2-4 are Premium.
 // ---------------------------------------------------------------------------------------------------
+const styleState = s => ({
+  choice: s.docStyleChoice, effective: s.docStyle.id, // (policies – kept for older screens)
+  choices: s.docStyleChoices, effectives: Object.fromEntries(Object.entries(s.docStyles).map(([k, v]) => [k, v.id])),
+});
 app.get('/api/doc-styles', wrap(async (req, res) => {
-  const s = prepSettings(loadConfig(fac(req)));
-  res.json({ styles: STYLES, fonts: FONTS, settings: styleSettings(), choice: s.docStyleChoice, effective: s.docStyle.id, premium: !isTrial(req.user) });
+  const cfg = loadConfig(fac(req)), s = prepSettings(cfg);
+  res.json({ styles: STYLES, fonts: FONTS, kinds: KINDS, settings: styleSettings(), ...styleState(s), premium: !isTrial(req.user), generated: generatedStyle(cfg) });
 }));
 app.put('/api/doc-styles', wrap(async (req, res) => res.json({ settings: saveStyleSettings(req.body || {}) })));
+/** The facility's style for one kind of document (policies, hr, thirdparty) – styles 2-4 need Premium. */
 app.put('/api/doc-styles/facility', wrap(async (req, res) => {
-  const style = String(req.body?.style || '');
+  const style = String(req.body?.style || ''), kind = KINDS[req.body?.kind] ? req.body.kind : 'policies';
   if (style && styleById(style).id !== style) throw new Error('Unknown document style');
   if (style && styleById(style).premium && isTrial(req.user)) throw upgradeError('Get Premium to Unlock Custom Templates');
-  const s = saveSettings(facId(req), { docStyle: style });
-  res.json({ choice: s.docStyleChoice, effective: s.docStyle.id });
+  const s = saveSettings(facId(req), kind === 'policies' ? { docStyle: style } : { docStyles: { [kind]: style } });
+  res.json(styleState(s));
 }));
-/** A preview of policy PO01 (or ?no=) in a style, as PDF (or ?format=docx) – any style can be previewed. */
+/**
+ * A preview in a style, as PDF (or ?format=docx) – any style can be previewed. ?kind=policies (PO01 or ?no=),
+ * ?kind=hr / thirdparty: the first form of that kind (or ?key=).
+ */
 app.get('/api/doc-styles/preview', wrap(async (req, res) => {
-  const style = styleById(String(req.query.style || '')).id;
-  const r = await previewPolicy(facId(req), { no: Number(req.query.no) || undefined, style, format: req.query.format === 'docx' ? 'docx' : 'pdf' });
+  const id = styleById(String(req.query.style || '')).id, kind = KINDS[req.query.kind] ? req.query.kind : 'policies';
+  const format = req.query.format === 'docx' ? 'docx' : 'pdf';
+  let r;
+  if (kind === 'policies') { const p = await previewPolicy(facId(req), { no: Number(req.query.no) || undefined, style: id, format }); r = { buffer: p.buffer, type: p.type, name: p.file }; }
+  else {
+    const forms = installedForms(kind === 'thirdparty' ? 'thirdparty' : 'hr');
+    const key = forms.some(f => f.key === req.query.key) ? req.query.key : forms[0]?.key;
+    if (!key) throw new Error(`No ${KINDS[kind]} have been uploaded yet`);
+    r = await previewForm(facId(req), key, { ...prepSettings(loadConfig(fac(req))).docStyles[kind], id }, format);
+  }
   res.type(r.type === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-    .set('Content-Disposition', `${req.query.download ? 'attachment' : 'inline'}; filename="${r.file.replace(/[^\w .-]/g, '')}"`).send(r.buffer);
+    .set('Content-Disposition', `${req.query.download ? 'attachment' : 'inline'}; filename="${r.name.replace(/[^\w .-]/g, '')}"`).send(r.buffer);
 }));
+/**
+ * Administrators: re-create the policies every facility already has in the style it now gets (after the default or
+ * the branding changed). One facility after the other in the background; each keeps the same set of policies.
+ */
+const restyle = { running: false, done: [], queue: [], current: null, problems: [] };
+app.post('/api/doc-styles/apply-all', wrap(async (req, res) => {
+  if (restyle.running) return res.json(restyle);
+  const todo = loadFacilities().list.map(f => {
+    const cfg = loadConfig(f.id), files = generatedFiles(cfg).word;
+    return files.length && !readiness(cfg).length ? { id: f.id, name: f.name, only: [...new Set(files.map(n => policyNoOf(n)).filter(Boolean))] } : null;
+  }).filter(Boolean);
+  Object.assign(restyle, { running: true, done: [], queue: todo.map(t => t.name), current: null, problems: [], started: new Date().toISOString() });
+  (async () => {
+    for (const t of todo) {
+      restyle.current = t.name; restyle.queue.shift();
+      try {
+        generatePolicies(t.id, { only: t.only });
+        while (jobState(t.id)?.running) await new Promise(r => setTimeout(r, 1500));
+        const j = jobState(t.id); if (j?.error) restyle.problems.push(`${t.name}: ${j.error}`);
+        restyle.done.push(t.name);
+      } catch (e) { restyle.problems.push(`${t.name}: ${e.message}`); }
+    }
+    restyle.running = false; restyle.current = null;
+  })();
+  res.json(restyle);
+}));
+app.get('/api/doc-styles/apply-all', wrap(async (req, res) => res.json(restyle)));
 
 app.get('/api/runs', wrap(async (req, res) => res.json(new Store(cfgOf(req)).data.runs.slice(0, 200))));
 
