@@ -1873,6 +1873,12 @@ const plusYear = iso => { if (!ISO.test(iso || '')) return ''; const [y, m, d] =
 const ppNo = n => `PO${String(n).padStart(2, '0')}`;
 
 /** Master files of a policy per version: v1.0 / v2.0 chips; the one used for the chosen version is highlighted. */
+/** The master file a policy version uses: the master stored for that version, otherwise the policy's own (newest). */
+function masterKeyFor(t, version) {
+  const key = v => `${Math.max(1, Math.floor(Number(v) || 1))}.0`;
+  const vs = Object.keys(t?.variants || {});
+  return vs.includes(key(version)) ? key(version) : key(t?.version);
+}
 function ppMasters(t, chosen) {
   const vs = Object.keys(t.variants || { [t.version]: 1 }).sort();
   const key = v => `${Math.max(1, Math.floor(Number(v) || 1))}.0`;
@@ -1954,9 +1960,12 @@ function renderPolicies() {
         ${pp.lock?.locked ? '<span class="muted small" title="Locked master"><i class=i-lock></i></span>' : `<button class="icon-btn del" data-admin data-del-tpl="${x.no}">Remove</button>`}
       </div></td></tr>`).join('')
     : '<tr><td colspan="8" class="muted">No master policies yet – an administrator uploads the Word files (e.g. all 33 ADHICS policies) once.</td></tr>';
-  $$('#pp-tpl-body [data-ver]').forEach(el => el.onchange = () => saveVersions());
-  $$('#pp-tpl-body [data-vt]').forEach(b => b.onclick = () => { $(`#pp-tpl-body input[data-ver="${b.dataset.vt}"]`).value = b.dataset.v; saveVersions(); });
-  $$('#pp-tpl-body [data-pm-open]').forEach(b => b.onclick = () => openMaster(Number(b.dataset.pmOpen), vKey(ver(Number(b.dataset.pmOpen))), b.dataset.pmMode));
+  // changing a version is saved at once and confirmed (which master it uses; created policies follow on the next run)
+  const verSaved = no => { const tp = t.find(x => x.no === Number(no)), v = $(`#pp-tpl-body [data-ver="${no}"]`).value;
+    toast(`${ppNo(Number(no))} will be issued as version ${esc(v)} – uses the v${masterKeyFor(tp, v)} master. Create the policies again to apply it to the Word / PDF files.`); };
+  $$('#pp-tpl-body select[data-ver]').forEach(el => el.onchange = async () => { if (await saveVersions()) verSaved(el.dataset.ver); });
+  $$('#pp-tpl-body [data-vt]').forEach(b => b.onclick = async () => { $(`#pp-tpl-body input[data-ver="${b.dataset.vt}"]`).value = b.dataset.v; if (await saveVersions()) verSaved(b.dataset.vt); });
+  $$('#pp-tpl-body [data-pm-open]').forEach(b => b.onclick = () => { const no = Number(b.dataset.pmOpen); openMaster(no, masterKeyFor(t.find(x => x.no === no), ver(no)), b.dataset.pmMode); });
   $$('#pp-tpl-body [data-desc]').forEach(el => el.onchange = () => saveVersions());
   $$('#pp-tpl-body [data-del-tpl]').forEach(b => b.onclick = async () => {
     if (!confirm(`Remove master policy ${ppNo(b.dataset.delTpl)} from the templates?`)) return;
@@ -2044,8 +2053,8 @@ async function saveVersions() {
   const versions = {}, descriptions = {};
   $$('#pp-tpl-body [data-ver]').forEach(el => { versions[el.dataset.ver] = el.value; });
   $$('#pp-tpl-body [data-desc]').forEach(el => { if (el.value.trim()) descriptions[el.dataset.desc] = el.value.trim(); });
-  try { await api('/api/policies/settings', { method: 'PUT', body: JSON.stringify({ versions, descriptions }) }); loadPolicies(); }
-  catch (e) { alert(`Not saved: ${e.message}`); }
+  try { await api('/api/policies/settings', { method: 'PUT', body: JSON.stringify({ versions, descriptions }) }); loadPolicies(); return true; }
+  catch (e) { toast(`<i class=i-alert></i> Not saved: ${esc(e.message)}`); return false; }
 }
 
 // ===================================================================================================
@@ -2065,10 +2074,11 @@ async function openMaster(no, version, mode = 'view') {
 function pmHeader() {
   const t = pmTpl(), v = t.variants?.[pm.version] || t;
   $('#pm-title').textContent = `${ppNo(pm.no)} – ${(v.title || t.title).replace(/^ADHICS\s*[-–]\s*/i, '')}`;
-  $('#pm-kicker').textContent = `Master policy · version ${pm.version}`;
-  const chosen = `${Math.max(1, Math.floor(Number(pp.settings.versions[pm.no] || (pp.majorRevision.includes(pm.no) ? '2.0' : '1.0')) || 1))}.0`;
+  const issued = pp.settings.versions[pm.no] || (pp.majorRevision.includes(pm.no) ? '2.0' : '1.0'); // the version the policy is issued as
+  const chosen = masterKeyFor(t, issued); // the master file that version uses
+  $('#pm-kicker').textContent = `Master policy · v${pm.version} master${pm.version === chosen ? ` · issued as version ${issued}` : ''}`;
   $('#pm-vers').innerHTML = Object.keys(t.variants || { [t.version]: 1 }).sort().map(k =>
-    `<button type="button" data-pmv="${k}" class="${k === pm.version ? 'on' : ''}">Version ${k}${k === chosen ? ' <small>used</small>' : ''}</button>`).join('');
+    `<button type="button" data-pmv="${k}" class="${k === pm.version ? 'on' : ''}">v${k} master${k === chosen ? ' <small>used</small>' : ''}</button>`).join('');
   $$('#pm-vers [data-pmv]').forEach(b => b.onclick = () => {
     if (b.dataset.pmv === pm.version) return;
     if (pmDirty() && !confirm('Discard the unsaved changes?')) return;
@@ -2078,7 +2088,7 @@ function pmHeader() {
   $('#pm-info').innerHTML = `${esc(v.original || v.file || '')} · written for <b>${esc(v.oldName || '–')}</b>` +
     (v.editedAt ? ` · edited ${fmt(v.editedAt)}${v.editedBy ? ` by ${esc(v.editedBy)}` : ''}` : '') +
     (pp.lock?.locked ? ' · <i class=i-lock></i> locked master' : '') +
-    (pm.version === chosen ? ' · <span class="tag ok">used for this facility\'s policies</span>' : ` · <span class="tag na">not used – this facility uses version ${chosen}</span>`);
+    (pm.version === chosen ? ` · <span class="tag ok">used for this facility's policy (issued as version ${esc(issued)})</span>` : ` · <span class="tag na">not used – this facility uses the v${chosen} master</span>`);
 }
 async function pmShow(mode) {
   pm.mode = mode;

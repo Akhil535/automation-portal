@@ -347,9 +347,12 @@ const historyDir = () => { const d = path.join(templatesDir(), '_history'); fs.m
 function variantOf(no, version) {
   const t = listTemplates().find(x => x.no === Number(no));
   if (!t) throw new Error(`Policy PO${no} is not in the masters`);
-  const key = versionKey(version || t.version);
-  const v = t.variants[key];
-  if (!v) throw new Error(`PO${String(no).padStart(2, '0')} has no v${key} master`);
+  // The policy version (1.0 / 2.0 / 3.0…) is the number a facility issues the policy as; it uses the master stored
+  // for that version, or – when there is none – the master the policy has (the newest), like policy generation does.
+  let key = versionKey(version || t.version);
+  if (!t.variants[key]) key = versionKey(t.version);
+  const v = t.variants[key] || Object.values(t.variants)[0];
+  if (!v) throw new Error(`PO${String(no).padStart(2, '0')} has no master file`);
   return { t, key, v, file: path.join(templatesDir(), v.file) };
 }
 /** Top-level body paragraphs (not inside tables or text boxes) as ranges. */

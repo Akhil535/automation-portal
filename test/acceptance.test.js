@@ -971,6 +971,8 @@ test('10i. policy preparation: templates are filled for a facility (ID, dates, n
   // In-portal editing: change a paragraph, add a DoH clause; the edited master is used for generation and locked.
   await P.lockTemplates('tester');
   const paras = await P.masterParagraphs(7, '1.0');
+  // a policy version without its own master file (e.g. issued as 3.0) opens the master the policy has – no error
+  assert.equal((await P.masterParagraphs(7, '3.0')).paragraphs.length, paras.paragraphs.length, 'version 3.0 uses the stored master');
   const target = paras.paragraphs.find(x => x.text.startsWith('This policy applies'));
   const saved = await P.saveMasterEdits(7, '1.0', { edits: [{ i: target.i, text: 'This policy applies to every user of OLD TOWN MEDICAL CENTER.' }], inserts: [{ after: target.i, text: 'DoH clause: incidents are reported to the DoH SOC.' }] }, 'tester');
   assert.equal(saved.paragraphs.length, paras.paragraphs.length + 1, 'one clause added');
