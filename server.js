@@ -31,7 +31,7 @@ import { imageSize } from './src/policy.js';
 import { htmlToPdf, logoDataUrl, reportHtml } from './src/report.js';
 import {
   MAJOR_REVISION, addTemplates, assetFile, generatePolicies, generatedFile, generatedFiles, jobState, listTemplates,
-  prepSettings, readiness, registerSourcePolicy, removeAsset, removeTemplate, saveAsset, saveSettings, zipGenerated, policyNoOf,
+  prepSettings, printPics, readiness, registerSourcePolicy, removeAsset, removeTemplate, saveAsset, saveSettings, zipGenerated, policyNoOf,
   generatedStyle, pdfFor, detectPictures, lockTemplates, masterFile, masterParagraphs, picturePreview, previewPolicy, saveMasterEdits, templateLock, unlockTemplates,
 } from './src/policyprep.js';
 import {
@@ -937,7 +937,10 @@ app.put('/api/document-control', wrap(async (req, res) => {
 async function snapshot(req, printButton, opts = {}) { // opts: { style, items } for a style preview
   const cfg = cfgOf(req);
   const items = opts.items || await readMaster(cfg);
+  // the facility's own logo: its logo file, else the logo uploaded for its policies, and only then the picture inside
+  // the workbook (which can still be the template facility's when the register was copied from it)
   let buf = cfg._facility.logo && fs.existsSync(cfg._facility.logo) ? fs.readFileSync(cfg._facility.logo) : null;
+  if (!buf) buf = (await printPics(cfg).catch(() => ({}))).logo?.buffer || null;
   if (!buf) buf = await readLogo(cfg.register.path, [cfg.documentControl.sheet, cfg.master.sheet]).catch(() => null);
   const store = new Store(cfg);
   let circulars = {};
