@@ -2104,10 +2104,15 @@ async function pmShow(mode) {
   $('#pm-save').hidden = mode !== 'edit';
   const q = `version=${encodeURIComponent(pm.version)}`;
   if (mode === 'view') {
-    $('#pm-view-msg').textContent = 'Preparing the document with Microsoft Word (about 10 seconds the first time)…';
-    const fr = $('#pm-frame');
-    fr.onload = () => { $('#pm-view-msg').textContent = pm.style === 'raw' ? 'The master exactly as stored – the facility details are filled in only when policies are generated.' : 'The master in the chosen document style – the facility details are filled in when policies are generated; the Word file for editing stays the master itself.'; };
-    fr.src = `/api/policies/templates/${pm.no}/view?${q}${pm.style ? `&style=${encodeURIComponent(pm.style)}` : ''}&t=${Date.now()}`;
+    $('#pm-view-msg').innerHTML = '<span class="spin"></span> Preparing the document with Microsoft Word – the first time takes a few seconds, the other styles are then ready at once…';
+    const fr = $('#pm-frame'), want = `${pm.no}|${pm.version}|${pm.style}`;
+    pm.want = want;
+    // fetched as a file (cached in memory): the note changes as soon as it is here – a PDF frame may never say "loaded"
+    previewFile(`/api/policies/templates/${pm.no}/view?${q}${pm.style ? `&style=${encodeURIComponent(pm.style)}` : ''}`).then(blobUrl => {
+      if (pm.want !== want) return;
+      fr.src = `${blobUrl}#view=FitH&toolbar=1&navpanes=0`;
+      $('#pm-view-msg').textContent = pm.style === 'raw' ? 'The master exactly as stored – the facility details are filled in only when policies are generated.' : 'The master in the chosen document style – the facility details are filled in when policies are generated; the Word file for editing stays the master itself.';
+    }).catch(e => { if (pm.want === want) $('#pm-view-msg').innerHTML = `<span class="warn-txt"><i class=i-alert></i> ${esc(e.message)}</span>`; });
   } else if (mode === 'edit') {
     if (!pm.data) {
       $('#pm-paras').innerHTML = '<li class="muted"><span class="spin"></span> Loading the paragraphs…</li>';
@@ -2165,6 +2170,7 @@ function pmFilter() {
 $('#pm-filter').oninput = pmFilter;
 
 $('#pm-save').onclick = async () => {
+  clearPreviewFiles(); // the master changes: views made before are out of date
   const body = {
     version: pm.version,
     edits: [...pm.edits].map(([i, text]) => ({ i, text })),
@@ -3749,6 +3755,42 @@ function openStylePreview(kind, style) {
   if (!dlg.open) dlg.showModal();
   renderStylePreview();
 }
+// Previews are fetched as files and kept in memory (per facility, style and branding), so switching tabs or opening
+// a preview again is instant; the waiting note goes away as soon as the file is here (a PDF in a frame often never
+// says "loaded"). After the first one, the other styles are fetched in the background – the server made them all in
+// one Word run, so they come straight from its cache.
+const dsFiles = new Map(); // url → Promise<object URL>
+const dsFileKey = url => `${url}|${JSON.stringify(dsData?.settings || {})}`;
+const dsFileAt = new Map();
+function previewFile(url) {
+  const k = dsFileKey(url);
+  if (dsFiles.has(k) && Date.now() - (dsFileAt.get(k) || 0) > 180000) { dsFiles.get(k).then(URL.revokeObjectURL).catch(() => {}); dsFiles.delete(k); } // 3 min: details may have changed
+  if (!dsFiles.has(k)) {
+    dsFileAt.set(k, Date.now());
+    dsFiles.set(k, fetch(url, { credentials: 'same-origin' }).then(async r => {
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
+      return URL.createObjectURL(await r.blob());
+    }).catch(e => { dsFiles.delete(k); throw e; }));
+    if (dsFiles.size > 40) { const [first] = dsFiles.keys(); dsFiles.get(first)?.then(URL.revokeObjectURL).catch(() => {}); dsFiles.delete(first); }
+  }
+  return dsFiles.get(k);
+}
+function clearPreviewFiles() { for (const p of dsFiles.values()) p.then(URL.revokeObjectURL).catch(() => {}); dsFiles.clear(); }
+let dsShowSeq = 0;
+async function showPreviewFile(url, kind) {
+  const seq = ++dsShowSeq, fr = $('#ds-prev-frame'), load = $('#ds-prev-load');
+  load.hidden = false; load.innerHTML = `<span class="spin"></span> ${kind === 'register' ? 'Preparing the report…' : 'Preparing the preview with Microsoft Word – the first time takes a few seconds, the other styles are then ready at once…'}`;
+  try {
+    const blobUrl = await previewFile(url);
+    if (seq !== dsShowSeq) return; // another tab was chosen meanwhile
+    fr.src = kind === 'register' ? blobUrl : `${blobUrl}#view=FitH&toolbar=1&navpanes=0`;
+    load.hidden = true;
+    // the other styles in the background (instant from the server's cache now)
+    for (const s of dsData.styles) if (s.id !== dsPrev.style) previewFile(u(`/api/doc-styles/preview?style=${s.id}&kind=${kind}`)).catch(() => {});
+  } catch (e) {
+    if (seq === dsShowSeq) load.innerHTML = `<span class="warn-txt"><i class=i-alert></i> ${esc(e.message)}</span>`;
+  }
+}
 function renderStylePreview() {
   const d = dsData, { kind, style } = dsPrev;
   const s = d.styles.find(x => x.id === style) || d.styles[0];
@@ -3759,10 +3801,7 @@ function renderStylePreview() {
   $('#ds-prev-tabs').innerHTML = d.styles.map(x => `<button type="button" role="tab" aria-selected="${x.id === style}" class="${x.id === style ? 'on' : ''}" data-ds-tab="${x.id}">${x.no} · ${esc(x.name)}${x.premium && !d.premium ? ' <i class=i-lock></i>' : ''}${x.id === eff ? ' <small>in use</small>' : ''}</button>`).join('');
   $$('#ds-prev-tabs [data-ds-tab]').forEach(b => b.onclick = () => { dsPrev.style = b.dataset.dsTab; renderStylePreview(); });
   const url = u(`/api/doc-styles/preview?style=${style}&kind=${kind}`);
-  const fr = $('#ds-prev-frame');
-  $('#ds-prev-load').hidden = false;
-  fr.onload = () => { $('#ds-prev-load').hidden = true; };
-  fr.src = url;
+  showPreviewFile(url, kind);
   $('#ds-prev-files').innerHTML = kind === 'register' ? `<a class="btn small" href="${url}" target="_blank" rel="noopener"><i class=i-eye></i> Open in a new tab</a>`
     : `<a class="btn small" href="${url}&download=1"><i class=i-download></i> PDF</a><a class="btn small" href="${url}&format=docx&download=1"><i class=i-download></i> Word</a>`;
   $('#ds-prev-act').innerHTML = style === eff ? '<span class="tag ok">In use for this facility</span>'

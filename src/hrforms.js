@@ -20,7 +20,7 @@ import { docToDocx } from './docparse.js';
 import { imageSize } from './imagesize.js';
 import { STATUSES, buildChecklistXlsx, countStatuses, parseChecklistXlsx } from './checklistxlsx.js';
 import {
-  MAJOR_REVISION, _internal, fillPolicy, generatedFiles, inspectTemplate, outputDirs, plusOneYear, prepSettings, printPics, templateLock, wordToPdf,
+  MAJOR_REVISION, _internal, fillPolicy, generatedFiles, inspectTemplate, outputDirs, pdfFor, plusOneYear, prepSettings, printPics, templateLock, wordToPdf,
 } from './policyprep.js';
 
 const { tables, textOf, labelOf, squash, replaceInParagraphs, sha256, cellWithText } = _internal;
@@ -649,15 +649,8 @@ export async function previewForm(id, key, style, format = 'pdf') {
   const r = await fillForm(id, key, { style });
   const name = `${r.file} - ${style?.id || 'style'}`;
   if (format === 'docx') return { buffer: r.buffer, type: 'docx', name: `${name}.docx` };
-  const tmp = fs.mkdtempSync(path.join(path.resolve(dir(loadGlobalConfig(), 'data')), 'preview-'));
-  try {
-    fs.mkdirSync(path.join(tmp, 'w'));
-    const w = path.join(tmp, 'w', 'form.docx'), out = path.join(tmp, 'w', 'form.pdf');
-    fs.writeFileSync(w, r.buffer);
-    const res = await wordToPdf([{ in: w, out }]);
-    if (!fs.existsSync(out)) throw new Error(`Preview PDF not created: ${res.results?.[0]?.error || res.error || 'Microsoft Word is needed'}`);
-    return { buffer: fs.readFileSync(out), type: 'pdf', name: `${name}.pdf` };
-  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+  const [pdf] = await pdfFor([r.buffer]); // cached by content: the same form in the same style comes back at once
+  return { buffer: pdf, type: 'pdf', name: `${name}.pdf` };
 }
 export async function formFile(id, key, format = 'pdf') {
   const cfg = loadConfig(id);

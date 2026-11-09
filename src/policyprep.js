@@ -463,20 +463,11 @@ export async function masterFile(no, version, format = 'pdf', style = null) {
   const raw = fs.readFileSync(file);
   const source = style ? await applyDocStyle(raw, style, { kind: 'policy' }) : raw;
   if (format === 'docx') return { buffer: source, name: `${path.basename(v.file, '.docx')} - ${style.id}.docx`, type: 'docx' };
-  const viewDir = path.join(templatesDir(), '_view');
-  fs.mkdirSync(viewDir, { recursive: true });
-  const hash = sha256(Buffer.concat([raw, Buffer.from(JSON.stringify(style || {}))])).slice(0, 16);
-  const pdfFile = path.join(viewDir, `${path.basename(v.file, '.docx')}-${hash}.pdf`);
-  if (!fs.existsSync(pdfFile)) {
-    const tmp = path.join(viewDir, `src-${hash}`);
-    fs.mkdirSync(path.join(tmp, 'w'), { recursive: true });
-    const src = path.join(tmp, 'w', 'master.docx');
-    fs.writeFileSync(src, source);
-    await wordToPdf([{ in: src, out: pdfFile }]);
-    fs.rmSync(tmp, { recursive: true, force: true });
-    if (!fs.existsSync(pdfFile)) throw new Error('The master could not be shown as PDF (Microsoft Word is needed)');
-  }
-  return { buffer: fs.readFileSync(pdfFile), name: `${path.basename(v.file, '.docx')}.pdf`, type: 'pdf' };
+  // PDF from the content cache; for a styled view the other styles of this master are made in the same Word run,
+  // so switching the "Shown in" style afterwards is instant
+  const others = style ? await Promise.all(STYLES.filter(x => x.id !== style.id).map(x => applyDocStyle(raw, { ...style, id: x.id }, { kind: 'policy' }))) : [];
+  const [pdf] = await pdfFor([source, ...others], { want: 0 });
+  return { buffer: pdf, name: `${path.basename(v.file, '.docx')}.pdf`, type: 'pdf' };
 }
 
 /** Read-only files on disk while locked (Windows "Read-only" attribute), writable again only while unlocked. */
@@ -1200,15 +1191,76 @@ export async function previewPolicy(id, { no, form = {}, pics = {}, newFacility 
   report.master = m.usedVersion;
   const file = `${s.code} - PO${String(t.no).padStart(2, '0')} - PREVIEW${style ? ` - ${style.toUpperCase()}` : ''}`;
   if (format === 'docx') return { buffer, type: 'docx', report, file: `${file}.docx` };
-  const tmp = fs.mkdtempSync(path.join(path.resolve(dir(loadGlobalConfig(), 'data')), 'preview-'));
-  try {
+  const [pdf] = await pdfFor([buffer]); // the same content was converted before → at once
+  return { buffer: pdf, type: 'pdf', report, file: `${file}.pdf` };
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Preview PDF cache: a PDF is made once per document CONTENT (the same filled Word document always gives the same
+// PDF), kept on disk, and several documents are converted in ONE Microsoft Word run (Word's start-up is most of the
+// time). Requests for a PDF that is being made wait for that run instead of starting Word again.
+// ---------------------------------------------------------------------------------------------------
+const pdfCacheDir = () => { const d = path.join(path.resolve(dir(loadGlobalConfig(), 'data')), 'pdf-cache'); fs.mkdirSync(d, { recursive: true }); return d; };
+const pdfInFlight = new Map();
+/** A fingerprint of a Word document's content (zip dates and order do not matter). */
+export async function contentKey(buffer) {
+  const z = await JSZip.loadAsync(buffer);
+  const parts = await Promise.all(Object.keys(z.files).sort().filter(f => !z.files[f].dir).map(async f => `${f}:${sha256(await z.file(f).async('nodebuffer'))}`));
+  return sha256(Buffer.from(parts.join('|'))).slice(0, 40);
+}
+/**
+ * PDFs for Word buffers: [docx, …] → [pdf buffer, …]; cached ones at once, the rest in ONE Word run.
+ * want: the index needed now – it is converted first and returned as soon as Word has written it (the others are
+ * finished by the same run in the background; their places in the result are null).
+ */
+export async function pdfFor(docxs, { want = null } = {}) {
+  const keys = await Promise.all(docxs.map(contentKey));
+  const file = k => path.join(pdfCacheDir(), `${k}.pdf`);
+  const order = want == null ? keys : [keys[want], ...keys.filter((k, i) => i !== want)];
+  const todo = [...new Set(order.filter(k => !fs.existsSync(file(k)) && !pdfInFlight.has(k)))];
+  if (todo.length) {
+    const tmp = fs.mkdtempSync(path.join(pdfCacheDir(), 'run-'));
     fs.mkdirSync(path.join(tmp, 'w'));
-    const w = path.join(tmp, 'w', 'preview.docx'), out = path.join(tmp, 'w', 'preview.pdf');
-    fs.writeFileSync(w, buffer);
-    const r = await wordToPdf([{ in: w, out }]);
-    if (!fs.existsSync(out)) throw new Error(`Preview PDF not created: ${r.results?.[0]?.error || r.error || 'Microsoft Word is needed'}`);
-    return { buffer: fs.readFileSync(out), type: 'pdf', report, file: `${file}.pdf` };
-  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+    const pairs = todo.map(k => { const w = path.join(tmp, 'w', `${k}.docx`); fs.writeFileSync(w, docxs[keys.indexOf(k)]); return { k, in: w, out: path.join(tmp, 'w', `${k}.pdf`) }; });
+    const run = (async () => {
+      try {
+        const r = await wordToPdf(pairs.map(({ in: i, out }) => ({ in: i, out })));
+        for (const p of pairs) if (fs.existsSync(p.out) && !fs.existsSync(file(p.k))) fs.copyFileSync(p.out, file(p.k));
+        if (!pairs.some(p => fs.existsSync(file(p.k)))) throw new Error(`PDF not created: ${r.results?.[0]?.error || r.error || 'Microsoft Word is needed'}`);
+      } finally {
+        fs.rmSync(tmp, { recursive: true, force: true });
+        for (const p of pairs) pdfInFlight.delete(p.k);
+        prunePdfCache();
+      }
+    })();
+    run.catch(() => {});
+    for (const p of pairs) pdfInFlight.set(p.k, { run, out: p.out });
+  }
+  // wait for the needed PDFs: as soon as Word has written one (its size stays the same), it is taken at once
+  const needed = want == null ? [...new Set(keys)] : [keys[want]];
+  await Promise.all(needed.map(async k => {
+    let last = -1;
+    while (!fs.existsSync(file(k)) && pdfInFlight.has(k)) {
+      const { run, out } = pdfInFlight.get(k);
+      const size = fs.existsSync(out) ? fs.statSync(out).size : -1;
+      if (size > 0 && size === last) { try { fs.copyFileSync(out, file(k)); } catch { /* the run finishes it */ } break; }
+      last = size;
+      await Promise.race([run.catch(() => {}), new Promise(r => setTimeout(r, 200))]);
+    }
+  }));
+  return keys.map((k, i) => {
+    if (fs.existsSync(file(k))) return fs.readFileSync(file(k));
+    if (want != null && i !== want) return null;
+    throw new Error('The preview PDF could not be made (Microsoft Word is needed)');
+  });
+}
+/** Keep the newest 400 cached PDFs. */
+function prunePdfCache() {
+  try {
+    const d = pdfCacheDir();
+    const list = fs.readdirSync(d).filter(f => f.endsWith('.pdf')).map(f => ({ f, t: fs.statSync(path.join(d, f)).mtimeMs })).sort((a, b) => b.t - a.t);
+    for (const x of list.slice(400)) fs.rmSync(path.join(d, x.f), { force: true });
+  } catch { /* best effort */ }
 }
 
 export function wordToPdf(pairs) {

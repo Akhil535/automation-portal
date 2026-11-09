@@ -1007,6 +1007,10 @@ test('10i. policy preparation: templates are filled for a facility (ID, dates, n
   assert.equal((kept.match(/<w:cantSplit\/>/g) || []).length, 2, 'no row splits over two pages'); assert.ok(kept.includes('<w:tblHeader/>'), 'header row repeats');
   assert.equal((kept.match(/<w:keepNext\/>/g) || []).length, 3, 'heading and rows keep together with the signature line');
   assert.equal(DS.effectiveStyle('split', { trial: true }).id, 'classic', 'free trial: Modern Classic only');
+  // preview cache: the same content gives the same key (zip dates / compression do not matter), other content another
+  const rezip = await (await JSZip.loadAsync(filledBuf)).generateAsync({ type: 'nodebuffer', compression: 'STORE' });
+  assert.equal(await P.contentKey(rezip), await P.contentKey(filledBuf), 'same content, same PDF from the cache');
+  assert.notEqual(await P.contentKey(await DS.applyDocStyle(filledBuf, { id: 'split', accent: '#123456' })), await P.contentKey(filledBuf), 'another style, another PDF');
   // forms keep their content and get the style's look: heading bands, light or accent-framed tables
   const formDoc = await (async () => { const z = new JSZip(); z.file('word/document.xml', '<w:document><w:body><w:p><w:pPr><w:spacing w:after="0"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Employee Agreement</w:t></w:r></w:p><w:tbl><w:tblPr><w:tblW w:w="5000" w:type="dxa"/><w:tblLook w:val="04A0"/></w:tblPr><w:tblGrid><w:gridCol w:w="5000"/></w:tblGrid><w:tr><w:tc><w:p><w:r><w:t>Name</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p/><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:left="1440" w:right="1440"/></w:sectPr></w:body></w:document>'); return z.generateAsync({ type: 'nodebuffer' }); })();
   const fx = async sid => (await JSZip.loadAsync(await DS.applyDocStyle(formDoc, { id: sid, accent: '#123456' }, { kind: 'form' }))).file('word/document.xml').async('string');

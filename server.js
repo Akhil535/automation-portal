@@ -32,7 +32,7 @@ import { htmlToPdf, logoDataUrl, reportHtml } from './src/report.js';
 import {
   MAJOR_REVISION, addTemplates, assetFile, generatePolicies, generatedFile, generatedFiles, jobState, listTemplates,
   prepSettings, readiness, registerSourcePolicy, removeAsset, removeTemplate, saveAsset, saveSettings, zipGenerated, policyNoOf,
-  generatedStyle, detectPictures, lockTemplates, masterFile, masterParagraphs, picturePreview, previewPolicy, saveMasterEdits, templateLock, unlockTemplates,
+  generatedStyle, pdfFor, detectPictures, lockTemplates, masterFile, masterParagraphs, picturePreview, previewPolicy, saveMasterEdits, templateLock, unlockTemplates,
 } from './src/policyprep.js';
 import {
   ROLES, SESSION_COOKIE, SESSION_MAX_AGE, canFacility, changeOwnPassword, createUser, deleteUser, endSession, hasUsers, loadUsers, registerUser,
@@ -993,13 +993,26 @@ app.get('/api/doc-styles/preview', wrap(async (req, res) => {
     const { html } = await snapshot(req, false, { style: { ...prepSettings(cfg).docStyles.register, id }, items });
     return res.type('html').send(html);
   }
-  if (kind === 'policies') { const p = await previewPolicy(facId(req), { no: Number(req.query.no) || undefined, style: id, format }); r = { buffer: p.buffer, type: p.type, name: p.file }; }
+  // the document in a style (Word); for the PDF all 4 styles are made at once – what is not cached yet goes to Word
+  // in ONE run – so switching to another style afterwards is instant
+  const fid = facId(req);
+  let docOf;
+  if (kind === 'policies') docOf = async sid => { const p = await previewPolicy(fid, { no: Number(req.query.no) || undefined, style: sid, format: 'docx' }); return { buffer: p.buffer, name: p.file }; };
   else {
     const forms = installedForms(kind === 'thirdparty' ? 'thirdparty' : 'hr');
     const key = forms.some(f => f.key === req.query.key) ? req.query.key : forms[0]?.key;
     if (!key) throw new Error(`No ${KINDS[kind]} have been uploaded yet`);
-    r = await previewForm(facId(req), key, { ...prepSettings(loadConfig(fac(req))).docStyles[kind], id }, format);
+    const base = prepSettings(loadConfig(fac(req))).docStyles[kind];
+    docOf = async sid => previewForm(fid, key, { ...base, id: sid }, 'docx');
   }
+  if (format === 'docx') { const d = await docOf(id); r = { buffer: d.buffer, type: 'docx', name: d.name }; }
+  else {
+    const all = STYLES.map(s => s.id), docs = await Promise.all(all.map(docOf));
+    const i = all.indexOf(id);
+    const pdfs = await pdfFor(docs.map(d => d.buffer), { want: i }); // this style first; the others finish in the same Word run
+    r = { buffer: pdfs[i], type: 'pdf', name: docs[i].name.replace(/\.docx$/i, '.pdf') };
+  }
+  res.set('Cache-Control', 'private, max-age=60');
   res.type(r.type === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
     .set('Content-Disposition', `${req.query.download ? 'attachment' : 'inline'}; filename="${r.name.replace(/[^\w .-]/g, '')}"`).send(r.buffer);
 }));
