@@ -451,7 +451,7 @@ function renderHeader(s) {
 // ===================================================================================================
 // Navigation
 // ===================================================================================================
-const loaders = { overview: () => { if (!master) loadMaster(); }, policies: () => loadPolicies(), master: () => loadMaster(), circulars: () => loadCirculars(), settings: () => loadSettings(), exports: () => loadExports(), hr: () => loadHr(), thirdparty: () => loadThirdParty(), checklist: () => loadChecklistPage() };
+const loaders = { overview: () => { if (!master) loadMaster(); }, policies: () => loadPolicies(), master: () => loadMaster(), circulars: () => loadCirculars(), settings: () => loadSettings(), exports: () => loadExports(), hr: () => loadHr(), thirdparty: () => loadThirdParty(), checklist: () => loadChecklistPage(), cyberppt: () => loadCyberPpt(), toolkit: tool => loadToolkit(tool) };
 
 /** Export hub: every download of the current facility on one page. */
 async function loadExports() {
@@ -487,7 +487,7 @@ function showTab(name, adm) {
   document.body.classList.remove('menu-open'); // phone: the side menu closes after choosing a page
   renderFlow(); // "You are here" follows the page
   if (name === 'admin') return showAdmin(adm);
-  loaders[name]?.();
+  loaders[name]?.(adm); // (the toolkit's tools use the second part to say which tool)
 }
 $$('#tabs button').forEach(b => b.onclick = () => showTab(b.dataset.tab, b.dataset.adm));
 
@@ -3787,19 +3787,20 @@ function clearPreviewFiles() { for (const p of dsFiles.values()) p.then(URL.revo
 let dsShowSeq = 0;
 async function showPreviewFile(url, kind) {
   const seq = ++dsShowSeq, fr = $('#ds-prev-frame'), load = $('#ds-prev-load');
-  load.hidden = false; load.innerHTML = `<span class="spin"></span> ${kind === 'register' ? 'Preparing the report…' : 'Preparing the preview with Microsoft Word – the first time takes a few seconds, the other styles are then ready at once…'}`;
+  load.hidden = false; load.innerHTML = `<span class="spin"></span> ${kind === 'register' ? 'Preparing the report…' : kind === 'ppt' ? 'Preparing the slides with Microsoft PowerPoint – the first time takes about half a minute, the other looks are then ready at once…' : 'Preparing the preview with Microsoft Word – the first time takes a few seconds, the other styles are then ready at once…'}`;
   try {
     const blobUrl = await previewFile(url);
     if (seq !== dsShowSeq) return; // another tab was chosen meanwhile
     fr.src = kind === 'register' ? blobUrl : `${blobUrl}#view=FitH&toolbar=1&navpanes=0`;
     load.hidden = true;
     // the other styles in the background (instant from the server's cache now)
-    for (const s of dsData.styles) if (s.id !== dsPrev.style) previewFile(u(`/api/doc-styles/preview?style=${s.id}&kind=${kind}`)).catch(() => {});
+    if (kind !== 'ppt') for (const s of dsData.styles) if (s.id !== dsPrev.style) previewFile(u(`/api/doc-styles/preview?style=${s.id}&kind=${kind}`)).catch(() => {});
   } catch (e) {
     if (seq === dsShowSeq) load.innerHTML = `<span class="warn-txt"><i class=i-alert></i> ${esc(e.message)}</span>`;
   }
 }
 function renderStylePreview() {
+  if (dsPrev.kind === 'ppt') return renderPptPreview(); // the presentation's looks
   const d = dsData, { kind, style } = dsPrev;
   const s = d.styles.find(x => x.id === style) || d.styles[0];
   const eff = (d.effectives || {})[kind] || 'classic', locked = s.premium && !d.premium, admin = me?.role === 'admin';
@@ -3816,4 +3817,111 @@ function renderStylePreview() {
     : locked && !admin ? '<button type="button" class="btn premium-btn" data-up>Get Premium to Unlock Custom Templates</button>'
     : me?.role === 'viewer' ? '' : `<button type="button" class="btn primary" id="ds-prev-use">Use this style for ${esc({ policies: 'the policies', hr: 'HR documents', thirdparty: '3rd-party documents', register: 'the LEGAL REGISTER report' }[kind])}</button>`;
   $('#ds-prev-use')?.addEventListener('click', async () => { await useDocStyle(style, kind); renderStylePreview(); });
+}
+
+// ===================================================================================================
+// Security & Awareness: the Cyber Security presentation (facility name on every slide, the IT contact on the
+// incident-reporting slide – PO18 by default or typed here – and 4 looks with slide previews), and the toolkit page
+// for the tools still to come.
+// ===================================================================================================
+var cp = null; // var: may be read during start-up
+async function loadCyberPpt() {
+  try { cp = await api('/api/toolkit/cyber-ppt'); } catch (e) { $('#cp-msg').innerHTML = `<div class="alert bad">${esc(e.message)}</div>`; return; }
+  renderCyberPpt();
+}
+function cpFile(params = {}) { return u(`/api/toolkit/cyber-ppt/file?${new URLSearchParams(params)}`); }
+function renderCyberPpt() {
+  const d = cp, m = d.master;
+  $('#cp-fac').textContent = d.facilityName || '–';
+  $('#cp-master').textContent = m ? `· ${m.slides} slides · the footer and contact are filled in for you` : '';
+  $('#cp-msg').innerHTML = m ? '' : `<div class="alert warn"><i class=i-alert></i> The master presentation has not been uploaded yet${me?.role === 'admin' ? ' – upload it below.' : ' – ask an administrator.'}</div>`;
+  $('#cp-pptx').href = cpFile({ format: 'pptx' }); $('#cp-pdf').href = cpFile({ download: 1 });
+  $$('#cp-pptx, #cp-pdf').forEach(a => a.classList.toggle('disabled', !m));
+  const f = $('#cp-form');
+  f.elements.email.value = d.email; f.elements.phone.value = d.phone;
+  f.elements.email.placeholder = d.defaults.email || 'it-support@clinic.ae';
+  f.elements.phone.placeholder = d.defaults.phone || '+971 …';
+  $('#cp-form [data-def="email"]').textContent = d.defaults.email ? `PO18 default: ${d.defaults.email}` : 'No contact e-mail in the policy details yet';
+  $('#cp-form [data-def="phone"]').textContent = d.defaults.phone ? `PO18 default: ${d.defaults.phone}` : 'No contact phone in the policy details yet';
+  const mail = d.email || d.defaults.email, tel = d.phone || d.defaults.phone;
+  $('#cp-line').innerHTML = m ? `Slide ${m.contactSlide || '–'} will read: <q>… send it to IT Department by email : <b>${esc(mail || '[IT department e-mail]')}</b> (${esc(tel || '[IT department phone]')})</q>${d.email || d.phone ? ' <span class="tag na">typed here</span>' : ' <span class="tag ok">from PO18</span>'}` : '';
+  $('#cp-current').textContent = `${(d.styles.find(s => s.id === d.style) || d.styles[0]).name}${d.choice ? '' : ' · the default'}`;
+  // style cards (the same component as the document styles, with presentation pictures)
+  const a = dsData?.settings?.accent || '#1F3864', ro = me?.role === 'viewer';
+  $('#cp-cards').innerHTML = d.styles.map(s => {
+    const locked = s.premium && !d.premium, on = d.style === s.id;
+    return `<article class="ds-card${on ? ' on' : ''}${locked ? ' locked' : ''}">
+      <button type="button" class="ds-thumb" data-cp-open="${s.id}" aria-label="Preview ${esc(s.name)}">${cpThumb(s.id, a)}${locked ? '<span class="ds-prem"><i class=i-lock></i> Premium</span>' : ''}${on ? '<span class="ds-on">✓ In use</span>' : ''}<span class="ds-zoom"><i class=i-eye></i> Preview</span></button>
+      <div class="ds-meta"><b>${s.no} · ${esc(s.name)}</b><small>${esc(s.desc)}</small></div>
+      <div class="ds-act"><button type="button" class="btn small" data-cp-open="${s.id}"><i class=i-eye></i> Preview</button>
+        ${locked ? '<button type="button" class="btn small premium-btn" data-up>Get Premium to Unlock Custom Templates</button>' : on ? '<span class="tag ok">Selected</span>' : `<button type="button" class="btn small primary" data-cp-use="${s.id}"${ro ? ' disabled' : ''}>Use this style</button>`}
+        ${s.id === 'classic' ? '<span class="tag na">★ Default</span>' : ''}</div></article>`;
+  }).join('');
+  $$('#cp-cards [data-cp-open]').forEach(b => b.onclick = () => openStylePreview('ppt', b.dataset.cpOpen));
+  $$('#cp-cards [data-cp-use]').forEach(b => b.onclick = () => saveCyberPpt({ style: b.dataset.cpUse }));
+  $('#cp-master-sub').textContent = m ? `${m.original || 'master.pptx'} · ${m.slides} slides · its facility "${m.name}" and contact ${m.email} (${m.phone}) on slide ${m.contactSlide} are replaced for each facility${m.preparer ? ` · "Prepared By" gets the policies' author` : ''}` : 'Not uploaded yet';
+  // the browser keeps previews per contact + style: a new contact gives new previews
+  const sec = $('[data-ds-sec="ppt"]');
+  if (sec && !sec.dataset.bound) { sec.dataset.bound = '1'; if (store.get('ds-closed-ppt') === '1') sec.open = false; sec.addEventListener('toggle', () => store.set('ds-closed-ppt', sec.open ? '' : '1')); }
+}
+async function saveCyberPpt(body, msg) {
+  try {
+    const r = await api('/api/toolkit/cyber-ppt', { method: 'PUT', body: JSON.stringify(body) });
+    cp = { ...cp, ...r }; renderCyberPpt();
+    toast(msg || (body.style ? `Presentation style: ${esc(cp.styles.find(s => s.id === cp.style).name)}` : 'Saved'));
+    if ($('#ds-prev').open && dsPrev.kind === 'ppt') renderStylePreview();
+    return true;
+  } catch (e) { if (!/Premium/i.test(e.message)) toast(`<i class=i-alert></i> ${esc(e.message)}`); return false; }
+}
+$('#cp-form').onsubmit = async e => {
+  e.preventDefault();
+  const f = e.target;
+  if (await saveCyberPpt({ email: f.elements.email.value.trim(), phone: f.elements.phone.value.trim() }, 'Contact saved – the presentation uses it')) $('#cp-saved').textContent = '✓ Saved';
+};
+$('#cp-reset').onclick = () => saveCyberPpt({ email: '', phone: '' }, 'Back to the PO18 contact');
+$('#cp-master-up').onchange = async e => {
+  const file = e.target.files[0]; e.target.value = '';
+  if (!file) return;
+  try {
+    const res = await fetch(u(`/api/toolkit/cyber-ppt/master?name=${encodeURIComponent(file.name)}`), { method: 'POST', body: file });
+    const j = await res.json(); if (!res.ok) throw new Error(j.error || res.statusText);
+    toast(`Master presentation replaced – ${j.slides} slides`); clearPreviewFiles(); loadCyberPpt();
+  } catch (er) { toast(`<i class=i-alert></i> ${esc(er.message)}`); }
+};
+/** A slide schematic of each presentation look (4:3). */
+function cpThumb(id, a) {
+  const L = (x, y, w, c = '#cfd5df') => `<rect x="${x}" y="${y}" width="${w}" height="3" rx="1.5" fill="${c}"/>`;
+  const bullets = (y, c) => [0, 1, 2, 3, 4].map(i => `<circle cx="22" cy="${y + i * 9 + 1.5}" r="1.4" fill="${c}"/>${L(27, y + i * 9, i % 2 ? 58 : 76, c)}`).join('');
+  const slide = (bg, inner) => `<svg viewBox="0 0 120 90" aria-hidden="true"><rect x="1" y="1" width="118" height="88" rx="5" fill="${bg}" stroke="#e3e6ec"/>${inner}</svg>`;
+  if (id === 'dark') return slide('#0B1220', `<rect x="14" y="10" width="92" height="11" rx="2" fill="#16223A"/><rect x="42" y="14" width="36" height="3.4" rx="1.5" fill="#E6F0FF"/>${bullets(30, '#9fb4d6')}<rect x="14" y="80" width="18" height="4" rx="1" fill="#22D3EE"/><rect x="52" y="81" width="16" height="2" rx="1" fill="#5d6b85"/>`);
+  if (id === 'minimal') return slide('#fff', `${[...Array(11)].map((_, i) => [...Array(8)].map((_, j) => `<circle cx="${8 + i * 10.5}" cy="${8 + j * 10.5}" r=".55" fill="#d9dee8"/>`).join('')).join('')}<rect x="14" y="10" width="92" height="11" rx="2" fill="#F3F5FA"/><rect x="42" y="14" width="36" height="3.4" rx="1.5" fill="${a}"/>${bullets(30, '#7a8496')}<rect x="52" y="81" width="16" height="2" rx="1" fill="#b8bfcc"/>`);
+  if (id === 'official') return slide('#fff', `<rect x="4" y="4" width="112" height="82" fill="none" stroke="${a}" stroke-width="1.4"/><rect x="4" y="4" width="112" height="3" fill="${a}"/><rect x="4" y="80" width="112" height="6" fill="#E8EDF6"/><rect x="14" y="12" width="92" height="10" rx="1" fill="#e9ecf1"/><rect x="42" y="15.5" width="36" height="3.4" rx="1.5" fill="#C00000"/>${bullets(30, '#7a8496')}<rect x="96" y="70" width="14" height="7" rx="1" fill="#dfe5f2"/>`);
+  return slide('#fff', `<rect x="14" y="10" width="92" height="11" rx="1" fill="#C0C0C0"/><rect x="42" y="14" width="36" height="3.4" rx="1.5" fill="#C00000"/>${bullets(30, '#5d6470')}<rect x="14" y="80" width="18" height="4" rx="1" fill="#2f5597"/><rect x="52" y="81" width="16" height="2" rx="1" fill="#b8bfcc"/>`);
+}
+/** The preview window, presentation mode: the slides in a look; the facility's contact as typed (even unsaved). */
+function renderPptPreview() {
+  const d = cp, { style } = dsPrev;
+  const s = d.styles.find(x => x.id === style) || d.styles[0], locked = s.premium && !d.premium, admin = me?.role === 'admin';
+  $('#ds-prev-kind').textContent = `Cyber Security PPT · ${d.master?.slides || ''} slides for ${d.facilityName}`;
+  $('#ds-prev-title').textContent = `${s.no} · ${s.name}`;
+  $('#ds-prev-desc').textContent = s.desc;
+  $('#ds-prev-tabs').innerHTML = d.styles.map(x => `<button type="button" role="tab" aria-selected="${x.id === style}" class="${x.id === style ? 'on' : ''}" data-ds-tab="${x.id}">${x.no} · ${esc(x.name)}${x.premium && !d.premium ? ' <i class=i-lock></i>' : ''}${x.id === d.style ? ' <small>in use</small>' : ''}</button>`).join('');
+  $$('#ds-prev-tabs [data-ds-tab]').forEach(b => b.onclick = () => { dsPrev.style = b.dataset.dsTab; renderStylePreview(); });
+  const f = $('#cp-form'), contact = { email: f.elements.email.value.trim(), phone: f.elements.phone.value.trim() };
+  const url = cpFile({ style, ...contact });
+  showPreviewFile(url, 'ppt');
+  $('#ds-prev-files').innerHTML = `<a class="btn small" href="${cpFile({ style, ...contact, download: 1 })}"><i class=i-download></i> PDF</a><a class="btn small" href="${cpFile({ style, ...contact, format: 'pptx' })}"><i class=i-download></i> PowerPoint</a>`;
+  $('#ds-prev-act').innerHTML = style === d.style ? '<span class="tag ok">In use for this facility</span>'
+    : locked && !admin ? '<button type="button" class="btn premium-btn" data-up>Get Premium to Unlock Custom Templates</button>'
+    : me?.role === 'viewer' ? '' : '<button type="button" class="btn primary" id="ds-prev-use">Use this style for the presentation</button>';
+  $('#ds-prev-use')?.addEventListener('click', () => saveCyberPpt({ style }));
+}
+/** The toolkit page: the chosen tool (still to come) and every tool of the section. */
+var tkTools = null;
+async function loadToolkit(tool) {
+  if (!tkTools) { try { tkTools = (await api('/api/toolkit')).tools; } catch { tkTools = []; } }
+  const t = tkTools.find(x => x.id === tool) || tkTools[0];
+  if (t) { $('#tk-title').textContent = t.title; $('#tk-desc').textContent = t.desc; $('#mb-title').textContent = t.title; }
+  $('#tk-grid').innerHTML = tkTools.map(x => `<button type="button" class="tk-card${x.id === t?.id ? ' on' : ''}" data-tk="${x.id}"><b>${esc(x.title)}</b><small class="muted">${esc(x.desc)}</small><span class="tag ${x.status === 'ready' ? 'ok' : 'na'}">${x.status === 'ready' ? 'Ready' : 'Coming soon'}</span></button>`).join('');
+  $$('#tk-grid [data-tk]').forEach(b => b.onclick = () => (b.dataset.tk === 'cyberppt' ? showTab('cyberppt') : showTab('toolkit', b.dataset.tk)));
 }

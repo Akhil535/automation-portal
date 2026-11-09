@@ -4452,3 +4452,32 @@ button.ds-thumb { width: 100%; border: 0; cursor: zoom-in; font: inherit; color:
 .ds-defaults > div { display: flex; flex-direction: column; gap: 4px; }
 .ds-defaults > div b { font-size: 14px; font-weight: 800; }
 .ds-def-ic { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 16px; color: var(--brand-ink); background: var(--brand); }
+
+/* v36 · Security & Awareness: the menu group, the Cyber Security PPT page and the toolkit page */
+.sb-group-label { margin-top: 10px !important; }
+.sb-nav button.sb-tool { font-size: 14px; }
+.sb-soon { margin-left: auto; flex: none; padding: 1px 7px; border-radius: 999px; font-size: 12px !important; font-weight: 700; color: var(--sb-muted) !important; border: 1px solid var(--sb-line); }
+.sb-nav button.active .sb-soon { color: #14161f !important; border-color: rgba(20, 22, 31, .25); }
+.sb-sep { height: 1px; margin: 8px 12px; background: var(--sb-line); }
+.cp-contact { margin-bottom: 18px; }
+.cp-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; align-items: start; }
+.cp-form label { display: flex; flex-direction: column; gap: 6px; font-weight: 700; font-size: 14px; }
+.cp-form small { font-weight: 500; }
+.cp-act { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cp-line { margin: 14px 0 0; padding: 12px 14px; border-radius: 12px; background: var(--panel-2); font-size: 14px; }
+.cp-line q { quotes: "“" "”"; }
+.cp-admin { margin-top: 18px; }
+#cyberppt .ds-thumb svg { max-width: 190px; }
+.btn.disabled { pointer-events: none; opacity: .5; }
+.tk-soon { display: flex; gap: 14px; align-items: center; margin-bottom: 18px; }
+.tk-soon-ic { flex: none; width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; font-size: 20px; color: var(--brand); background: var(--brand-soft); }
+.tk-soon b { font-size: 16px; }
+.tk-soon p { margin: 2px 0 0; }
+.tk-h { font-size: 16px; margin: 0 0 10px; }
+.tk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.tk-card { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; text-align: left; padding: 16px; border-radius: 18px; border: 1.5px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; cursor: pointer; box-shadow: var(--shadow); }
+.tk-card:hover { border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); }
+.tk-card.on { border-color: var(--brand); }
+.tk-card b { font-size: 14px; }
+.tk-card small { font-size: 12px; line-height: 1.45; }
+@media (max-width: 700px) { .cp-form { grid-template-columns: 1fr; } }

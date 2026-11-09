@@ -22,6 +22,7 @@ import { formKind, installedForms } from './src/hrforms.js';
 import { MODULE_KEYS, buildPackage, packageTree } from './src/package.js';
 import { allowedSet, checkFreeRows, freeRegisterRows, maskMaster, checkChecklistItem, checkTrialApply, checklistFree, claim, claimUpload, maskChecklist, createdFacilities, facilityAllowance, isTrial, planInfo, setTrialLimits, trialLimits, upgradeError, upgradeUrl } from './src/plans.js';
 import { previewForm } from './src/hrforms.js';
+import { PPT_STYLES, TOOLS, buildPpt, cyberState, pptPdf, saveCyber, saveMaster as saveCyberMaster, trialFacility } from './src/cyberppt.js';
 import { addForms, addItem, checklistXlsx, crossCheck, formFile, formsStatus, formsZip, generateForms, getChecklist, pdfState, prewarmPdfs, saveDocSettings, GROUPS, importMasterChecklist, listForms, masterChecklist, removeForm, removeItem, resetChecklist, updateItem } from './src/hrforms.js';
 import { documentHeader, sendMail } from './src/mailer.js';
 import { FONTS, KINDS, STYLES, effectiveStyle, saveStyleSettings, styleById, styleSettings } from './src/docstyle.js';
@@ -120,7 +121,8 @@ function requiredRole(req) {
   if (m === 'DELETE') return 'admin'; // deleting (entries, items, pictures, facilities, users…) is for administrators only
   if (p === '/api/plans' || p === '/api/welcome') return m === 'GET' ? 'viewer' : 'admin';
   if (p === '/api/doc-styles' && m !== 'GET') return 'admin'; // the default document style and branding
-  if (p === '/api/doc-styles/apply-all') return 'admin'; // re-create every facility's policies in its style
+  if (p === '/api/doc-styles/apply-all') return 'admin';
+  if (p === '/api/toolkit/cyber-ppt/master') return 'admin'; // the master presentation // re-create every facility's policies in its style
   if (p === '/api/assistant/ask') return 'viewer'; // everyone may ask (read-only answers)
   if (p === '/api/assistant/key') return 'admin';
   if (p.startsWith('/api/users')) return 'admin';
@@ -1047,6 +1049,43 @@ app.post('/api/doc-styles/apply-all', wrap(async (req, res) => {
 }));
 app.get('/api/doc-styles/apply-all', wrap(async (req, res) => res.json(restyle)));
 
+// ---------------------------------------------------------------------------------------------------
+// Security & Awareness toolkit: the tools (new ones are added to TOOLS) and the Cyber Security presentation
+// ---------------------------------------------------------------------------------------------------
+app.get('/api/toolkit', wrap(async (req, res) => res.json({ tools: TOOLS })));
+app.get('/api/toolkit/cyber-ppt', wrap(async (req, res) => {
+  const fid = facId(req), st = cyberState(fid, { trial: isTrial(req.user) || trialFacility(loadFacilities().list.find(f => f.id === fid)) });
+  res.json({ ...st, premium: !isTrial(req.user) });
+}));
+/** The facility's contact (e-mail / phone, '' = the PO18 default) and style – styles 2-4 need Premium. */
+app.put('/api/toolkit/cyber-ppt', wrap(async (req, res) => {
+  const b = req.body || {};
+  if (b.style && PPT_STYLES.find(s => s.id === b.style)?.premium && isTrial(req.user)) throw upgradeError('Get Premium to Unlock Custom Templates');
+  saveCyber(facId(req), { email: b.email, phone: b.phone, style: b.style });
+  res.json(cyberState(facId(req), { trial: isTrial(req.user) }));
+}));
+/**
+ * The presentation: ?format=pptx (download) or pdf; ?style= a style (preview – any style can be previewed; the download
+ * is made in the facility's own style); ?email= / ?phone= try other contact details before saving them.
+ */
+app.get('/api/toolkit/cyber-ppt/file', wrap(async (req, res) => {
+  const fid = facId(req), st = cyberState(fid, { trial: isTrial(req.user) });
+  const style = PPT_STYLES.some(s => s.id === req.query.style) ? req.query.style : st.style;
+  const opts = { email: req.query.email !== undefined ? String(req.query.email) : null, phone: req.query.phone !== undefined ? String(req.query.phone) : null };
+  const name = `${st.facilityName || 'Facility'} - Cyber Security Presentation${style === 'classic' ? '' : ` - ${PPT_STYLES.find(s => s.id === style).name}`}`.replace(/[^\w .()-]/g, '');
+  if (req.query.format === 'pptx') {
+    const buf = await buildPpt(fid, { ...opts, style });
+    return res.set({ 'Content-Type': 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'Content-Disposition': `attachment; filename="${name}.pptx"` }).send(buf);
+  }
+  const pdf = await pptPdf(fid, style, opts);
+  res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `${req.query.download ? 'attachment' : 'inline'}; filename="${name}.pdf"`, 'Cache-Control': 'private, max-age=60' }).send(pdf);
+}));
+/** Administrators: replace the master presentation (.pptx). */
+app.post('/api/toolkit/cyber-ppt/master', express.raw({ type: () => true, limit: '80mb' }), wrap(async (req, res) => {
+  if (!req.body?.length) throw new Error('No file received');
+  res.json(await saveCyberMaster(req.body, String(req.query.name || 'presentation.pptx')));
+}));
+
 app.get('/api/runs', wrap(async (req, res) => res.json(new Store(cfgOf(req)).data.runs.slice(0, 200))));
 
 app.get('/api/log', wrap(async (req, res) => {
@@ -1125,10 +1164,12 @@ app.listen(port, host, () => {
   console.log(`Legal Register Portal running at http://${host === '0.0.0.0' ? 'localhost' : host}:${port} (${loadFacilities().list.length} facility(ies))`);
   if (!process.env.DOH_PORTAL_NO_SCHEDULER) startScheduler();
   else console.log('Scheduler disabled (--no-scheduler)');
-  // Hidden Word copies left by conversions that were cut off (e.g. a restart in the middle of one) keep files locked:
-  // automation-only Word processes running for over an hour are closed. Word windows a person opened are never touched.
+  // Hidden Word / PowerPoint copies left by conversions that were cut off (e.g. a restart in the middle of one) keep
+  // files locked: automation-only copies running for over 45 minutes (no conversion takes that long) are closed – at
+  // start-up and every 15 minutes. Word or PowerPoint windows a person opened are never touched.
   if (process.platform === 'win32' && !process.env.DOH_PORTAL_NO_SCHEDULER) {
-    const ps = "Get-CimInstance Win32_Process -Filter \"Name='WINWORD.EXE'\" | Where-Object { $_.CommandLine -match '/Automation' -and $_.CreationDate -lt (Get-Date).AddHours(-1) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }";
-    execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps], { windowsHide: true, timeout: 60000 }, () => {});
+    const ps = "Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^(WINWORD|POWERPNT)\\.EXE$' -and $_.CommandLine -match '/Automation' -and $_.CreationDate -lt (Get-Date).AddMinutes(-45) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }";
+    const sweep = () => execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps], { windowsHide: true, timeout: 60000 }, () => {});
+    sweep(); setInterval(sweep, 15 * 60000).unref();
   }
 });

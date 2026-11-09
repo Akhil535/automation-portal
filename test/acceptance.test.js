@@ -96,6 +96,18 @@ before(async () => {
 });
 
 after(() => mock?.server.close());
+// Test servers are stopped part-way: hidden Word / PowerPoint copies they started are closed at the end of the run
+// (only automation copies started during this run – never Office windows a person has open).
+const RUN_STARTED = new Date();
+after(() => {
+  if (process.platform !== 'win32') return;
+  const since = RUN_STARTED.toISOString();
+  try {
+    execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command',
+      `Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^(WINWORD|POWERPNT)\\.EXE$' -and $_.CommandLine -match '/Automation' -and $_.CreationDate -ge [datetime]'${since}' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`],
+      { windowsHide: true, timeout: 60000 });
+  } catch { /* best effort */ }
+});
 
 test('1. check-only run detects exactly the new in-scope circulars and changes nothing', async () => {
   const h = sha(REG);
@@ -1010,6 +1022,37 @@ test('10i. policy preparation: templates are filled for a facility (ID, dates, n
   assert.equal((kept.match(/<w:cantSplit\/>/g) || []).length, 2, 'no row splits over two pages'); assert.ok(kept.includes('<w:tblHeader/>'), 'header row repeats');
   assert.equal((kept.match(/<w:keepNext\/>/g) || []).length, 3, 'heading and rows keep together with the signature line');
   assert.equal(DS.effectiveStyle('split', { trial: true }).id, 'classic', 'free trial: Modern Classic only');
+  // Cyber Security presentation: the master's facility name (footer) and the security contact are replaced; the 4 looks
+  {
+    const CP = await import('../src/cyberppt.js');
+    const zp = new JSZip();
+    const sld = (body, foot = 'Old Homecare') => `<p:sld xmlns:a="a" xmlns:p="p"><p:cSld><p:spTree><p:grpSpPr/>${body}<p:sp><p:txBody><a:p><a:r><a:t>${foot}</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>`;
+    const run = t => `<p:sp><p:txBody><a:p><a:r><a:rPr><a:solidFill><a:srgbClr val="C00000"/></a:solidFill></a:rPr><a:t>${t}</a:t></a:r></a:p></p:txBody></p:sp>`;
+    zp.file('ppt/presentation.xml', '<p:presentation xmlns:p="p"><p:sldSz cx="9144000" cy="6858000"/></p:presentation>');
+    zp.file('ppt/slides/slide1.xml', sld(run('Prepared By: ') + run('Mr') + run(' ') + run('Sulfikar') + run('Cyber Security Presentation')));
+    zp.file('ppt/slides/slide2.xml', sld(run('Example: john.doe@example.com is a phishing sender')));
+    zp.file('ppt/slides/slide3.xml', sld(run('Reporting Information Security Events') + run('send it to IT Department by email : old.it@oldcare.ae (+971 50 969 3359)')));
+    zp.file('ppt/slideMasters/slideMaster1.xml', '<p:sldMaster xmlns:a="a" xmlns:p="p"><p:cSld><p:bg><p:bgRef idx="1001"/></p:bg><p:spTree><p:grpSpPr/></p:spTree></p:cSld><p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2"/></p:sldMaster>');
+    zp.file('ppt/slideMasters/_rels/slideMaster1.xml.rels', '<Relationships></Relationships>');
+    zp.file('ppt/theme/theme1.xml', '<a:theme xmlns:a="a"><a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1><a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="1F497D"/></a:dk2><a:lt2><a:srgbClr val="EEECE1"/></a:lt2><a:accent1><a:srgbClr val="4F81BD"/></a:accent1><a:accent2><a:srgbClr val="C0504D"/></a:accent2><a:accent3><a:srgbClr val="9BBB59"/></a:accent3><a:hlink><a:srgbClr val="0000FF"/></a:hlink><a:folHlink><a:srgbClr val="800080"/></a:folHlink><a:majorFont><a:latin typeface="Calibri"/></a:majorFont><a:minorFont><a:latin typeface="Calibri"/></a:minorFont></a:theme>');
+    zp.file('[Content_Types].xml', '<Types><Default Extension="xml" ContentType="application/xml"/></Types>');
+    const info = await CP.saveMaster(await zp.generateAsync({ type: 'nodebuffer' }), 'test.pptx');
+    assert.deepEqual([info.name, info.email, info.phone, info.contactSlide, info.preparer?.name], ['Old Homecare', 'old.it@oldcare.ae', '+971 50 969 3359', 3, 'Sulfikar'], 'the security contact – not the example address');
+    const st = CP.cyberState(id);
+    CP.saveCyber(id, { email: 'it-desk@clinic.ae', phone: '+971 2 555 0100' });
+    const out = await JSZip.loadAsync(await CP.buildPpt(id, { style: 'classic' }));
+    const s3 = await out.file('ppt/slides/slide3.xml').async('string'), s2 = await out.file('ppt/slides/slide2.xml').async('string');
+    assert.ok(s3.includes('it-desk@clinic.ae (+971 2 555 0100)') && !s3.includes('oldcare'), 'the typed contact on the reporting slide');
+    assert.ok(s2.includes(st.facilityName) && !s2.includes('Old Homecare') && s2.includes('john.doe@example.com'), 'facility name in the footer; training examples unchanged');
+    CP.saveCyber(id, { email: '', phone: '' });
+    const def = await (await JSZip.loadAsync(await CP.buildPpt(id, { style: 'classic' }))).file('ppt/slides/slide3.xml').async('string');
+    if (st.defaults.email) assert.ok(def.includes(st.defaults.email), 'no override: the PO18 contact');
+    const dark = await JSZip.loadAsync(await CP.buildPpt(id, { style: 'dark' }));
+    assert.match(await dark.file('ppt/slideMasters/slideMaster1.xml').async('string'), /bg1="dk1" tx1="lt1"/, 'dark: the colour map is swapped');
+    const off = await JSZip.loadAsync(await CP.buildPpt(id, { style: 'official' }));
+    assert.match(await off.file('ppt/slideMasters/slideMaster1.xml').async('string'), /name="Header banner"[\s\S]*name="Footer band"/, 'official: banners on the master');
+    assert.throws(() => CP.saveCyber(id, { email: 'not-an-email' }), /not valid/);
+  }
   // preview cache: the same content gives the same key (zip dates / compression do not matter), other content another
   const rezip = await (await JSZip.loadAsync(filledBuf)).generateAsync({ type: 'nodebuffer', compression: 'STORE' });
   assert.equal(await P.contentKey(rezip), await P.contentKey(filledBuf), 'same content, same PDF from the cache');

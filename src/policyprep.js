@@ -1213,7 +1213,7 @@ export async function contentKey(buffer) {
  * want: the index needed now – it is converted first and returned as soon as Word has written it (the others are
  * finished by the same run in the background; their places in the result are null).
  */
-export async function pdfFor(docxs, { want = null } = {}) {
+export async function pdfFor(docxs, { want = null, kind = 'word' } = {}) { // kind: 'word' (.docx) or 'ppt' (.pptx, PowerPoint)
   const keys = await Promise.all(docxs.map(contentKey));
   const file = k => path.join(pdfCacheDir(), `${k}.pdf`);
   const order = want == null ? keys : [keys[want], ...keys.filter((k, i) => i !== want)];
@@ -1221,10 +1221,10 @@ export async function pdfFor(docxs, { want = null } = {}) {
   if (todo.length) {
     const tmp = fs.mkdtempSync(path.join(pdfCacheDir(), 'run-'));
     fs.mkdirSync(path.join(tmp, 'w'));
-    const pairs = todo.map(k => { const w = path.join(tmp, 'w', `${k}.docx`); fs.writeFileSync(w, docxs[keys.indexOf(k)]); return { k, in: w, out: path.join(tmp, 'w', `${k}.pdf`) }; });
+    const pairs = todo.map(k => { const w = path.join(tmp, 'w', `${k}.${kind === 'ppt' ? 'pptx' : 'docx'}`); fs.writeFileSync(w, docxs[keys.indexOf(k)]); return { k, in: w, out: path.join(tmp, 'w', `${k}.pdf`) }; });
     const run = (async () => {
       try {
-        const r = await wordToPdf(pairs.map(({ in: i, out }) => ({ in: i, out })));
+        const r = await (kind === 'ppt' ? pptToPdf : wordToPdf)(pairs.map(({ in: i, out }) => ({ in: i, out })));
         for (const p of pairs) if (fs.existsSync(p.out) && !fs.existsSync(file(p.k))) fs.copyFileSync(p.out, file(p.k));
         if (!pairs.some(p => fs.existsSync(file(p.k)))) throw new Error(`PDF not created: ${r.results?.[0]?.error || r.error || 'Microsoft Word is needed'}`);
       } finally {
@@ -1254,6 +1254,8 @@ export async function pdfFor(docxs, { want = null } = {}) {
     throw new Error('The preview PDF could not be made (Microsoft Word is needed)');
   });
 }
+/** A cached PDF by its content key, or null. */
+export function cachedPdf(key) { const f = path.join(pdfCacheDir(), `${key}.pdf`); return fs.existsSync(f) ? fs.readFileSync(f) : null; }
 /** Keep the newest 400 cached PDFs. */
 function prunePdfCache() {
   try {
@@ -1261,6 +1263,22 @@ function prunePdfCache() {
     const list = fs.readdirSync(d).filter(f => f.endsWith('.pdf')).map(f => ({ f, t: fs.statSync(path.join(d, f)).mtimeMs })).sort((a, b) => b.t - a.t);
     for (const x of list.slice(400)) fs.rmSync(path.join(d, x.f), { force: true });
   } catch { /* best effort */ }
+}
+
+/** PowerPoint presentations → PDF with Microsoft PowerPoint (one PowerPoint run for all of them). */
+export function pptToPdf(pairs) {
+  const listFile = path.join(path.dirname(pairs[0].out), '..', '_ppt-jobs.json');
+  fs.writeFileSync(listFile, JSON.stringify(pairs));
+  return new Promise(resolve => {
+    execFile('powershell', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(APP, 'scripts', 'ppt-to-pdf.ps1'), listFile],
+      { timeout: 20 * 60000, windowsHide: true, maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
+        fs.rmSync(listFile, { force: true });
+        const last = String(stdout || '').trim().split(/\r?\n/).pop() || '';
+        let res = [];
+        try { res = JSON.parse(last || '[]'); } catch { /* below */ }
+        resolve({ ok: !err, results: [].concat(res), error: err && (last || err.message) });
+      });
+  });
 }
 
 export function wordToPdf(pairs) {
