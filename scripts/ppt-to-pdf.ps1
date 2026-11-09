@@ -19,8 +19,13 @@ try {
     try {
       # Open(FileName, ReadOnly, Untitled, WithWindow)
       $pres = $app.Presentations.Open($j.in, -1, 0, 0)
-      try { $pres.SaveAs($j.out, 32) } finally { $pres.Close() }   # 32 = ppSaveAsPDF
-      $results += [pscustomobject]@{ in = $j.in; out = $j.out; ok = (Test-Path -LiteralPath $j.out) }
+      try {
+        if ($j.pdf -ne $false) { $pres.SaveAs($j.out, 32) }   # 32 = ppSaveAsPDF
+        # optional: one slide as a picture (the style cards' thumbnails)
+        if ($j.thumb) { $n = [Math]::Min([int]$j.slide, $pres.Slides.Count); $pres.Slides.Item([Math]::Max(1, $n)).Export($j.thumb, 'PNG', 640, 480) }
+      } finally { $pres.Close() }
+      $done = if ($j.pdf -ne $false) { Test-Path -LiteralPath $j.out } else { Test-Path -LiteralPath $j.thumb }
+      $results += [pscustomobject]@{ in = $j.in; out = $j.out; ok = $done }
     } catch {
       $results += [pscustomobject]@{ in = $j.in; out = $j.out; ok = $false; error = $_.Exception.Message }
     }

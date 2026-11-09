@@ -22,7 +22,7 @@ import { formKind, installedForms } from './src/hrforms.js';
 import { MODULE_KEYS, buildPackage, packageTree } from './src/package.js';
 import { allowedSet, checkFreeRows, freeRegisterRows, maskMaster, checkChecklistItem, checkTrialApply, checklistFree, claim, claimUpload, maskChecklist, createdFacilities, facilityAllowance, isTrial, planInfo, setTrialLimits, trialLimits, upgradeError, upgradeUrl } from './src/plans.js';
 import { previewForm } from './src/hrforms.js';
-import { PPT_STYLES, TOOLS, buildPpt, cyberState, pptPdf, saveCyber, saveMaster as saveCyberMaster, trialFacility } from './src/cyberppt.js';
+import { PPT_STYLES, TOOLS, buildPpt, cyberState, pptPdf, pptThumb, saveCyber, saveMaster as saveCyberMaster, trialFacility } from './src/cyberppt.js';
 import { addForms, addItem, checklistXlsx, crossCheck, formFile, formsStatus, formsZip, generateForms, getChecklist, pdfState, prewarmPdfs, saveDocSettings, GROUPS, importMasterChecklist, listForms, masterChecklist, removeForm, removeItem, resetChecklist, updateItem } from './src/hrforms.js';
 import { documentHeader, sendMail } from './src/mailer.js';
 import { FONTS, KINDS, STYLES, effectiveStyle, saveStyleSettings, styleById, styleSettings } from './src/docstyle.js';
@@ -1055,26 +1055,29 @@ app.get('/api/doc-styles/apply-all', wrap(async (req, res) => res.json(restyle))
 // Security & Awareness toolkit: the tools (new ones are added to TOOLS) and the Cyber Security presentation
 // ---------------------------------------------------------------------------------------------------
 app.get('/api/toolkit', wrap(async (req, res) => res.json({ tools: TOOLS })));
+// Presentation looks 2-4 are preview-only for everyone but administrators (download, export and apply)
+const pptLocked = req => req.user?.role !== 'admin';
+const PPT_LOCK_MSG = 'Presentation looks 2-4 are preview-only - only an administrator can download, export or apply them';
 app.get('/api/toolkit/cyber-ppt', wrap(async (req, res) => {
-  const fid = facId(req), st = cyberState(fid, { trial: isTrial(req.user) || trialFacility(loadFacilities().list.find(f => f.id === fid)) });
-  res.json({ ...st, premium: !isTrial(req.user) });
+  const fid = facId(req), st = cyberState(fid, { trial: pptLocked(req) || trialFacility(loadFacilities().list.find(f => f.id === fid)) });
+  res.json({ ...st, premium: !pptLocked(req) });
 }));
 /** The facility's contact (e-mail / phone, '' = the PO18 default) and style – styles 2-4 need Premium. */
 app.put('/api/toolkit/cyber-ppt', wrap(async (req, res) => {
   const b = req.body || {};
-  if (b.style && PPT_STYLES.find(s => s.id === b.style)?.premium && isTrial(req.user)) throw upgradeError('Get Premium to Unlock Custom Templates');
+  if (b.style && PPT_STYLES.find(s => s.id === b.style)?.premium && pptLocked(req)) throw upgradeError(PPT_LOCK_MSG);
   saveCyber(facId(req), { email: b.email, phone: b.phone, style: b.style });
-  res.json(cyberState(facId(req), { trial: isTrial(req.user) }));
+  res.json({ ...cyberState(facId(req), { trial: pptLocked(req) }), premium: !pptLocked(req) });
 }));
 /**
  * The presentation: ?format=pptx (download) or pdf; ?style= a style (preview – any style can be previewed; the download
  * is made in the facility's own style); ?email= / ?phone= try other contact details before saving them.
  */
 app.get('/api/toolkit/cyber-ppt/file', wrap(async (req, res) => {
-  const fid = facId(req), st = cyberState(fid, { trial: isTrial(req.user) });
+  const fid = facId(req), st = cyberState(fid, { trial: pptLocked(req) });
   const style = PPT_STYLES.some(s => s.id === req.query.style) ? req.query.style : st.style;
-  // premium looks can be previewed by everyone; downloading them (PowerPoint or PDF) needs Premium (or administrator)
-  if (PPT_STYLES.find(s => s.id === style)?.premium && isTrial(req.user) && (req.query.download || req.query.format === 'pptx')) throw upgradeError('Downloading custom presentation styles is part of Premium');
+  // looks 2-4 can be previewed by everyone; downloading them (PowerPoint or PDF) is for administrators only
+  if (PPT_STYLES.find(s => s.id === style)?.premium && pptLocked(req) && (req.query.download || req.query.format === 'pptx')) throw upgradeError(PPT_LOCK_MSG);
   const opts = { email: req.query.email !== undefined ? String(req.query.email) : null, phone: req.query.phone !== undefined ? String(req.query.phone) : null };
   const name = `${st.facilityName || 'Facility'} - Cyber Security Presentation${style === 'classic' ? '' : ` - ${PPT_STYLES.find(s => s.id === style).name}`}`.replace(/[^\w .()-]/g, '');
   if (req.query.format === 'pptx') {
@@ -1083,6 +1086,11 @@ app.get('/api/toolkit/cyber-ppt/file', wrap(async (req, res) => {
   }
   const pdf = await pptPdf(fid, style, opts);
   res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `${req.query.download ? 'attachment' : 'inline'}; filename="${name}.pdf"`, 'Cache-Control': 'private, max-age=60' }).send(pdf);
+}));
+/** A style card's picture: slide 2 of the facility's presentation in a look (cached). */
+app.get('/api/toolkit/cyber-ppt/thumb', wrap(async (req, res) => {
+  const png = await pptThumb(facId(req), String(req.query.style || 'classic'));
+  res.set({ 'Content-Type': 'image/png', 'Cache-Control': 'private, max-age=300' }).send(png);
 }));
 /** Administrators: replace the master presentation (.pptx). */
 app.post('/api/toolkit/cyber-ppt/master', express.raw({ type: () => true, limit: '80mb' }), wrap(async (req, res) => {

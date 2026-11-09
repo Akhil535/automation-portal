@@ -3854,10 +3854,10 @@ function renderCyberPpt() {
   $('#cp-cards').innerHTML = d.styles.map(s => {
     const locked = s.premium && !d.premium, on = d.style === s.id;
     return `<article class="ds-card${on ? ' on' : ''}${locked ? ' locked' : ''}">
-      <button type="button" class="ds-thumb" data-cp-open="${s.id}" aria-label="Preview ${esc(s.name)}">${cpThumb(s.id, a)}${locked ? '<span class="ds-prem"><i class=i-lock></i> Premium</span>' : ''}${on ? '<span class="ds-on">✓ In use</span>' : ''}<span class="ds-zoom"><i class=i-eye></i> Preview</span></button>
+      <button type="button" class="ds-thumb" data-cp-open="${s.id}" aria-label="Preview ${esc(s.name)}">${cpThumb(s.id, a)}<img class="cp-shot" alt="" loading="lazy" src="${u(`/api/toolkit/cyber-ppt/thumb?style=${s.id}&v=${encodeURIComponent(m?.at || '')}`)}" onload="this.classList.add('ok')" onerror="this.remove()">${locked ? '<span class="ds-prem"><i class=i-lock></i> Preview only</span>' : ''}${on ? '<span class="ds-on">✓ In use</span>' : ''}<span class="ds-zoom"><i class=i-eye></i> Preview</span></button>
       <div class="ds-meta"><b>${s.no} · ${esc(s.name)}</b><small>${esc(s.desc)}</small></div>
       <div class="ds-act"><button type="button" class="btn small" data-cp-open="${s.id}"><i class=i-eye></i> Preview</button>
-        ${locked ? '<button type="button" class="btn small premium-btn" data-up>Get Premium to Unlock Custom Templates</button>' : on ? '<span class="tag ok">Selected</span>' : `<button type="button" class="btn small primary" data-cp-use="${s.id}"${ro ? ' disabled' : ''}>Use this style</button>`}
+        ${locked ? '<span class="tag na" title="Only an administrator can download, export or apply this look"><i class=i-lock></i> Preview only · administrator</span>' : on ? '<span class="tag ok">Selected</span>' : `<button type="button" class="btn small primary" data-cp-use="${s.id}"${ro ? ' disabled' : ''}>Use this style</button>`}
         ${s.id === 'classic' ? '<span class="tag na">★ Default</span>' : ''}</div></article>`;
   }).join('');
   $$('#cp-cards [data-cp-open]').forEach(b => b.onclick = () => openStylePreview('ppt', b.dataset.cpOpen));
@@ -3913,12 +3913,13 @@ function renderPptPreview() {
   const f = $('#cp-form'), contact = { email: f.elements.email.value.trim(), phone: f.elements.phone.value.trim() };
   const url = cpFile({ style, ...contact });
   showPreviewFile(url, 'ppt', locked && !admin);
-  $('#ds-prev-files').innerHTML = locked && !admin ? lockedDownloads(['PDF', 'PowerPoint'])
+  $('#ds-prev-files').innerHTML = locked && !admin ? lockedDownloads(['PDF', 'PowerPoint'], 'Preview only – an administrator downloads this look', false)
     : `<a class="btn small" href="${cpFile({ style, ...contact, download: 1 })}"><i class=i-download></i> PDF</a><a class="btn small" href="${cpFile({ style, ...contact, format: 'pptx' })}"><i class=i-download></i> PowerPoint</a>`;
   $('#ds-prev-act').innerHTML = style === d.style ? '<span class="tag ok">In use for this facility</span>'
-    : locked && !admin ? '<button type="button" class="btn premium-btn" data-up>Get Premium to Unlock Custom Templates</button>'
+    : locked && !admin ? '<span class="tag na"><i class=i-lock></i> Preview only – only an administrator can download, export or apply this look</span>'
     : me?.role === 'viewer' ? '' : '<button type="button" class="btn primary" id="ds-prev-use">Use this style for the presentation</button>';
   $('#ds-prev-use')?.addEventListener('click', () => saveCyberPpt({ style }));
+  $('#ds-prev-files [data-locked]').forEach(b => b.onclick = () => toast('<i class=i-lock></i> Preview only – only an administrator can download, export or apply looks 2–4'));
 }
 /** The toolkit page: the chosen tool (still to come) and every tool of the section. */
 var tkTools = null;
@@ -3930,6 +3931,6 @@ async function loadToolkit(tool) {
   $$('#tk-grid [data-tk]').forEach(b => b.onclick = () => (b.dataset.tk === 'cyberppt' ? showTab('cyberppt') : showTab('toolkit', b.dataset.tk)));
 }
 /** Download buttons of a premium style for a non-premium account: locked – a click opens Get Premium instead. */
-function lockedDownloads(labels) {
-  return labels.map(l => `<button type="button" class="btn small dl-locked" data-up title="Downloading this style is part of Premium"><i class=i-lock></i> ${esc(l)}</button>`).join('');
+function lockedDownloads(labels, why = 'Downloading this style is part of Premium', up = true) {
+  return labels.map(l => `<button type="button" class="btn small dl-locked" ${up ? 'data-up' : 'data-locked'} title="${esc(why)}"><i class=i-lock></i> ${esc(l)}</button>`).join('');
 }

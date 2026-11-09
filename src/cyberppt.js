@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import JSZip from 'jszip';
 import { dir, loadConfig, loadGlobalConfig, updateFacility } from './config.js';
-import { cachedPdf, contentKey, pdfFor, prepSettings, printPics } from './policyprep.js';
+import { cachedPdf, contentKey, pdfFor, pptToPdf, prepSettings, printPics } from './policyprep.js';
 import { styleSettings, trialFacility } from './docstyle.js';
 import { imageSize } from './imagesize.js';
 import { artTiles, scenePng, topicOf } from './pptart.js';
@@ -187,8 +187,8 @@ async function applyLook(z, id, { accent, logo }) {
           let ct = await z.file('[Content_Types].xml').async('string');
           if (!new RegExp(`Extension="${ext}"`, 'i').test(ct)) ct = ct.replace('<Default ', `<Default Extension="${ext}" ContentType="image/${ext}"/><Default `);
           z.file('[Content_Types].xml', ct);
-          const h = 400000, w = Math.min(1600000, Math.round(h * info.width / info.height));
-          pic = `<p:pic><p:nvPicPr><p:cNvPr id="9103" name="Facility logo"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr userDrawn="1"/></p:nvPicPr><p:blipFill><a:blip r:embed="rIdLrpLogo"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="${W - w - 230000}" y="${H - 300000 - h - 40000}"/><a:ext cx="${w}" cy="${h}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
+          const h = 170000, w = Math.min(900000, Math.round(h * info.width / info.height));
+          pic = `<p:pic><p:nvPicPr><p:cNvPr id="9103" name="Facility logo"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr userDrawn="1"/></p:nvPicPr><p:blipFill><a:blip r:embed="rIdLrpLogo"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="2050000" y="${H - 290000}"/><a:ext cx="${w}" cy="${h}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
         }
       }
       // a frame, a header banner and a footer band behind the content of every slide, the logo above the footer
@@ -203,10 +203,14 @@ async function applyLook(z, id, { accent, logo }) {
       if (/showMasterSp="0"/.test(lx)) z.file(f, lx.replace(/\sshowMasterSp="0"/, ''));
     }
   }
+  // each look's own type pairing (titles get theirs on the slides, see composeSlides)
+  const lf = LOOK_FONTS[id];
+  th = th.replace(/(<a:majorFont>\s*<a:latin typeface=")[^"]*"/, `$1${lf.title}"`).replace(/(<a:minorFont>\s*<a:latin typeface=")[^"]*"/, `$1${lf.body}"`);
   z.file(themePath, th);
   // every look but the master format: framed pictures and a security illustration per slide (in free space only)
   const pres = await z.file('ppt/presentation.xml').async('string');
   await decorateSlides(z, id, accent, Number(pres.match(/<p:sldSz cx="([0-9]+)"/)?.[1] || 9144000), Number(pres.match(/<p:sldSz[^>]*cy="([0-9]+)"/)?.[1] || 6858000));
+  await composeSlides(z, id, accent.replace('#', '').toUpperCase());
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -283,6 +287,81 @@ async function decorateSlides(z, look, accent, W, H) {
   }
 }
 
+// ---------------------------------------------------------------------------------------------------
+// The identity of looks 2-4: title bars, the title slide's banner and the content get each look's own composition
+// (fonts, colours, cards / rules). Only shapes are added behind the content and title bars are recoloured – every
+// word, position and picture stays as in the master.
+// ---------------------------------------------------------------------------------------------------
+const LOOK_FONTS = { dark: { title: 'Bahnschrift SemiBold', body: 'Calibri' }, minimal: { title: 'Segoe UI Semibold', body: 'Calibri Light' }, official: { title: 'Cambria', body: 'Calibri' } };
+const fillOf = s => (s.match(/<p:spPr\b[^>]*>([\s\S]*?)<\/p:spPr>/)?.[1] || '').replace(/<a:ln\b[\s\S]*?<\/a:ln>|<a:ln\b[^>]*\/>/g, '').replace(/<a:extLst>[\s\S]*?<\/a:extLst>/g, '').match(/<a:solidFill>[\s\S]*?<\/a:solidFill>/)?.[0] || '';
+const textOf = s => (s.match(/<a:t>[^<]*<\/a:t>/g) || []).map(t => t.slice(5, -6)).join('').trim();
+/** Replace a shape's own fill (after its geometry). */
+const setFill = (s, fill, geom = null) => s.replace(/<p:spPr\b[^>]*>[\s\S]*?<\/p:spPr>/, sp => {
+  // (a placeholder may have no geometry of its own: it is given one, the fill follows the geometry)
+  let v = /<a:prstGeom\b|<a:custGeom\b/.test(sp) ? sp : sp.replace(/(<\/a:xfrm>)/, `$1<a:prstGeom prst="${geom || 'rect'}"><a:avLst/></a:prstGeom>`);
+  v = v.replace(/(<\/a:prstGeom>|<a:prstGeom\b[^>]*\/>)\s*(?:<a:solidFill>[\s\S]*?<\/a:solidFill>|<a:noFill\/>|<a:gradFill\b[\s\S]*?<\/a:gradFill>)?/, `$1${fill}`);
+  if (geom) v = v.replace(/<a:prstGeom prst="[^"]*">\s*<a:avLst\/>\s*<\/a:prstGeom>/, `<a:prstGeom prst="${geom}"><a:avLst/></a:prstGeom>`);
+  return v;
+});
+/** Every run of a shape's text in a colour (and a font). */
+function setRuns(s, color, font = null) {
+  return s.replace(/<p:txBody>[\s\S]*<\/p:txBody>/, tb => tb.replace(/<a:(rPr|endParaRPr)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/a:\1>)/g, (m, tag, attrs, inner = '') => {
+    let v = inner.replace(/<a:solidFill>[\s\S]*?<\/a:solidFill>|<a:gradFill\b[\s\S]*?<\/a:gradFill>/g, '');
+    if (font) v = v.replace(/<a:latin\b[^>]*\/>/g, '');
+    const ln = v.match(/^\s*<a:ln\b[\s\S]*?<\/a:ln>|^\s*<a:ln\b[^>]*\/>/)?.[0] || '';
+    v = ln + `<a:solidFill><a:srgbClr val="${color}"/></a:solidFill>` + v.slice(ln.length);
+    if (font) { const i = v.search(/<a:(ea|cs|sym|hlinkClick|hlinkMouseOver|rtl|extLst)\b/); const lat = `<a:latin typeface="${font}"/>`; v = i < 0 ? v + lat : v.slice(0, i) + lat + v.slice(i); }
+    return `<a:${tag}${attrs}>${v}</a:${tag}>`;
+  }));
+}
+const shape = (id, name, b, geom, spPr, adj = '') => `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${name}"/><p:cNvSpPr/><p:nvPr userDrawn="1"/></p:nvSpPr><p:spPr><a:xfrm><a:off x="${Math.round(b.x)}" y="${Math.round(b.y)}"/><a:ext cx="${Math.round(b.w)}" cy="${Math.round(b.h)}"/></a:xfrm><a:prstGeom prst="${geom}"><a:avLst>${adj}</a:avLst></a:prstGeom>${spPr}</p:spPr><p:txBody><a:bodyPr rtlCol="0" anchor="ctr"/><a:lstStyle/><a:p><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>`;
+const solid = (c, alpha = null) => `<a:solidFill><a:srgbClr val="${c}"${alpha == null ? '/>' : `><a:alpha val="${alpha}"/></a:srgbClr>`}</a:solidFill>`;
+async function composeSlides(z, look, a) {
+  const IN = EMU_IN, F = LOOK_FONTS[look];
+  const isRed = f => /val="(C00000|FF0000|C0504D|E31A1C|B00000)"/i.test(f);
+  for (const f of Object.keys(z.files).filter(n => /^ppt\/slides\/slide\d+\.xml$/.test(n))) {
+    let sx = await z.file(f).async('string');
+    const behind = [], above = [];
+    let id = 9300;
+    sx = sx.replace(/<p:sp>[\s\S]*?<\/p:sp>/g, s => {
+      const b = boxesIn(s)[0], fill = fillOf(s), text = textOf(s);
+      if (!b || !text || /<p:ph\b[^>]*type="(dt|ftr|sldNum)"/.test(s)) return s;
+      // the title slide's banner (a red bar with the presentation's name)
+      if (fill && isRed(fill) && b.w > 4 * IN && b.h < 1.6 * IN) {
+        if (look === 'dark') return setRuns(setFill(s, '<a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0"><a:srgbClr val="0E7490"/></a:gs><a:gs pos="100000"><a:srgbClr val="6D28D9"/></a:gs></a:gsLst><a:lin ang="0" scaled="0"/></a:gradFill>', 'roundRect'), 'FFFFFF', F.title);
+        if (look === 'minimal') return setRuns(setFill(s, solid(a), 'roundRect'), 'FFFFFF', F.title);
+        above.push(shape(id++, 'Banner rule', { x: b.x, y: b.y + b.h, w: b.w, h: 0.06 * IN }, 'rect', `${solid('C9A227')}<a:ln><a:noFill/></a:ln>`));
+        return setRuns(setFill(s, solid(a)), 'FFFFFF', F.title);
+      }
+      // a slide's title bar (a filled bar across the top)
+      if (fill && b.y < 1.5 * IN && b.w > 5 * IN && b.h < 1.3 * IN && text.length < 90) {
+        if (look === 'dark') {
+          behind.push(shape(id++, 'Title accent', { x: b.x, y: b.y + 0.08 * IN, w: 0.08 * IN, h: b.h - 0.16 * IN }, 'rect', `${solid('22D3EE')}<a:ln><a:noFill/></a:ln>`));
+          behind.push(shape(id++, 'Title rule', { x: b.x, y: b.y + b.h + 0.04 * IN, w: b.w, h: 0.035 * IN }, 'rect', `<a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0"><a:srgbClr val="22D3EE"/></a:gs><a:gs pos="100000"><a:srgbClr val="A78BFA"><a:alpha val="0"/></a:srgbClr></a:gs></a:gsLst><a:lin ang="0" scaled="0"/></a:gradFill><a:ln><a:noFill/></a:ln>`));
+          return setRuns(setFill(s, '<a:noFill/>'), 'F8FAFC', F.title).replace(/(<a:pPr\b[^>]*?)\salgn="ctr"/g, '$1 algn="l"').replace(/(<a:bodyPr\b)/, '$1 lIns="228600"');
+        }
+        if (look === 'minimal') {
+          behind.push(shape(id++, 'Title underline', { x: b.x + 0.1 * IN, y: b.y + b.h + 0.02 * IN, w: 1.6 * IN, h: 0.09 * IN }, 'roundRect', `${solid(a)}<a:ln><a:noFill/></a:ln>`));
+          return setRuns(setFill(s, '<a:noFill/>'), a, F.title).replace(/(<a:pPr\b[^>]*?)\salgn="ctr"/g, '$1 algn="l"');
+        }
+        behind.push(shape(id++, 'Title rule', { x: b.x, y: b.y + b.h, w: b.w, h: 0.05 * IN }, 'rect', `${solid('C9A227')}<a:ln><a:noFill/></a:ln>`));
+        return setRuns(setFill(s, solid(a)), 'FFFFFF', F.title);
+      }
+      // the content: a card behind it (dark, minimal) or a rule beside it (official)
+      if (!fill && b.y > 1.0 * IN && b.w > 3 * IN && b.h > 1.2 * IN && text.length > 60 && !/<p:ph\b[^>]*type="(title|ctrTitle|subTitle)"/.test(s)) {
+        const p = 0.14 * IN, card = { x: b.x - p, y: b.y - p, w: b.w + 2 * p, h: Math.min(b.h + 2 * p, 6.88 * IN - (b.y - p)) }; // (the footer stays clear)
+        if (look === 'dark') behind.push(shape(id++, 'Content card', card, 'roundRect', `${solid('111C33', 85000)}<a:ln w="9525">${solid('22D3EE', 35000)}</a:ln>`, '<a:gd name="adj" fmla="val 4000"/>'));
+        else if (look === 'minimal') behind.push(shape(id++, 'Content card', card, 'roundRect', `${solid('FFFFFF')}<a:ln w="6350">${solid('E5E9F2')}</a:ln><a:effectLst><a:outerShdw blurRad="190500" dist="38100" dir="5400000" algn="t" rotWithShape="0"><a:srgbClr val="1F2937"><a:alpha val="12000"/></a:srgbClr></a:outerShdw></a:effectLst>`, '<a:gd name="adj" fmla="val 3500"/>'));
+        else behind.push(shape(id++, 'Content rule', { x: b.x - 0.16 * IN, y: b.y, w: 0.05 * IN, h: b.h }, 'rect', `${solid(a)}<a:ln><a:noFill/></a:ln>`));
+      }
+      return s;
+    });
+    if (behind.length) sx = sx.replace(/(<p:spTree>[\s\S]*?(?:<\/p:grpSpPr>|<p:grpSpPr\/>))/, `$1${behind.join('')}`);
+    if (above.length) sx = sx.replace(/<\/p:spTree>/, `${above.join('')}</p:spTree>`);
+    z.file(f, sx);
+  }
+}
+
 /** The facility's presentation (.pptx buffer) in a style. */
 export async function buildPpt(id, { style = null, email = null, phone = null } = {}) {
   if (!fs.existsSync(masterFile())) throw Object.assign(new Error('The master presentation has not been uploaded yet'), { status: 409 });
@@ -326,7 +405,7 @@ async function inputsKey(id, style, opts = {}) {
   return crypto.createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 32);
 }
 /** Raised whenever a look changes, so presentations made with an older look are made again. */
-const LOOK_VERSION = 6;
+const LOOK_VERSION = 7;
 const sigFile = () => path.join(home(), 'pdf-index.json');
 const readSigs = () => { try { return JSON.parse(fs.readFileSync(sigFile(), 'utf8')); } catch { return {}; } };
 /** PDFs of the presentation in every style (made in one PowerPoint run, cached); returns the one asked for. */
@@ -342,5 +421,35 @@ export async function pptPdf(id, style, opts = {}) {
   fs.writeFileSync(sigFile(), JSON.stringify(index));
   const pdfs = await pdfFor(bufs, { want: i, kind: 'ppt' });
   return pdfs[i];
+}
+
+/** The style cards' pictures: slide 2 of the facility's presentation in each look (one PowerPoint run, cached). */
+const THUMB_SLIDE = 2;
+const thumbDir = () => { const d = path.join(home(), 'thumbs'); fs.mkdirSync(d, { recursive: true }); return d; };
+const thumbRuns = new Map();
+export async function pptThumb(id, style) {
+  const f = path.join(thumbDir(), `${await inputsKey(id, pptStyle(style).id)}.png`);
+  if (fs.existsSync(f)) return fs.readFileSync(f);
+  if (!thumbRuns.has(id)) thumbRuns.set(id, makeThumbs(id).finally(() => thumbRuns.delete(id)));
+  await thumbRuns.get(id);
+  if (fs.existsSync(f)) return fs.readFileSync(f);
+  throw new Error('The slide picture could not be made (Microsoft PowerPoint is needed)');
+}
+async function makeThumbs(id) {
+  const tmp = fs.mkdtempSync(path.join(thumbDir(), 'run-'));
+  try {
+    fs.mkdirSync(path.join(tmp, 'w'));
+    const jobs = [];
+    for (const s of PPT_STYLES) {
+      const thumb = path.join(thumbDir(), `${await inputsKey(id, s.id)}.png`);
+      if (fs.existsSync(thumb)) continue;
+      const inp = path.join(tmp, 'w', `${s.id}.pptx`);
+      fs.writeFileSync(inp, await buildPpt(id, { style: s.id }));
+      jobs.push({ in: inp, out: path.join(tmp, 'w', `${s.id}.pdf`), pdf: false, thumb, slide: THUMB_SLIDE });
+    }
+    if (jobs.length) await pptToPdf(jobs);
+    const list = fs.readdirSync(thumbDir()).filter(n => n.endsWith('.png')).map(n => ({ n, t: fs.statSync(path.join(thumbDir(), n)).mtimeMs })).sort((a, b) => b.t - a.t);
+    for (const x of list.slice(200)) fs.rmSync(path.join(thumbDir(), x.n), { force: true });
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
 export { trialFacility };

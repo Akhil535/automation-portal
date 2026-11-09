@@ -791,6 +791,10 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
     assert.equal((await put('/api/doc-styles', { accent: 'red' }, adminCookie)).status, 400);
     assert.equal((await put(`/api/users/${asked.id}`, { plan: 'premium' }, adminCookie)).status, 200);
     assert.equal((await (await fetch(`${base}/api/plan`, nb)).json()).plan, 'premium');
+    // presentation looks 2-4: preview-only for everyone but administrators (Premium included)
+    for (const qs of ['style=dark&format=pptx', 'style=minimal&download=1']) assert.equal((await fetch(`${base}/api/toolkit/cyber-ppt/file${q}&${qs}`, nb)).status, 402, `presentation look download is admin-only: ${qs}`);
+    assert.equal((await put(`/api/toolkit/cyber-ppt${q}`, { style: 'dark' }, newbieCookie)).status, 402, 'a presentation look is applied by an administrator only');
+    assert.equal((await (await fetch(`${base}/api/toolkit/cyber-ppt${q}`, nb)).json()).premium, false);
     assert.equal((await put(`/api/doc-styles/facility${q}`, { style: 'official' }, newbieCookie)).status, 200, 'Premium: any document style');
     assert.equal((await (await fetch(`${base}/api/doc-styles${q}`, nb)).json()).effective, 'official');
     // the default is always the master format (every kind); other styles only where a facility chose one

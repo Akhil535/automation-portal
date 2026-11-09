@@ -4485,3 +4485,8 @@ button.ds-thumb { width: 100%; border: 0; cursor: zoom-in; font: inherit; color:
 /* v36b · download buttons of premium styles for non-premium accounts: locked, open Get Premium */
 .btn.dl-locked { color: var(--muted) !important; border-style: dashed !important; }
 .btn.dl-locked:hover { color: var(--ink) !important; }
+
+/* v37 · Cyber PPT style cards: the real slide (slide 2 of the facility's presentation in that look) over the schematic */
+#cyberppt .ds-thumb .cp-shot { position: absolute; inset: 12px; width: calc(100% - 24px); height: calc(100% - 24px); object-fit: contain; opacity: 0; transition: opacity .3s; filter: drop-shadow(0 6px 14px rgba(20, 22, 31, .18)); }
+#cyberppt .ds-thumb .cp-shot.ok { opacity: 1; }
+#cyberppt .ds-thumb:has(.cp-shot.ok) svg { visibility: hidden; }
