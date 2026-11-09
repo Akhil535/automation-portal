@@ -4321,3 +4321,25 @@ dialog::backdrop { background: rgba(12, 12, 15, .5) !important; backdrop-filter:
 /* v33c · contrast: done badges in How it works, small blue labels on light-blue chips */
 .hiw-card .hiw-node[data-state="done"] .hiw-ic em { background: #15803d !important; border-color: #15803d !important; color: #fff !important; }
 :root:not([data-theme="dark"]) :is(.pack-kicker, .pw-kicker, .eyebrow, .hiw-kicker) { color: #2a46d6 !important; }
+
+/* v34 · sign-in page: the 5-step showcase (same pictures as the dashboard) on the dark brand panel */
+.hiw-card.hiw-login { margin: 0; padding: 16px 18px 0 !important; border-radius: 22px !important; overflow: hidden;
+  background: rgba(255, 255, 255, .07) !important; border: 1px solid rgba(255, 255, 255, .16) !important; box-shadow: 0 30px 60px -30px rgba(0, 0, 0, .6) !important; backdrop-filter: blur(8px);
+  --hw-ink: #ffffff; --hw-mut: #d4d6e0; --hw-a: #a9b8ff; --hw-b: #c4b5fd; --hw-c: #ffb27a; --hw-line: rgba(255, 255, 255, .16); --hw-node: rgba(255, 255, 255, .1); --hw-glass: rgba(8, 10, 30, .32); color: #fff; }
+.auth-art.la .hiw-login { margin-block: auto !important; }
+.hiw-login .hiw-track-wrap { margin: 4px 0 4px; }
+.hiw-login .hiw-ic { width: 48px; height: 48px; border-radius: 15px; color: #e0e6ff; }
+.hiw-login .hiw-line { top: 22px; }
+.hiw-login .hiw-meta b { font-size: 12px; color: #fff; }
+.hiw-login .hiw-node.on .hiw-ic { color: #0b1033; }
+.hiw-login .hiw-ic em { color: #0b1033; background: #c7d0ff; border-color: transparent; }
+.hiw-login .hiw-stage { position: relative; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); padding: 14px 16px; margin-top: 8px; }
+.hiw-login .hiw-copy h3 { font-size: 16px; color: #fff; }
+.hiw-login .hiw-copy p { font-size: 14px; color: #d4d6e0; margin: 0; }
+.hiw-login .hiw-step { color: #c7d0ff; }
+.hiw-login .la-ai { top: 10px; right: 10px; }
+.hiw-login .la-ctrl { display: flex; justify-content: flex-end; padding: 10px 0 0; }
+.hiw-login .hiw-btn { background: rgba(255, 255, 255, .1) !important; border-color: rgba(255, 255, 255, .25) !important; color: #fff !important; }
+.hiw-login .hiw-bar { margin: 12px -18px 0; background: rgba(255, 255, 255, .12); }
+@media (max-width: 1100px) { .hiw-login .hiw-stage { grid-template-columns: 1fr; } .hiw-login .hiw-art { order: -1; max-width: 380px; width: 100%; justify-self: center; } }
+@media (max-width: 600px) { .hiw-login .hiw-ic { width: 40px; height: 40px; } .hiw-login .hiw-line { top: 18px; } .hiw-login .hiw-meta b { font-size: 12px; } }

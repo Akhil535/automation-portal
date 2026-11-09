@@ -1,64 +1,56 @@
-// Sign-in page: the animated isometric "compliance factory" (public/iso-factory.js) – four stations on a moving
-// conveyor belt: 1 Policies · 2 HR & vendor forms · 3 LEGAL REGISTER · DoH updates. Documents ride the belt, a
-// glowing package hops to the active station, a caption explains each step, and an AI assistant bubble answers on
-// the way. Pauses when hidden; a still picture for people who prefer less motion.
+// Sign-in page: the same 5-step showcase as the dashboard's "How it works" (public/hiw-art.js) –
+// 1 Policies · 2 HR documents · 3 3rd-party · 4 LEGAL REGISTER · 5 Checklist – with an animated preview of what each
+// step produces and a short caption. Plays by itself; pauses when the tab is hidden; a still picture (and the step
+// buttons) for people who prefer less motion.
 (() => {
-  const stage = document.getElementById('la-stage');
-  if (!stage || !window.IsoFactory) return;
-  const F = IsoFactory.create({ labels: ['Policies', 'HR forms', 'Register', 'DoH'], pkgId: 'la-pkg', gradId: 'laGlow' });
-  stage.innerHTML = F.svg;
-  const svg = stage.querySelector('svg');
-  const fit = () => IsoFactory.fit(svg, Math.max(0, st.k));
-  requestAnimationFrame(fit); setTimeout(fit, 400); window.addEventListener('load', fit); IsoFactory.watch(svg);
-
-  const STEPS = [
-    { tag: 'Step 1 · Policies', title: 'Your 33 ADHICS policies – printed for you', sub: 'Add your logo, signature and stamp once. Every policy is filled with your facility’s name, dates and Policy IDs, as Word and PDF.' },
-    { tag: 'Step 2 · HR & vendor forms', title: 'HR, training and 3rd-party forms in seconds', sub: 'NDA, orientation, background checks, exit clearance, training records, vendor NDAs – each with your logo and its own Ref. No.' },
-    { tag: 'Step 3 · LEGAL REGISTER', title: 'Every licence and certificate, always in date', sub: 'Upload a document or a photo – the dates are read for you. Renewals are flagged before anything lapses.' },
-    { tag: 'Always on · DoH updates', title: 'New DoH circulars added every week', sub: 'The portal checks the Department of Health, adds each new circular to your register and tells you what applies to you.' },
-  ];
+  const H = window.HiwArt;
+  const track = document.getElementById('hiw-track');
+  if (!H || !track) return;
+  const { STEPS, ART } = H;
   const $ = id => document.getElementById(id);
-  const dots = [...document.querySelectorAll('#la-dots button')];
-  const STEP_MS = 4200, MOVE_MS = 900;
+  const N = STEPS.length, STEP_MS = 5600;
   const st = { k: -1, t0: performance.now(), playing: true, raf: 0 };
   const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  const lerp = (a, b, f) => a.map((v, i) => v + (b[i] - v) * f);
-  const ease = f => (f < 0.5 ? 2 * f * f : 1 - (-2 * f + 2) ** 2 / 2);
-  function place(k, f) {
-    const from = F.centre(k === 0 ? 3 : k - 1), to = F.centre(k);
-    const g = lerp(from, to, ease(Math.min(1, f)));
-    const hop = f < 1 ? Math.sin(Math.PI * Math.min(1, f)) * (k === 0 ? 70 : 42) : 0;
-    const [sx, sy] = F.P(g[0], g[1], g[2] + 8 + hop), [ox, oy] = F.P(0, 0, 0);
-    $('la-pkg')?.setAttribute('transform', `translate(${(sx - ox).toFixed(1)},${(sy - oy).toFixed(1)})`);
-  }
+  const esc = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  track.innerHTML = STEPS.map((s, k) => `<li role="presentation"><button type="button" role="tab" class="hiw-node" data-k="${k}" aria-label="Step ${k + 1}: ${esc(s.label)}">
+    <span class="hiw-ic"><i class="i-${s.icon}"></i><em>${k + 1}</em></span><span class="hiw-meta"><b>${esc(s.label)}</b></span></button></li>`).join('');
+  const nodes = [...track.querySelectorAll('.hiw-node')];
+
   function show(k) {
     if (k === st.k) return;
     st.k = k;
-    IsoFactory.fit(svg, k);
-    stage.querySelectorAll('.iso-isle').forEach(g => { const on = Number(g.dataset.k) === k; g.classList.toggle('on', on); g.classList.toggle('now', on); });
-    dots.forEach((b, i) => { b.classList.toggle('on', i === k); b.setAttribute('aria-selected', i === k); });
-    const cap = $('la-caption');
-    cap.classList.remove('in'); void cap.offsetWidth; cap.classList.add('in');
-    $('la-tag').textContent = STEPS[k].tag; $('la-title').textContent = STEPS[k].title; $('la-sub').textContent = STEPS[k].sub;
-    $('la-ai').classList.toggle('show', k === 2 || k === 3);
+    nodes.forEach((b, i) => { const on = i === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); b.tabIndex = on ? 0 : -1; });
+    $('hiw-step').textContent = `Step ${k + 1} of ${N}`;
+    $('la-title').textContent = STEPS[k].title; $('la-sub').textContent = STEPS[k].sub;
+    const art = $('hiw-art'); art.innerHTML = ART[k]; art.dataset.k = k;
+    const stage = $('hiw-stage'); stage.classList.remove('enter'); void stage.offsetWidth; stage.classList.add('enter');
+    $('hiw-fill').style.setProperty('--f', (k / (N - 1)).toFixed(3));
+    $('la-ai').classList.toggle('show', k === 3); // the assistant speaks up on the LEGAL REGISTER step
   }
   function frame(now) {
     st.raf = 0;
     if (!st.playing || document.hidden) return;
-    const el = now - st.t0, k = Math.floor(el / STEP_MS) % 4, f = (el % STEP_MS) / MOVE_MS;
-    show(k); place(k, f);
-    $('la-bar').style.width = `${(((el % (STEP_MS * 4)) / (STEP_MS * 4)) * 100).toFixed(2)}%`;
+    const el = now - st.t0, k = Math.floor(el / STEP_MS) % N;
+    show(k);
+    $('la-bar').style.width = `${(((el % STEP_MS) / STEP_MS) * 100).toFixed(2)}%`;
     st.raf = requestAnimationFrame(frame);
   }
   const run = () => { if (!st.raf && st.playing) st.raf = requestAnimationFrame(frame); };
-  const paused = on => stage.classList.toggle('paused', on);
-  function jump(k) { st.playing = false; paused(true); cancelAnimationFrame(st.raf); st.raf = 0; show(k); place(k, 1); $('la-bar').style.width = `${((k + 1) / 4) * 100}%`; $('la-play').textContent = '▶ Play'; st.t0 = performance.now() - k * STEP_MS - MOVE_MS; }
-  dots.forEach((b, i) => { b.onclick = () => jump(i); });
-  $('la-play').onclick = () => {
-    st.playing = !st.playing; paused(!st.playing);
-    $('la-play').textContent = st.playing ? '❚❚ Pause' : '▶ Play';
-    if (st.playing) { st.t0 = performance.now() - Math.max(0, st.k) * STEP_MS - MOVE_MS; run(); }
+  const setPlaying = on => {
+    st.playing = on;
+    document.querySelector('.hiw-login')?.classList.toggle('paused', !on);
+    $('la-play').textContent = on ? '❚❚ Pause' : '▶ Play';
+    if (on) { st.t0 = performance.now() - Math.max(0, st.k) * STEP_MS; run(); } else { cancelAnimationFrame(st.raf); st.raf = 0; $('la-bar').style.width = '100%'; }
   };
+  const jump = k => { setPlaying(false); st.k = -1; show(k); };
+  nodes.forEach((b, i) => { b.onclick = () => jump(i); });
+  track.onkeydown = e => {
+    const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    if (!d) return;
+    e.preventDefault(); jump((Math.max(0, st.k) + d + N) % N); nodes[st.k].focus();
+  };
+  $('la-play').onclick = () => setPlaying(!st.playing);
   document.addEventListener('visibilitychange', run);
-  if (reduce) { jump(0); } else { show(0); run(); }
+  if (reduce) jump(0); else { show(0); run(); }
 })();

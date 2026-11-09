@@ -17,24 +17,29 @@
   </div>
   <div class="la-hero">
     <h2>ADHICS compliance,<span>on autopilot.</span></h2>
-    <p>Policies, HR and vendor forms, licences and DoH circulars – prepared, tracked and kept up to date for your facility, in one secure place.</p>
+    <p>Policies, HR and vendor documents, licences and your compliance checklist – prepared, tracked and kept up to date for your facility, in one secure place.</p>
   </div>
-  <figure class="la-video">
-    <div class="la-screen">
-      <div class="la-stage iso-stage" id="la-stage"></div>
-      <div class="la-ai" id="la-ai" aria-hidden="true"><i>✦</i><span><b>AI assistant</b>“3 licences expire in 30 days – renew the DoH licence first.”</span></div>
+  <figure class="la-show hiw-card hiw-login" aria-label="How it works">
+    <div class="hiw-track-wrap">
+      <div class="hiw-line" aria-hidden="true"><i id="hiw-fill"></i><b></b></div>
+      <ol class="hiw-track" id="hiw-track" role="tablist" aria-label="Steps"></ol>
     </div>
-    <figcaption class="la-caption in" id="la-caption"><span class="la-tag" id="la-tag">Step 1 · Policies</span><b id="la-title">Your 33 ADHICS policies – written for you</b><small id="la-sub"></small></figcaption>
-    <div class="la-ctrl">
-      <div class="la-dots" id="la-dots" role="tablist" aria-label="Steps"><button type="button" role="tab">1</button><button type="button" role="tab">2</button><button type="button" role="tab">3</button><button type="button" role="tab">↻</button></div>
-      <button type="button" class="la-play" id="la-play">❚❚ Pause</button>
+    <div class="hiw-stage" id="hiw-stage">
+      <div class="hiw-copy">
+        <span class="hiw-step" id="hiw-step">Step 1 of 5</span>
+        <h3 id="la-title">–</h3>
+        <p id="la-sub"></p>
+      </div>
+      <div class="hiw-art" id="hiw-art" aria-hidden="true"></div>
+      <div class="la-ai" id="la-ai" aria-hidden="true"><i>✦</i><span><b>AI assistant</b>“3 licences expire in 30 days – renew the trade licence first.”</span></div>
     </div>
-    <div class="la-bar"><i id="la-bar"></i></div>
+    <div class="la-ctrl"><button type="button" class="btn small hiw-btn" id="la-play">❚❚ Pause</button></div>
+    <div class="hiw-bar"><i id="la-bar"></i></div>
   </figure>
   <ul class="la-facts">
     <li><b>33</b><span>ADHICS policies<br>Word + PDF</span></li>
     <li><b>13</b><span>HR, training &amp;<br>vendor forms</span></li>
-    <li><b>Weekly</b><span>DoH circular<br>check</span></li>
+    <li><b>5 steps</b><span>policies to<br>checklist</span></li>
     <li><b>2FA</b><span>secure sign-in,<br>roles per facility</span></li>
   </ul>
 </aside>
@@ -42,15 +47,17 @@
   <div class="auth-brand">
     <span class="sb-app-mark auth-mark"><svg viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5zm-1.2 14.2-3.5-3.5 1.4-1.4 2.1 2.1 4.9-4.9 1.4 1.4z"/></svg></span>
     <div>
-      <div class="eyebrow"><b>ADHICS COMPLIANCE SUITE</b> · Policies · HR · Vendors · Legal · DoH</div>
+      <div class="eyebrow"><b>ADHICS COMPLIANCE SUITE</b> · Policies · HR · Vendors · Legal · Checklist</div>
       <h1>Compliance Portal</h1>
       <p class="muted small">Facility user portal &amp; admin console · secure sign-in with two-factor authentication</p>
     </div>
   </div>
   <ol class="auth-steps">
     <li><i>1</i>Policies</li>
-    <li><i>2</i>LEGAL REGISTER</li>
-    <li><i>3</i>DoH monitoring</li>
+    <li><i>2</i>HR documents</li>
+    <li><i>3</i>3rd-party</li>
+    <li><i>4</i>LEGAL REGISTER</li>
+    <li><i>5</i>Checklist</li>
   </ol>
 
   <div class="auth-card">
@@ -138,7 +145,7 @@
   <p class="auth-foot muted small">RESTRICTED / داخلي · Authorised users only. Sign-ins are logged.</p>
 </div>
 <script src="login.js"></script>
-<script src="/iso-factory.js" defer></script>
+<script src="/hiw-art.js" defer></script>
 <script src="/login-scene.js" defer></script>
 </body>
 </html>

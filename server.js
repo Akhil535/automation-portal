@@ -94,7 +94,7 @@ function throttle(req) {
 }
 
 // Pages and files anyone may load (the sign-in screen); everything else needs a session.
-const PUBLIC = new Set(['/login.html', '/login.js', '/login-scene.js', '/iso-factory.js', '/style.css', '/favicon.ico']);
+const PUBLIC = new Set(['/login.html', '/login.js', '/login-scene.js', '/hiw-art.js', '/style.css', '/favicon.ico']);
 app.use((req, res, next) => {
   if (PUBLIC.has(req.path) || req.path.startsWith('/api/auth/')) return next();
   const user = sessionUser(cookies(req)[SESSION_COOKIE]);
