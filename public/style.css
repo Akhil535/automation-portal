@@ -4038,3 +4038,12 @@ i[class^="i-"], i[class*=" i-"] { width: 1.05em !important; height: 1.05em !impo
 .act-foot { justify-content: flex-end; }
 .chg-review { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; font-weight: 700; }
 @media (max-width: 600px) { .act-row { grid-template-columns: 26px 1fr; } .act-res { grid-column: 2; } .act-dlg form { padding: 16px; } }
+
+/* v30 · training / 3rd-party dates and details: changes wait for "Apply to the documents" */
+.dd-apply { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; padding: 10px 12px; border-radius: 12px; border: 1px dashed var(--line); background: transparent; }
+.dd-apply-msg { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.doc-dates.dirty .dd-apply { border-style: solid; border-color: rgba(245, 158, 11, .55); background: rgba(251, 191, 36, .1); }
+.doc-dates.dirty .dd-apply-msg { color: var(--warn); font-weight: 600; }
+.doc-dates.dirty :is(input:not([disabled])) { transition: box-shadow .2s; }
+.dd-apply .btn[disabled] { opacity: .5; cursor: not-allowed; }
+.trial-locked-box .dd-apply { display: none; }

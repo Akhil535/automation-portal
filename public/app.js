@@ -2836,6 +2836,7 @@ function renderDocDates(sel, setting) {
   if (!box) return;
   const forms = d.forms.filter(f => f.dates?.setting === setting || (f.details && setting === 'training'));
   if (!forms.length) { box.innerHTML = ''; return; }
+  if (box.querySelector(`.doc-dates.dirty[data-fac="${CSS.escape(String(facility))}"]`)) return; // unsaved edits (same facility): keep them until Apply / Discard
   // free trial: the 3rd-party documents use the default dates (PO11 / the policy review date) – own dates are Premium
   // free trial: the training date and details are Premium too (shown blurred, read-only)
   const tpLocked = (setting === 'thirdparty' || setting === 'training') && !!planState?.included;
@@ -2849,7 +2850,7 @@ function renderDocDates(sel, setting) {
   const hint = setting === 'training'
     ? 'Enter it once – it fills every date in the training documents. A document can have its own date below (e.g. the acknowledgement signed on another day).'
     : `One date for the 3rd-party documents${fallback ? ` – empty = the policy review date (${ymdToDmy(fallback)})` : ''}. Policy ID, issued / reviewed / due dates follow PO11.`;
-  box.innerHTML = `<div class="doc-dates${tpLocked ? ' trial-locked-box' : ''}" data-setting="${setting}">
+  box.innerHTML = `<div class="doc-dates${tpLocked ? ' trial-locked-box' : ''}" data-setting="${setting}" data-fac="${esc(String(facility))}">
     ${tpLocked ? '<div class="dd-lock"><span aria-hidden="true"><i class=i-lock></i></span><span>' + lockMsg + '</span><button type="button" class="btn small premium-btn" data-up>Get Premium</button></div>' : ''}
     <div class="dd-global"><label><b>${title}</b><input type="date" data-dd-global value="${esc(globalDate)}"${ro}></label><small class="muted">${hint}</small></div>
     <div class="dd-list">${forms.filter(f => f.dates).map(f => {
@@ -2859,14 +2860,57 @@ function renderDocDates(sel, setting) {
         ${dt.own ? `<button type="button" class="link-btn small" data-dd-reset="${f.key}"${ro}>Use the ${title.toLowerCase()}</button>` : ''}</div>`;
     }).join('')}</div>
     ${forms.filter(f => f.details?.length).map(f => `<div class="dd-details"><b class="small">Details in the ${esc(f.title)}</b><div class="dd-grid">${f.details.map(x => `<label>${esc(x.label)}<input data-dd-detail="${f.key}" data-k="${x.key}" value="${esc(x.value)}" placeholder="${esc(x.master)}"${ro}></label>`).join('')}</div></div>`).join('')}</div>`;
-  const save = async (body, msg) => {
-    try { await api('/api/hr/documents', { method: 'PUT', body: JSON.stringify(body) }); hrData = await api('/api/hr'); renderHr(); toast(msg); }
-    catch (e) { toast(`<i class=i-alert></i> ${esc(e.message)}`); }
+  // Nothing is written while typing: changes are collected and only applied to the documents with "Apply"
+  // (or thrown away with "Discard"). Until then the box keeps the user's edits, even when the page refreshes.
+  const dd = box.querySelector('.doc-dates');
+  if (!ro) dd.insertAdjacentHTML('beforeend', `<div class="dd-apply" role="status"><span class="dd-apply-msg"><i class=i-clock></i> <span>No unsaved changes</span></span>
+    <div class="btn-row"><button type="button" class="btn small" data-dd-discard disabled>Discard</button><button type="button" class="btn small primary" data-dd-apply disabled>✓ Apply to the documents</button></div></div>`);
+  const resets = new Set();
+  const changed = () => {
+    const out = [];
+    const g = box.querySelector('[data-dd-global]');
+    if (g && g.value !== (d.dateSettings[setting] || '')) out.push({ body: { group: setting, date: g.value }, what: title.toLowerCase() });
+    box.querySelectorAll('[data-dd-doc]').forEach(i => {
+      const f = forms.find(x => x.key === i.dataset.ddDoc);
+      const v = resets.has(f.key) ? '' : i.value;
+      if (v !== (f.dates.own || '')) out.push({ body: { key: f.key, date: v }, what: `${f.title} date` });
+    });
+    for (const f of forms.filter(x => x.details?.length)) {
+      const vals = Object.fromEntries([...box.querySelectorAll(`[data-dd-detail="${f.key}"]`)].map(x => [x.dataset.k, x.value]));
+      if (f.details.some(x => (vals[x.key] ?? '') !== (x.value ?? ''))) out.push({ body: { key: f.key, details: vals }, what: `details in the ${f.title}` });
+    }
+    return out;
   };
-  box.querySelector('[data-dd-global]').onchange = e => save({ group: setting, date: e.target.value }, `${title} saved – every document without its own date follows it`);
-  box.querySelectorAll('[data-dd-doc]').forEach(i => i.onchange = () => save({ key: i.dataset.ddDoc, date: i.value }, i.value ? 'Date saved for this document' : `Back to the ${title.toLowerCase()}`));
-  box.querySelectorAll('[data-dd-reset]').forEach(b => b.onclick = () => save({ key: b.dataset.ddReset, date: '' }, `Back to the ${title.toLowerCase()}`));
-  box.querySelectorAll('[data-dd-detail]').forEach(i => i.onchange = () => save({ key: i.dataset.ddDetail, details: Object.fromEntries([...box.querySelectorAll(`[data-dd-detail="${i.dataset.ddDetail}"]`)].map(x => [x.dataset.k, x.value])) }, 'Saved'));
+  const refresh = () => {
+    const n = changed().length;
+    dd.classList.toggle('dirty', n > 0);
+    const bar = box.querySelector('.dd-apply');
+    if (!bar) return;
+    bar.querySelector('.dd-apply-msg span').textContent = n ? `${n} unsaved change${n > 1 ? 's' : ''} – the documents are not updated until you apply` : 'No unsaved changes';
+    bar.querySelectorAll('button').forEach(b => { b.disabled = !n; });
+  };
+  box.querySelectorAll('[data-dd-global], [data-dd-doc], [data-dd-detail]').forEach(i => { i.oninput = refresh; i.onchange = refresh; });
+  box.querySelectorAll('[data-dd-reset]').forEach(b => b.onclick = () => {
+    resets.add(b.dataset.ddReset);
+    const i = box.querySelector(`[data-dd-doc="${b.dataset.ddReset}"]`); if (i) i.value = '';
+    b.hidden = true; refresh();
+  });
+  box.querySelector('[data-dd-discard]')?.addEventListener('click', () => { dd.classList.remove('dirty'); renderDocDates(sel, setting); toast('Changes discarded'); });
+  box.querySelector('[data-dd-apply]')?.addEventListener('click', async e => {
+    const list = changed();
+    if (!list.length) return;
+    const btn = e.currentTarget; btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Applying…';
+    let done = 0;
+    try {
+      for (const c of list) { await api('/api/hr/documents', { method: 'PUT', body: JSON.stringify(c.body) }); done++; }
+      dd.classList.remove('dirty');
+      hrData = await api('/api/hr'); renderHr(); if (setting === 'thirdparty') renderThirdParty();
+      toast(`<i class=i-save></i> Applied – ${list.map(c => c.what).join(', ')} updated in the documents`);
+    } catch (er) {
+      toast(`<i class=i-alert></i> ${esc(er.message)}${done ? ` (${done} of ${list.length} applied)` : ''}`);
+      btn.disabled = false; btn.textContent = '✓ Apply to the documents';
+    }
+  });
 }
 
 /** 3rd-party documents page: same branding (logo, name, code) and engine as the HR forms. */
@@ -3422,3 +3466,6 @@ function renderChecklistPage(hrErr, regErr) {
     </tbody></table></div>`;
 }
 $$('#checklist [data-goto]').forEach(b => { b.onclick = () => showTab(b.dataset.goto); });
+
+// Training / 3rd-party dates and details not applied yet: the browser asks before the page is left.
+window.addEventListener('beforeunload', e => { if (document.querySelector('.doc-dates.dirty')) { e.preventDefault(); e.returnValue = ''; } });
