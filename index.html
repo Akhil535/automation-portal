@@ -38,13 +38,13 @@
   <div class="mark"></div>
   <h1>Compliance Portal<span>policies, HR &amp; LEGAL REGISTER</span></h1>
   <p id="msg">Opening the portal…</p>
-  <a class="btn" id="go" href="https://img-vital-conventions-house.trycloudflare.com">Open the portal →</a>
-  <small id="when">Link updated 09 Nov 2026, 11:35 (UAE)</small>
+  <a class="btn" id="go" href="https://api.trycloudflare.com">Open the portal →</a>
+  <small id="when">Link updated 09 Nov 2026, 14:59 (UAE)</small>
 </main>
 <script>
   // The portal runs on the facility's PC; its address can change. link.json always holds the current one.
   (async () => {
-    let url = 'https://img-vital-conventions-house.trycloudflare.com', online = true;
+    let url = 'https://api.trycloudflare.com', online = true;
     try {
       const r = await fetch('link.json?t=' + Date.now(), { cache: 'no-store' });
       if (r.ok) { const j = await r.json(); url = j.url || url; online = j.online !== false; document.getElementById('when').textContent = 'Link updated ' + (j.updated || ''); }
