@@ -16,6 +16,7 @@ import { dir, loadConfig, loadGlobalConfig, updateFacility } from './config.js';
 import { cachedPdf, contentKey, pdfFor, prepSettings, printPics } from './policyprep.js';
 import { styleSettings, trialFacility } from './docstyle.js';
 import { imageSize } from './imagesize.js';
+import { artTiles, topicOf } from './pptart.js';
 
 /** The tools of the Security & Awareness section; new ones are added here (status 'soon' shows a placeholder page). */
 export const TOOLS = [
@@ -202,6 +203,75 @@ async function applyLook(z, id, { accent, logo }) {
     }
   }
   z.file(themePath, th);
+  // every look but the master format: framed pictures and a security illustration per slide (in free space only)
+  const pres = await z.file('ppt/presentation.xml').async('string');
+  await decorateSlides(z, id, accent, Number(pres.match(/<p:sldSz cx="([0-9]+)"/)?.[1] || 9144000), Number(pres.match(/<p:sldSz[^>]*cy="([0-9]+)"/)?.[1] || 6858000));
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Looks 2-4: every original picture and every word stays; the pictures are framed in the look's colours, and each
+// slide gets a security illustration for its topic – only in a corner that is free (nothing is ever covered).
+// ---------------------------------------------------------------------------------------------------
+const EMU_IN = 914400;
+const boxesIn = xml => [...xml.matchAll(/<a:off x="(-?\d+)" y="(-?\d+)"\/>\s*<a:ext cx="(\d+)" cy="(\d+)"\/>/g)].map(m => ({ x: +m[1], y: +m[2], w: +m[3], h: +m[4] }));
+const overlaps = (a, b, pad = 0.06 * EMU_IN) => a.x < b.x + b.w + pad && b.x < a.x + a.w + pad && a.y < b.y + b.h + pad && b.y < a.y + a.h + pad;
+const PIC_FRAME = {
+  dark: '<a:ln w="15875"><a:solidFill><a:srgbClr val="22D3EE"/></a:solidFill></a:ln><a:effectLst><a:glow rad="63500"><a:srgbClr val="22D3EE"><a:alpha val="35000"/></a:srgbClr></a:glow></a:effectLst>',
+  minimal: '<a:ln><a:noFill/></a:ln><a:effectLst><a:outerShdw blurRad="152400" dist="38100" dir="5400000" algn="t" rotWithShape="0"><a:srgbClr val="1F2937"><a:alpha val="22000"/></a:srgbClr></a:outerShdw></a:effectLst>',
+  official: a => `<a:ln w="19050"><a:solidFill><a:srgbClr val="${a}"/></a:solidFill></a:ln><a:effectLst><a:outerShdw blurRad="63500" dist="25400" dir="5400000" algn="t" rotWithShape="0"><a:srgbClr val="000000"><a:alpha val="30000"/></a:srgbClr></a:outerShdw></a:effectLst>`,
+};
+async function decorateSlides(z, look, accent, W, H) {
+  const a = accent.replace('#', '').toUpperCase();
+  const tiles = await artTiles(look, accent);
+  if (!Object.keys(tiles).length) return; // no browser to draw them: the look without illustrations
+  let ct = await z.file('[Content_Types].xml').async('string');
+  if (!/Extension="png"/i.test(ct)) z.file('[Content_Types].xml', ct.replace('<Default ', '<Default Extension="png" ContentType="image/png"/><Default '));
+  const layoutBoxes = new Map(); // layout file → its placeholders' boxes by type / idx
+  const S = Math.round(0.82 * EMU_IN), m = Math.round(0.18 * EMU_IN), top = Math.round((look === 'official' ? 0.36 : 0.16) * EMU_IN), footer = Math.round(0.62 * EMU_IN);
+  const slides = Object.keys(z.files).filter(f => /^ppt\/slides\/slide\d+\.xml$/.test(f));
+  for (const f of slides) {
+    let sx = await z.file(f).async('string');
+    const relPath = f.replace('slides/', 'slides/_rels/') + '.rels';
+    let rels = await z.file(relPath)?.async('string') || '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+    // 1 · the slide's pictures (not small badges): framed in the look's colours
+    const frame = typeof PIC_FRAME[look] === 'function' ? PIC_FRAME[look](a) : PIC_FRAME[look];
+    sx = sx.replace(/<p:pic>[\s\S]*?<\/p:pic>/g, pic => {
+      const e = pic.match(/<a:ext cx="(\d+)" cy="(\d+)"/);
+      if (!e || (+e[1] * +e[2]) < EMU_IN * EMU_IN || /<a:ln\b|<a:effectLst\b/.test(pic.match(/<p:spPr\b[\s\S]*?<\/p:spPr>/)?.[0] || '')) return pic;
+      return pic.replace(/<\/p:spPr>/, `${frame}</p:spPr>`);
+    });
+    // 2 · what is already on the slide: its own shapes and the layout's placeholders it uses without a position
+    const boxes = boxesIn(sx.replace(/<p:grpSpPr>[\s\S]*?<\/p:grpSpPr>/g, m0 => (/<a:chOff/.test(m0) ? m0 : '')));
+    const layout = rels.match(/Type="[^"]*\/slideLayout"[^>]*Target="\.\.\/slideLayouts\/([^"]+)"/)?.[1] || rels.match(/Target="\.\.\/slideLayouts\/([^"]+)"[^>]*Type="[^"]*\/slideLayout"/)?.[1];
+    if (layout) {
+      if (!layoutBoxes.has(layout)) {
+        const lx = await z.file(`ppt/slideLayouts/${layout}`)?.async('string') || '';
+        layoutBoxes.set(layout, [...lx.matchAll(/<p:sp>[\s\S]*?<\/p:sp>/g)].map(s0 => ({ ph: s0[0].match(/<p:ph\b[^>]*>/)?.[0] || '', box: boxesIn(s0[0])[0] })).filter(v => v.ph && v.box));
+      }
+      for (const s0 of sx.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || []) {
+        const ph = s0.match(/<p:ph\b[^>]*>/)?.[0]; if (!ph || boxesIn(s0).length) continue;
+        const type = ph.match(/type="([^"]+)"/)?.[1] || 'body', idx = ph.match(/idx="([^"]+)"/)?.[1];
+        const hit = layoutBoxes.get(layout).find(v => (idx && v.ph.includes(`idx="${idx}"`)) || (v.ph.match(/type="([^"]+)"/)?.[1] || 'body') === type);
+        if (hit) boxes.push(hit.box);
+      }
+    }
+    // 3 · the illustration for the slide's topic, in the first free corner (the footer stays clear)
+    const text = (sx.match(/<a:t>[^<]*<\/a:t>/g) || []).map(t => t.slice(5, -6)).join(' ');
+    const topic = topicOf(text);
+    const spots = [{ x: W - S - m, y: top }, { x: m, y: top }, { x: W - S - m, y: H - S - footer }, { x: m, y: H - S - footer }].map(p => ({ ...p, w: S, h: S }));
+    const spot = tiles[topic] && spots.find(p => !boxes.some(b => overlaps(p, b)));
+    if (spot) {
+      const media = `ppt/media/lrp-art-${look}-${topic}.png`;
+      if (!z.file(media)) z.file(media, tiles[topic]);
+      const rid = 'rIdLrpArt';
+      if (!rels.includes(`Id="${rid}"`)) rels = rels.replace('</Relationships>', `<Relationship Id="${rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/lrp-art-${look}-${topic}.png"/></Relationships>`);
+      const pic = `<p:pic><p:nvPicPr><p:cNvPr id="9201" name="Security illustration" descr="${topic}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="${spot.x}" y="${spot.y}"/><a:ext cx="${S}" cy="${S}"/></a:xfrm><a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val 16667"/></a:avLst></a:prstGeom></p:spPr></p:pic>`;
+      sx = sx.replace(/<\/p:spTree>/, `${pic}</p:spTree>`);
+      if (!/xmlns:r=/.test(sx.slice(0, 600))) sx = sx.replace('<p:sld ', '<p:sld xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ');
+      z.file(relPath, rels);
+    }
+    z.file(f, sx);
+  }
 }
 
 /** The facility's presentation (.pptx buffer) in a style. */
@@ -247,7 +317,7 @@ async function inputsKey(id, style, opts = {}) {
   return crypto.createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 32);
 }
 /** Raised whenever a look changes, so presentations made with an older look are made again. */
-const LOOK_VERSION = 4;
+const LOOK_VERSION = 5;
 const sigFile = () => path.join(home(), 'pdf-index.json');
 const readSigs = () => { try { return JSON.parse(fs.readFileSync(sigFile(), 'utf8')); } catch { return {}; } };
 /** PDFs of the presentation in every style (made in one PowerPoint run, cached); returns the one asked for. */

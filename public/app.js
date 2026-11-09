@@ -3811,7 +3811,9 @@ function renderStylePreview() {
   $$('#ds-prev-tabs [data-ds-tab]').forEach(b => b.onclick = () => { dsPrev.style = b.dataset.dsTab; renderStylePreview(); });
   const url = u(`/api/doc-styles/preview?style=${style}&kind=${kind}`);
   showPreviewFile(url, kind);
-  $('#ds-prev-files').innerHTML = kind === 'register' ? `<a class="btn small" href="${url}" target="_blank" rel="noopener"><i class=i-eye></i> Open in a new tab</a>`
+  // premium styles: everyone may look, only Premium accounts and administrators download (the server checks too)
+  $('#ds-prev-files').innerHTML = locked && !admin ? lockedDownloads(kind === 'register' ? ['Open in a new tab'] : ['PDF', 'Word'])
+    : kind === 'register' ? `<a class="btn small" href="${url}" target="_blank" rel="noopener"><i class=i-eye></i> Open in a new tab</a>`
     : `<a class="btn small" href="${url}&download=1"><i class=i-download></i> PDF</a><a class="btn small" href="${url}&format=docx&download=1"><i class=i-download></i> Word</a>`;
   $('#ds-prev-act').innerHTML = style === eff ? '<span class="tag ok">In use for this facility</span>'
     : locked && !admin ? '<button type="button" class="btn premium-btn" data-up>Get Premium to Unlock Custom Templates</button>'
@@ -3910,7 +3912,8 @@ function renderPptPreview() {
   const f = $('#cp-form'), contact = { email: f.elements.email.value.trim(), phone: f.elements.phone.value.trim() };
   const url = cpFile({ style, ...contact });
   showPreviewFile(url, 'ppt');
-  $('#ds-prev-files').innerHTML = `<a class="btn small" href="${cpFile({ style, ...contact, download: 1 })}"><i class=i-download></i> PDF</a><a class="btn small" href="${cpFile({ style, ...contact, format: 'pptx' })}"><i class=i-download></i> PowerPoint</a>`;
+  $('#ds-prev-files').innerHTML = locked && !admin ? lockedDownloads(['PDF', 'PowerPoint'])
+    : `<a class="btn small" href="${cpFile({ style, ...contact, download: 1 })}"><i class=i-download></i> PDF</a><a class="btn small" href="${cpFile({ style, ...contact, format: 'pptx' })}"><i class=i-download></i> PowerPoint</a>`;
   $('#ds-prev-act').innerHTML = style === d.style ? '<span class="tag ok">In use for this facility</span>'
     : locked && !admin ? '<button type="button" class="btn premium-btn" data-up>Get Premium to Unlock Custom Templates</button>'
     : me?.role === 'viewer' ? '' : '<button type="button" class="btn primary" id="ds-prev-use">Use this style for the presentation</button>';
@@ -3924,4 +3927,8 @@ async function loadToolkit(tool) {
   if (t) { $('#tk-title').textContent = t.title; $('#tk-desc').textContent = t.desc; $('#mb-title').textContent = t.title; }
   $('#tk-grid').innerHTML = tkTools.map(x => `<button type="button" class="tk-card${x.id === t?.id ? ' on' : ''}" data-tk="${x.id}"><b>${esc(x.title)}</b><small class="muted">${esc(x.desc)}</small><span class="tag ${x.status === 'ready' ? 'ok' : 'na'}">${x.status === 'ready' ? 'Ready' : 'Coming soon'}</span></button>`).join('');
   $$('#tk-grid [data-tk]').forEach(b => b.onclick = () => (b.dataset.tk === 'cyberppt' ? showTab('cyberppt') : showTab('toolkit', b.dataset.tk)));
+}
+/** Download buttons of a premium style for a non-premium account: locked – a click opens Get Premium instead. */
+function lockedDownloads(labels) {
+  return labels.map(l => `<button type="button" class="btn small dl-locked" data-up title="Downloading this style is part of Premium"><i class=i-lock></i> ${esc(l)}</button>`).join('');
 }

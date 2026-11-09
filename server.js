@@ -990,6 +990,8 @@ app.put('/api/doc-styles/facility', wrap(async (req, res) => {
  */
 app.get('/api/doc-styles/preview', wrap(async (req, res) => {
   const id = styleById(String(req.query.style || '')).id, kind = KINDS[req.query.kind] ? req.query.kind : 'policies';
+  // premium styles can be looked at by everyone, but only Premium accounts (and administrators) download them
+  if (styleById(id).premium && isTrial(req.user) && (req.query.download || req.query.format === 'docx')) throw upgradeError('Downloading custom document styles is part of Premium');
   const format = req.query.format === 'docx' ? 'docx' : 'pdf';
   let r;
   if (kind === 'register') { // the LEGAL REGISTER snapshot in the style (a web page; on the free trial with the locked rows masked)
@@ -1071,6 +1073,8 @@ app.put('/api/toolkit/cyber-ppt', wrap(async (req, res) => {
 app.get('/api/toolkit/cyber-ppt/file', wrap(async (req, res) => {
   const fid = facId(req), st = cyberState(fid, { trial: isTrial(req.user) });
   const style = PPT_STYLES.some(s => s.id === req.query.style) ? req.query.style : st.style;
+  // premium looks can be previewed by everyone; downloading them (PowerPoint or PDF) needs Premium (or administrator)
+  if (PPT_STYLES.find(s => s.id === style)?.premium && isTrial(req.user) && (req.query.download || req.query.format === 'pptx')) throw upgradeError('Downloading custom presentation styles is part of Premium');
   const opts = { email: req.query.email !== undefined ? String(req.query.email) : null, phone: req.query.phone !== undefined ? String(req.query.phone) : null };
   const name = `${st.facilityName || 'Facility'} - Cyber Security Presentation${style === 'classic' ? '' : ` - ${PPT_STYLES.find(s => s.id === style).name}`}`.replace(/[^\w .()-]/g, '');
   if (req.query.format === 'pptx') {

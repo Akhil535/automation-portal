@@ -780,6 +780,12 @@ test('10g. security: sign-in with password + 2FA, lockout, roles and facility ac
     // document styles: 2-4 are Premium; only administrators set the default and branding
     assert.equal((await put(`/api/doc-styles/facility${q}`, { style: 'split' }, newbieCookie)).status, 402, 'custom document styles are Premium');
     assert.equal((await put(`/api/doc-styles/facility${q}`, { style: 'classic' }, newbieCookie)).status, 200, 'Modern Classic on the trial');
+    // premium styles: previews for everyone, downloads only for Premium accounts and administrators
+    for (const qs of ['style=split&kind=policies&download=1', 'style=official&kind=hr&format=docx']) {
+      const r = await fetch(`${base}/api/doc-styles/preview${q}&${qs}`, nb);
+      assert.equal(r.status, 402, `no premium download on the trial: ${qs}`); assert.equal((await r.json()).upgrade, true);
+    }
+    for (const qs of ['style=dark&format=pptx', 'style=official&download=1']) assert.equal((await fetch(`${base}/api/toolkit/cyber-ppt/file${q}&${qs}`, nb)).status, 402, `no premium presentation download on the trial: ${qs}`);
     assert.equal((await put('/api/policies/settings' + q, { docStyle: 'official' }, newbieCookie)).status !== 402 && (await (await fetch(`${base}/api/doc-styles${q}`, nb)).json()).effective, 'classic', 'the style cannot be set around the Premium check');
     assert.equal((await put('/api/doc-styles', { accent: '#112233' }, newbieCookie)).status, 403, 'only administrators set the branding');
     assert.equal((await put('/api/doc-styles', { accent: 'red' }, adminCookie)).status, 400);
@@ -1049,6 +1055,10 @@ test('10i. policy preparation: templates are filled for a facility (ID, dates, n
     if (st.defaults.email) assert.ok(def.includes(st.defaults.email), 'no override: the PO18 contact');
     const dark = await JSZip.loadAsync(await CP.buildPpt(id, { style: 'dark' }));
     assert.match(await dark.file('ppt/slideMasters/slideMaster1.xml').async('string'), /bg1="dk1" tx1="lt1"/, 'dark: the colour map is swapped');
+    // looks 2-4 keep every word of every slide (illustrations only go into free space)
+    const words = async z => (await Promise.all(Object.keys(z.files).filter(f => /^ppt\/slides\/slide\d+\.xml$/.test(f)).sort().map(f => z.file(f).async('string')))).map(x => (x.match(/<a:t>[^<]*<\/a:t>/g) || []).join('')).join('|');
+    const masterWords = await words(await JSZip.loadAsync(await CP.buildPpt(id, { style: 'classic' })));
+    for (const look of ['dark', 'minimal', 'official']) assert.equal(await words(await JSZip.loadAsync(await CP.buildPpt(id, { style: look }))), masterWords, `${look}: all slide text kept`);
     const off = await JSZip.loadAsync(await CP.buildPpt(id, { style: 'official' }));
     assert.match(await off.file('ppt/slideMasters/slideMaster1.xml').async('string'), /name="Header banner"[\s\S]*name="Footer band"/, 'official: banners on the master');
     assert.throws(() => CP.saveCyber(id, { email: 'not-an-email' }), /not valid/);
