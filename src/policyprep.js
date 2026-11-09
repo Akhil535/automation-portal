@@ -530,12 +530,13 @@ export function prepSettings(cfg) {
     // document style: the facility's choice (empty = the administrator's default) and what its documents get
     // per kind of document: the facility's choice (empty = the administrator's default) and what it gets
     docStyleChoice: p.docStyle || '',
-    docStyleChoices: { policies: p.docStyle || '', hr: p.docStyles?.hr || '', thirdparty: p.docStyles?.thirdparty || '' },
+    docStyleChoices: { policies: p.docStyle || '', hr: p.docStyles?.hr || '', thirdparty: p.docStyles?.thirdparty || '', register: p.docStyles?.register || '' },
     docStyle: effectiveStyle(p.docStyle, { trial: trialFacility(cfg._facility), kind: 'policies' }),
     docStyles: {
       policies: effectiveStyle(p.docStyle, { trial: trialFacility(cfg._facility), kind: 'policies' }),
       hr: effectiveStyle(p.docStyles?.hr, { trial: trialFacility(cfg._facility), kind: 'hr' }),
       thirdparty: effectiveStyle(p.docStyles?.thirdparty, { trial: trialFacility(cfg._facility), kind: 'thirdparty' }),
+      register: effectiveStyle(p.docStyles?.register, { trial: trialFacility(cfg._facility), kind: 'register' }),
     },
   };
 }
@@ -563,7 +564,7 @@ export function saveSettings(id, body = {}) {
   if (body.docStyles) { // { hr, thirdparty }: the forms' styles (policies: docStyle)
     next.docStyles = { ...(cur.docStyles || {}) };
     for (const [k, v] of Object.entries(body.docStyles)) {
-      if (!['hr', 'thirdparty'].includes(k) || (v && !STYLES.some(x => x.id === v))) throw new Error('Unknown document style');
+      if (!['hr', 'thirdparty', 'register'].includes(k) || (v && !STYLES.some(x => x.id === v))) throw new Error('Unknown document style');
       next.docStyles[k] = v || '';
     }
   }

@@ -5,8 +5,17 @@ $ErrorActionPreference = 'Stop'
 $jobs = Get-Content -Raw -LiteralPath $List | ConvertFrom-Json
 $results = @()
 $word = $null
+$before = @(Get-Process WINWORD -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })
+$mine = @()
 try {
   $word = New-Object -ComObject Word.Application
+  # the Word process this conversion started (closed for sure at the end, even if Quit does not end it)
+  # (only when exactly one new Word appeared while this one started – never another conversion's Word)
+  for ($i = 0; $i -lt 20 -and -not $mine.Count; $i++) {
+    $mine = @(Get-Process WINWORD -ErrorAction SilentlyContinue | Where-Object { $before -notcontains $_.Id } | ForEach-Object { $_.Id })
+    if (-not $mine.Count) { Start-Sleep -Milliseconds 100 }
+  }
+  if ($mine.Count -ne 1) { $mine = @() }
   $word.Visible = $false
   $word.DisplayAlerts = 0
   $word.AutomationSecurity = 3   # msoAutomationSecurityForceDisable
@@ -26,6 +35,12 @@ try {
 } catch {
   $results = @([pscustomobject]@{ ok = $false; error = "Microsoft Word could not be started: $($_.Exception.Message)" })
 } finally {
-  if ($word) { $word.Quit() | Out-Null; [System.Runtime.InteropServices.Marshal]::ReleaseComObject($word) | Out-Null }
+  if ($word) { try { $word.Quit() | Out-Null } catch {}; try { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($word) | Out-Null } catch {} }
+  $word = $null; [GC]::Collect(); [GC]::WaitForPendingFinalizers()
+  # give Word a moment to end by itself, then make sure it is gone
+  foreach ($id in $mine) {
+    for ($i = 0; $i -lt 20 -and (Get-Process -Id $id -ErrorAction SilentlyContinue); $i++) { Start-Sleep -Milliseconds 150 }
+    Get-Process -Id $id -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+  }
 }
 ConvertTo-Json -InputObject @($results) -Compress -Depth 3

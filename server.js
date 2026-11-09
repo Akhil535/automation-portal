@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import express from 'express';
+import { execFile } from 'node:child_process';
 import './src/args.js';
 import cron from 'node-cron';
 import {
@@ -933,16 +934,16 @@ app.put('/api/document-control', wrap(async (req, res) => {
 }));
 
 /** Data for the compliance snapshot (print view and PDF). */
-async function snapshot(req, printButton) {
+async function snapshot(req, printButton, opts = {}) { // opts: { style, items } for a style preview
   const cfg = cfgOf(req);
-  const items = await readMaster(cfg);
+  const items = opts.items || await readMaster(cfg);
   let buf = cfg._facility.logo && fs.existsSync(cfg._facility.logo) ? fs.readFileSync(cfg._facility.logo) : null;
   if (!buf) buf = await readLogo(cfg.register.path, [cfg.documentControl.sheet, cfg.master.sheet]).catch(() => null);
   const store = new Store(cfg);
   let circulars = {};
   try { const snap = await readRegister(cfg.register.path, cfg.register); circulars = { total: snap.records.length, latest: snap.records.at(-1)?.number }; } catch { /* locked */ }
   if (store.meta.lastSuccess) circulars.lastCheck = new Date(store.meta.lastSuccess).toLocaleString('en-GB', { timeZone: 'Asia/Dubai', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-  return { cfg, html: reportHtml({ cfg, items, logo: logoDataUrl(buf), circulars, printButton, style: prepSettings(cfg).docStyle }) };
+  return { cfg, html: reportHtml({ cfg, items, logo: logoDataUrl(buf), circulars, printButton, style: opts.style || prepSettings(cfg).docStyles.register }) };
 }
 const exportName = (cfg, ext) => `${cfg.facility.code} LEGAL REGISTER ${new Date(Date.now() + 4 * 3600e3).toISOString().slice(0, 10)}.${ext}`;
 
@@ -986,6 +987,12 @@ app.get('/api/doc-styles/preview', wrap(async (req, res) => {
   const id = styleById(String(req.query.style || '')).id, kind = KINDS[req.query.kind] ? req.query.kind : 'policies';
   const format = req.query.format === 'docx' ? 'docx' : 'pdf';
   let r;
+  if (kind === 'register') { // the LEGAL REGISTER snapshot in the style (a web page; on the free trial with the locked rows masked)
+    const cfg = cfgOf(req);
+    const items = (maskMaster(req.user, { items: await readMaster(cfg) }) || {}).items;
+    const { html } = await snapshot(req, false, { style: { ...prepSettings(cfg).docStyles.register, id }, items });
+    return res.type('html').send(html);
+  }
   if (kind === 'policies') { const p = await previewPolicy(facId(req), { no: Number(req.query.no) || undefined, style: id, format }); r = { buffer: p.buffer, type: p.type, name: p.file }; }
   else {
     const forms = installedForms(kind === 'thirdparty' ? 'thirdparty' : 'hr');
@@ -1102,4 +1109,10 @@ app.listen(port, host, () => {
   console.log(`Legal Register Portal running at http://${host === '0.0.0.0' ? 'localhost' : host}:${port} (${loadFacilities().list.length} facility(ies))`);
   if (!process.env.DOH_PORTAL_NO_SCHEDULER) startScheduler();
   else console.log('Scheduler disabled (--no-scheduler)');
+  // Hidden Word copies left by conversions that were cut off (e.g. a restart in the middle of one) keep files locked:
+  // automation-only Word processes running for over an hour are closed. Word windows a person opened are never touched.
+  if (process.platform === 'win32' && !process.env.DOH_PORTAL_NO_SCHEDULER) {
+    const ps = "Get-CimInstance Win32_Process -Filter \"Name='WINWORD.EXE'\" | Where-Object { $_.CommandLine -match '/Automation' -and $_.CreationDate -lt (Get-Date).AddHours(-1) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }";
+    execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps], { windowsHide: true, timeout: 60000 }, () => {});
+  }
 });

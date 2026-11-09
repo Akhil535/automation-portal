@@ -1083,6 +1083,7 @@ function renderStatusBar() {
 
 let masterLoading = false;
 async function loadMaster() {
+  loadDocStyles(); // the LEGAL REGISTER report style cards
   if (!master) $('#mtbl tbody').innerHTML = '<tr><td colspan="9" class="muted">Loading…</td></tr>';
   const forFacility = facility;
   masterLoading = true;
@@ -3603,40 +3604,15 @@ function renderDocStyles() {
   const a = d.settings.accent, name = id => d.styles.find(s => s.id === id)?.name || id;
   const preview = (id, kind = 'policies') => u(`/api/doc-styles/preview?style=${id}&kind=${kind}`);
   const eff = d.effectives || { policies: d.effective };
-  // users: their facility's policy style (step 3 of Prepare policies)
-  const box = $('#ds-user-cards');
-  if (box) {
-    const ro = me?.role === 'viewer';
-    box.innerHTML = d.styles.map(s => {
-      const locked = s.premium && !d.premium, on = eff.policies === s.id;
-      return `<article class="ds-card${on ? ' on' : ''}${locked ? ' locked' : ''}" data-ds="${s.id}">
-        <div class="ds-thumb">${dsThumb(s.id, a)}${locked ? '<span class="ds-prem"><i class=i-lock></i> Premium</span>' : ''}${on ? '<span class="ds-on">✓ In use</span>' : ''}</div>
-        <div class="ds-meta"><b>${s.no} · ${esc(s.name)}</b><small>${esc(s.desc)}</small></div>
-        <div class="ds-act">
-          <a class="btn small" href="${preview(s.id)}" target="_blank" rel="noopener" title="PO01 in this style as a PDF (takes a few seconds)"><i class=i-eye></i> Preview</a>
-          ${locked ? '<button type="button" class="btn small premium-btn" data-up>Get Premium to Unlock Custom Templates</button>'
-            : on ? '<span class="tag ok">Selected</span>' : `<button type="button" class="btn small primary" data-ds-use="${s.id}"${ro ? ' disabled' : ''}>Use this style</button>`}
-        </div></article>`;
-    }).join('');
-    $$('#ds-user-cards [data-ds-use]').forEach(b => b.onclick = () => useDocStyle(b.dataset.dsUse, 'policies'));
+  // every section (policies, HR, 3rd-party, LEGAL REGISTER): the same style cards; a click opens the detailed preview
+  $$('[data-ds-cards]').forEach(el => renderStyleCards(el, el.dataset.dsCards));
+  $$('[data-ds-current]').forEach(el => { const k = el.dataset.dsCurrent; el.textContent = `${name(eff[k] || 'classic')}${d.choices?.[k] ? '' : ' · the default'}`; });
+  if ($('#ds-note')) {
     // the policies on disk were made in another style (or branding) than they get now
     const g = d.generated;
     $('#ds-note').innerHTML = g && !g.current ? `<div class="ds-outdated"><i class=i-alert></i><span>Your policies were created in <b>${esc(name(g.made))}</b>${g.at ? ` (${fmt(g.at)})` : ''}; they now get <b>${esc(name(g.now))}</b>${g.made === g.now ? ' with new branding' : ''}. Create all policies again to update the Word / PDF files.</span>${me?.role !== 'viewer' ? '<button type="button" class="btn small primary" id="ds-regen">Create all policies again</button>' : ''}</div>` : '';
     $('#ds-regen')?.addEventListener('click', () => $('#pp-generate')?.click());
   }
-  // HR and 3rd-party pages: a compact picker (the forms are filled when opened, so the change shows at once)
-  $$('.ds-mini[data-ds-kind]').forEach(el => {
-    const kind = el.dataset.dsKind, cur = eff[kind] || 'classic', ro = me?.role === 'viewer';
-    el.innerHTML = `<label>Document style<select data-ds-mini="${kind}"${ro ? ' disabled' : ''}>${d.styles.map(s => `<option value="${s.id}"${s.id === cur ? ' selected' : ''}${s.premium && !d.premium ? ' data-locked="1"' : ''}>${s.no} · ${esc(s.name)}${s.premium && !d.premium ? ' – Premium' : ''}</option>`).join('')}</select></label>
-      <a class="btn small" href="${preview(cur, kind)}" target="_blank" rel="noopener" data-ds-prev="${kind}"><i class=i-eye></i> Preview</a>`;
-    const sel = el.querySelector('select');
-    sel.onchange = () => {
-      const opt = sel.selectedOptions[0];
-      el.querySelector('[data-ds-prev]').href = preview(sel.value, kind);
-      if (opt.dataset.locked) { sel.value = cur; showUpgrade?.({ message: 'Get Premium to Unlock Custom Templates' }); return; }
-      useDocStyle(sel.value, kind);
-    };
-  });
   // administrators: never locked – preview / export any style, the defaults per kind, branding, re-create all
   const adm = $('#ds-admin-cards');
   if (adm && me?.role === 'admin') {
@@ -3646,18 +3622,15 @@ function renderDocStyles() {
     $$('#ds-defaults [data-ds-def]').forEach(sel => sel.onchange = () => saveDocStyleSettings({ defaults: { [sel.dataset.dsDef]: sel.value } }));
     const isDef = id => Object.values(def).filter(v => v === id).length;
     adm.innerHTML = d.styles.map(s => `<article class="ds-card${isDef(s.id) ? ' on' : ''}">
-      <div class="ds-thumb">${dsThumb(s.id, a)}<span class="ds-prem tier${s.premium ? '' : ' free'}" title="${s.premium ? 'Users on Premium can choose it; free-trial users see Get Premium' : 'Every user, the free trial too'}">${s.premium ? 'Premium users' : 'All users'}</span>${isDef(s.id) ? `<span class="ds-on">★ Default${isDef(s.id) < 3 ? ` · ${Object.entries(def).filter(([, v]) => v === s.id).map(([k]) => ({ policies: 'Policies', hr: 'HR', thirdparty: '3rd-party' })[k]).join(', ')}` : ''}</span>` : ''}</div>
+      <div class="ds-thumb" data-ds-pv="${s.id}" data-kind="policies" role="button" tabindex="0" title="Preview">${dsThumb(s.id, a)}<span class="ds-prem tier${s.premium ? '' : ' free'}" title="${s.premium ? 'Users on Premium can choose it; free-trial users see Get Premium' : 'Every user, the free trial too'}">${s.premium ? 'Premium users' : 'All users'}</span>${isDef(s.id) ? `<span class="ds-on">★ Default${isDef(s.id) < Object.keys(def).length ? ` · ${Object.entries(def).filter(([, v]) => v === s.id).map(([k]) => ({ policies: 'Policies', hr: 'HR', thirdparty: '3rd-party', register: 'Register' })[k]).join(', ')}` : ''}</span>` : ''}</div>
       <div class="ds-meta"><b>${s.no} · ${esc(s.name)}</b><small>${esc(s.desc)}</small></div>
       <div class="ds-act">
-        <a class="btn small" href="${preview(s.id)}" target="_blank" rel="noopener" title="Policy PO01"><i class=i-eye></i> Policy</a>
-        <a class="btn small" href="${preview(s.id, 'hr')}" target="_blank" rel="noopener" title="The first HR form"><i class=i-eye></i> HR</a>
-        <a class="btn small" href="${preview(s.id, 'thirdparty')}" target="_blank" rel="noopener" title="The first 3rd-party form"><i class=i-eye></i> 3rd-party</a>
-        <a class="btn small" href="${preview(s.id)}&download=1"><i class=i-download></i> PDF</a>
-        <a class="btn small" href="${preview(s.id)}&format=docx&download=1"><i class=i-download></i> Word</a>
-        ${isDef(s.id) === 3 ? '<span class="tag ok">Default for all</span>' : `<button type="button" class="btn small primary" data-ds-default="${s.id}">Set as default for all</button>`}
+        ${['policies', 'hr', 'thirdparty', 'register'].map(k => `<button type="button" class="btn small" data-ds-pv="${s.id}" data-kind="${k}" title="Preview ${esc(DS_KIND_SAMPLE[k])}"><i class=i-eye></i> ${{ policies: 'Policy', hr: 'HR', thirdparty: '3rd-party', register: 'Register' }[k]}</button>`).join('')}
+        ${isDef(s.id) === Object.keys(def).length ? '<span class="tag ok">Default for all</span>' : `<button type="button" class="btn small primary" data-ds-default="${s.id}">Set as default for all</button>`}
         ${eff.policies === s.id ? '<span class="tag ok">This facility\'s policies</span>' : `<button type="button" class="btn small" data-ds-use="${s.id}">Use for this facility</button>`}
       </div></article>`).join('');
     $$('#ds-admin-cards [data-ds-use]').forEach(b => b.onclick = () => useDocStyle(b.dataset.dsUse, 'policies'));
+    $$('#ds-admin-cards [data-ds-pv]').forEach(b => b.onclick = () => openStylePreview(b.dataset.kind, b.dataset.dsPv));
     $$('#ds-admin-cards [data-ds-default]').forEach(b => b.onclick = () => saveDocStyleSettings({ default: b.dataset.dsDefault }));
     renderApplyAll();
     const f = $('#ds-brand');
@@ -3701,4 +3674,77 @@ if ($('#ds-brand')) {
   f.elements.accent.oninput = () => { f.elements.accentText.value = f.elements.accent.value.toUpperCase(); };
   f.elements.accentText.oninput = () => { if (/^#[0-9a-f]{6}$/i.test(f.elements.accentText.value)) f.elements.accent.value = f.elements.accentText.value; };
   f.onsubmit = e => { e.preventDefault(); saveDocStyleSettings({ accent: f.elements.accentText.value || f.elements.accent.value, font: f.elements.font.value, watermark: f.elements.watermark.value }); };
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Style cards for every section and the detailed preview window
+// ---------------------------------------------------------------------------------------------------
+const DS_KIND_LABEL = { policies: 'Policies', hr: 'HR documents', thirdparty: '3rd-party documents', register: 'LEGAL REGISTER report' };
+const DS_KIND_SAMPLE = { policies: 'Policy PO01', hr: 'the first HR form', thirdparty: 'the first 3rd-party form', register: 'this facility\'s LEGAL REGISTER report' };
+/** The page schematic of a style for a kind of document: a policy, a form, or the landscape register report. */
+function dsThumbFor(id, a, kind) {
+  if (kind === 'policies' || !kind) return dsThumb(id, a);
+  const L = (x, y, w) => `<rect x="${x}" y="${y}" width="${w}" height="3" rx="1.5" fill="#cfd5df"/>`;
+  if (kind === 'register') {
+    const page = inner => `<svg viewBox="0 0 150 110" aria-hidden="true"><rect x="1" y="1" width="148" height="108" rx="6" fill="#fff" stroke="#e3e6ec"/>${inner}</svg>`;
+    const rows = (y0, head) => `${head}${[0, 1, 2, 3, 4].map(i => `<rect x="10" y="${y0 + 8 + i * 8}" width="130" height="6" fill="${i % 2 ? '#f6f7fa' : '#fff'}"/>${L(13, y0 + 9.5 + i * 8, 40)}<rect x="${100}" y="${y0 + 9 + i * 8}" width="18" height="4" rx="2" fill="${['#bbf7d0', '#bbf7d0', '#fde68a', '#fecdd3', '#bbf7d0'][i]}"/>`).join('')}`;
+    if (id === 'split') return page(`<rect x="10" y="9" width="50" height="5" rx="2" fill="${a}"/><rect x="10" y="20" width="44" height="26" rx="3" fill="${a}" opacity=".12"/><rect x="10" y="20" width="2.5" height="26" fill="${a}"/>${[0, 1, 2].map(i => `<rect x="${62 + i * 26}" y="22" width="22" height="20" rx="3" fill="#f1f3f8" stroke="${a}" stroke-width=".5"/>`).join('')}${rows(50, `<rect x="10" y="50" width="130" height="7" fill="${a}"/>`)}`);
+    if (id === 'minimal') return page(`<rect x="10" y="9" width="60" height="5" rx="2" fill="#1f2937"/><rect x="10" y="17" width="130" height="1" fill="${a}"/>${[0, 1, 2, 3].map(i => `<rect x="${10 + i * 33}" y="22" width="30" height="16" fill="#f6f7fa"/><rect x="${10 + i * 33}" y="22" width="30" height="1.5" fill="${a}"/>`).join('')}${rows(46, `<rect x="10" y="53" width="130" height="1.2" fill="${a}"/>${L(12, 49, 30)}`)}`);
+    if (id === 'official') return page(`<rect x="4" y="4" width="142" height="102" rx="2" fill="none" stroke="${a}" stroke-width="1.5"/><rect x="7" y="7" width="136" height="96" fill="none" stroke="${a}" stroke-width=".5"/><rect x="45" y="11" width="60" height="5" rx="2" fill="${a}"/><rect x="40" y="19" width="70" height="1" fill="${a}"/>${rows(46, `<rect x="10" y="46" width="130" height="7" fill="${a}"/>`)}${[0, 1, 2, 3].map(i => `<rect x="${12 + i * 32}" y="25" width="28" height="15" fill="none" stroke="#d6dce6"/>`).join('')}`);
+    return page(`<rect x="10" y="9" width="50" height="5" rx="2" fill="#1f2937"/><rect x="10" y="17" width="130" height="1.5" fill="#3b5bfd"/>${[0, 1, 2, 3].map(i => `<rect x="${10 + i * 33}" y="22" width="30" height="16" rx="3" fill="none" stroke="#e3e6ec"/><rect x="${10 + i * 33}" y="22" width="30" height="2" fill="${['#3b5bfd', '#16a34a', '#d97706', '#dc2626'][i]}"/>`).join('')}${rows(46, `<rect x="10" y="46" width="130" height="7" fill="#3b5bfd"/>`)}`);
+  }
+  // a form (HR / 3rd-party): logo + Ref. No., headings, text, a signature table
+  const page = inner => `<svg viewBox="0 0 120 150" aria-hidden="true"><rect x="1" y="1" width="118" height="148" rx="6" fill="#fff" stroke="#e3e6ec"/>${inner}</svg>`;
+  const text = y => [0, 1, 2, 3].map(i => L(12, y + i * 6, i === 3 ? 60 : 96)).join('');
+  const head = (y, w = 56) => id === 'split' ? `<rect x="12" y="${y}" width="96" height="7" fill="${a}" opacity=".12"/><rect x="12" y="${y}" width="2.5" height="7" fill="${a}"/><rect x="18" y="${y + 2}" width="${w}" height="3" rx="1.5" fill="${a}"/>`
+    : `<rect x="${id === 'official' ? 60 - w / 2 : 12}" y="${y + 2}" width="${w}" height="3.4" rx="1.5" fill="${id === 'classic' ? '#1f3864' : a}"/>`;
+  const tbl = y => { const c = id === 'official' ? a : id === 'minimal' ? '#e3e6ec' : '#9aa3b5'; return `<rect x="12" y="${y}" width="96" height="18" fill="none" stroke="${c}" stroke-width="${id === 'official' ? 1 : .7}"/><rect x="60" y="${y}" width=".7" height="18" fill="${c}"/><rect x="12" y="${y + 9}" width="96" height=".7" fill="${c}"/>`; };
+  return page(`${id === 'official' ? `<rect x="5" y="5" width="110" height="140" rx="2" fill="none" stroke="${a}" stroke-width="1.5"/>` : ''}<rect x="44" y="10" width="32" height="7" rx="2" fill="#dfe5f2"/><rect x="84" y="20" width="22" height="2.5" rx="1" fill="#9aa3b5"/>
+    ${head(27, 62)}${text(39)}${head(66, 46)}${text(78)}${tbl(108)}`);
+}
+function renderStyleCards(el, kind) {
+  const d = dsData; if (!d?.styles || !el) return;
+  const a = d.settings.accent, eff = d.effectives || { policies: d.effective }, ro = me?.role === 'viewer';
+  el.innerHTML = d.styles.map(s => {
+    const locked = s.premium && !d.premium, on = (eff[kind] || 'classic') === s.id;
+    return `<article class="ds-card${on ? ' on' : ''}${locked ? ' locked' : ''}" data-ds="${s.id}">
+      <button type="button" class="ds-thumb" data-ds-open="${s.id}" aria-label="Preview ${esc(s.name)}">${dsThumbFor(s.id, a, kind)}${locked ? '<span class="ds-prem"><i class=i-lock></i> Premium</span>' : ''}${on ? '<span class="ds-on">✓ In use</span>' : ''}<span class="ds-zoom"><i class=i-eye></i> Preview</span></button>
+      <div class="ds-meta"><b>${s.no} · ${esc(s.name)}</b><small>${esc(s.desc)}</small></div>
+      <div class="ds-act">
+        <button type="button" class="btn small" data-ds-open="${s.id}"><i class=i-eye></i> Preview</button>
+        ${locked ? '<button type="button" class="btn small premium-btn" data-up>Get Premium to Unlock Custom Templates</button>'
+          : on ? '<span class="tag ok">Selected</span>' : `<button type="button" class="btn small primary" data-ds-use="${s.id}"${ro ? ' disabled' : ''}>Use this style</button>`}
+      </div></article>`;
+  }).join('');
+  el.querySelectorAll('[data-ds-open]').forEach(b => b.onclick = () => openStylePreview(kind, b.dataset.dsOpen));
+  el.querySelectorAll('[data-ds-use]').forEach(b => b.onclick = () => useDocStyle(b.dataset.dsUse, kind));
+}
+/** The detailed preview: the real document of this facility in the style (made with Word; the register as a page). */
+var dsPrev = { kind: 'policies', style: 'classic' };
+function openStylePreview(kind, style) {
+  dsPrev = { kind, style };
+  const dlg = $('#ds-prev');
+  if (!dlg.open) dlg.showModal();
+  renderStylePreview();
+}
+function renderStylePreview() {
+  const d = dsData, { kind, style } = dsPrev;
+  const s = d.styles.find(x => x.id === style) || d.styles[0];
+  const eff = (d.effectives || {})[kind] || 'classic', locked = s.premium && !d.premium, admin = me?.role === 'admin';
+  $('#ds-prev-kind').textContent = `${DS_KIND_LABEL[kind]} · preview of ${DS_KIND_SAMPLE[kind]}`;
+  $('#ds-prev-title').textContent = `${s.no} · ${s.name}`;
+  $('#ds-prev-desc').textContent = s.desc;
+  $('#ds-prev-tabs').innerHTML = d.styles.map(x => `<button type="button" role="tab" aria-selected="${x.id === style}" class="${x.id === style ? 'on' : ''}" data-ds-tab="${x.id}">${x.no} · ${esc(x.name)}${x.premium && !d.premium ? ' <i class=i-lock></i>' : ''}${x.id === eff ? ' <small>in use</small>' : ''}</button>`).join('');
+  $$('#ds-prev-tabs [data-ds-tab]').forEach(b => b.onclick = () => { dsPrev.style = b.dataset.dsTab; renderStylePreview(); });
+  const url = u(`/api/doc-styles/preview?style=${style}&kind=${kind}`);
+  const fr = $('#ds-prev-frame');
+  $('#ds-prev-load').hidden = false;
+  fr.onload = () => { $('#ds-prev-load').hidden = true; };
+  fr.src = url;
+  $('#ds-prev-files').innerHTML = kind === 'register' ? `<a class="btn small" href="${url}" target="_blank" rel="noopener"><i class=i-eye></i> Open in a new tab</a>`
+    : `<a class="btn small" href="${url}&download=1"><i class=i-download></i> PDF</a><a class="btn small" href="${url}&format=docx&download=1"><i class=i-download></i> Word</a>`;
+  $('#ds-prev-act').innerHTML = style === eff ? '<span class="tag ok">In use for this facility</span>'
+    : locked && !admin ? '<button type="button" class="btn premium-btn" data-up>Get Premium to Unlock Custom Templates</button>'
+    : me?.role === 'viewer' ? '' : `<button type="button" class="btn primary" id="ds-prev-use">Use this style for ${esc({ policies: 'the policies', hr: 'HR documents', thirdparty: '3rd-party documents', register: 'the LEGAL REGISTER report' }[kind])}</button>`;
+  $('#ds-prev-use')?.addEventListener('click', async () => { await useDocStyle(style, kind); renderStylePreview(); });
 }

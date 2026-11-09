@@ -31,7 +31,7 @@ const DEFAULT_ACCENT = '#1F3864';
 export const styleById = id => STYLES.find(s => s.id === id) || STYLES[0];
 
 /** The three kinds of documents; each has its own default style (and each facility its own choice). */
-export const KINDS = { policies: 'Policies', hr: 'HR documents', thirdparty: '3rd-party documents' };
+export const KINDS = { policies: 'Policies', hr: 'HR documents', thirdparty: '3rd-party documents', register: 'LEGAL REGISTER snapshot' };
 const okStyle = v => STYLES.some(s => s.id === v);
 /** The administrator's settings: the default style per kind, accent colour, font, watermark. */
 export function styleSettings() {

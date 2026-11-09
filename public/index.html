@@ -383,7 +383,7 @@
       <section class="ds-pick" aria-labelledby="ds-pick-title">
         <div class="ds-pick-head"><div><b id="ds-pick-title">Document style</b><small class="muted">The look of your policies, HR and 3rd-party documents (Word and PDF). Preview any style as a PDF of PO01.</small></div></div>
         <div class="ds-note" id="ds-note"></div>
-        <div class="ds-grid" id="ds-user-cards"></div>
+        <div class="ds-grid" id="ds-user-cards" data-ds-cards="policies"></div>
       </section>
       <div id="pp-need"></div>
       <div class="pw-create">
@@ -442,10 +442,16 @@
     <div class="hr-gen card" id="hr-gen-box" hidden></div>
 
     <article class="card hr-forms">
-      <header class="hr-sec-head"><div><h2>HR &amp; onboarding forms</h2><p class="muted small" id="hr-forms-sub">Filled for this facility every time you open them</p></div><div class="ds-mini" data-ds-kind="hr"></div></header>
+      <header class="hr-sec-head"><div><h2>HR &amp; onboarding forms</h2><p class="muted small" id="hr-forms-sub">Filled for this facility every time you open them</p></div></header>
       <div class="hr-form-grid" id="hr-form-grid"></div>
       <div class="hr-sync" id="hr-sync"></div>
     </article>
+
+    <details class="card ds-sec" data-ds-sec="hr">
+      <summary><span class="ds-sec-t"><b>Document style</b><small class="muted" data-ds-current="hr">–</small></span><span class="btn small">Change style</span></summary>
+      <p class="muted small">The look of every HR and training document (Word and PDF) – it changes at once, the next time a form is opened or downloaded. Click a style to see a detailed preview.</p>
+      <div class="ds-grid" data-ds-cards="hr"></div>
+    </details>
 
     <article class="card hr-training">
       <header class="hr-sec-head"><div><h2>Employee training</h2><p class="muted small">Training report and policy acknowledgement – one training date fills every date, or give a document its own dates.</p></div></header>
@@ -475,10 +481,16 @@
     </header>
     <div class="pp-for step-for"><img id="tp-logo" alt="" onerror="this.hidden=true"><span>Preparing vendor documents for</span><b id="tp-fac">–</b></div>
     <article class="card">
-      <header class="hr-sec-head"><div><h2>Vendor &amp; service-provider documents</h2><p class="muted small" id="tp-sub">–</p></div><div class="ds-mini" data-ds-kind="thirdparty"></div></header>
+      <header class="hr-sec-head"><div><h2>Vendor &amp; service-provider documents</h2><p class="muted small" id="tp-sub">–</p></div></header>
       <div class="hr-form-grid" id="tp-grid"></div>
       <div id="tp-dates"></div>
     </article>
+
+    <details class="card ds-sec" data-ds-sec="thirdparty">
+      <summary><span class="ds-sec-t"><b>Document style</b><small class="muted" data-ds-current="thirdparty">–</small></span><span class="btn small">Change style</span></summary>
+      <p class="muted small">The look of every vendor and service-provider document (Word and PDF) – it changes at once. Click a style to see a detailed preview.</p>
+      <div class="ds-grid" data-ds-cards="thirdparty"></div>
+    </details>
   </section>
 
   <!-- ============================== Step 5: Checklist (executive overview) ============================== -->
@@ -617,6 +629,11 @@
       <span><b>Drop documents or photos here</b> — the portal reads them and fills in the right row. You check before anything is saved.</span>
     </label>
     <p class="muted small">Rows 10–15 (federal laws) are fixed. Every change is saved to the Excel file after a backup — keep the file closed in Excel.</p>
+    <details class="card ds-sec" data-ds-sec="register">
+      <summary><span class="ds-sec-t"><b>Document style</b><small class="muted" data-ds-current="register">–</small></span><span class="btn small">Change style</span></summary>
+      <p class="muted small">The look of the LEGAL REGISTER report (PDF and print view). The Excel register keeps its own layout. Click a style to see a detailed preview.</p>
+      <div class="ds-grid" data-ds-cards="register"></div>
+    </details>
   </section>
 
   <!-- ============================== DoH circulars ============================== -->
@@ -1230,6 +1247,15 @@
     </div>
     <div class="btn-row"><button class="btn" value="close">Close</button><button type="button" class="btn primary" id="lk-send">Send to the administrator</button></div>
     <p class="small muted" id="lk-msg" role="status"></p>
+  </form>
+</dialog>
+<dialog id="ds-prev" class="ds-prev" aria-labelledby="ds-prev-title">
+  <form method="dialog">
+    <header class="ds-prev-head"><div><small class="muted" id="ds-prev-kind">Preview</small><h2 id="ds-prev-title">Document style</h2></div><button class="icon-btn" value="close" aria-label="Close">✕</button></header>
+    <div class="ds-prev-tabs" id="ds-prev-tabs" role="tablist" aria-label="Styles"></div>
+    <p class="muted small" id="ds-prev-desc"></p>
+    <div class="ds-prev-frame"><iframe id="ds-prev-frame" title="Document preview"></iframe><div class="ds-prev-load" id="ds-prev-load"><span class="spin"></span> Preparing the preview with Microsoft Word – a few seconds…</div></div>
+    <div class="btn-row ds-prev-foot"><span id="ds-prev-files"></span><span class="ds-prev-act" id="ds-prev-act"></span></div>
   </form>
 </dialog>
 <dialog id="act-dlg" class="act-dlg" aria-labelledby="act-title">

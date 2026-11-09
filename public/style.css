@@ -4405,3 +4405,37 @@ dialog::backdrop { background: rgba(12, 12, 15, .5) !important; backdrop-filter:
 .pm-style { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 14px; font-weight: 700; }
 .pm-style select { min-width: 240px; }
 .ds-act .btn.small { padding: 6px 11px; }
+
+/* v35d · style cards on every section (HR, 3rd-party, LEGAL REGISTER) and the detailed preview window */
+.ds-sec { margin-top: 18px; padding: 0 !important; overflow: hidden; }
+.ds-sec > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; cursor: pointer; list-style: none; }
+.ds-sec > summary::-webkit-details-marker { display: none; }
+.ds-sec-t { display: flex; flex-direction: column; gap: 2px; }
+.ds-sec-t b { font-size: 16px; font-weight: 800; }
+.ds-sec[open] > summary { border-bottom: 1px solid var(--line); }
+.ds-sec[open] > summary .btn::after { content: " ▴"; }
+.ds-sec > summary .btn::after { content: " ▾"; }
+.ds-sec > p, .ds-sec > .ds-grid { margin: 0; padding: 14px 20px 0; }
+.ds-sec > .ds-grid { padding-bottom: 20px; }
+button.ds-thumb { width: 100%; border: 0; cursor: zoom-in; font: inherit; color: inherit; }
+.ds-thumb[data-ds-pv] { cursor: zoom-in; }
+.ds-zoom { position: absolute; bottom: 8px; right: 8px; display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 800;
+  color: #fff; background: rgba(20, 22, 31, .72); opacity: 0; transform: translateY(4px); transition: opacity .2s, transform .2s; }
+.ds-card:hover .ds-zoom, .ds-thumb:focus-visible .ds-zoom { opacity: 1; transform: none; }
+.ds-prev { width: min(1100px, calc(100vw - 32px)); height: min(92vh, 980px); max-height: none; padding: 0; border: 1px solid var(--line); border-radius: 22px; background: var(--panel); color: var(--ink); }
+.ds-prev::backdrop { background: rgba(12, 12, 15, .55); backdrop-filter: blur(4px); }
+.ds-prev form { display: flex; flex-direction: column; gap: 10px; height: 100%; padding: 18px 20px; box-sizing: border-box; }
+.ds-prev-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.ds-prev-head h2 { margin: 2px 0 0; font-size: 22px; }
+.ds-prev-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.ds-prev-tabs button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.ds-prev-tabs button.on { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+.ds-prev-tabs small { font-size: 12px; opacity: .8; }
+.ds-prev-desc, #ds-prev-desc { margin: 0; }
+.ds-prev-frame { position: relative; flex: 1; min-height: 300px; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: #e9ebf0; }
+.ds-prev-frame iframe { width: 100%; height: 100%; border: 0; background: #fff; }
+.ds-prev-load { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(233, 235, 240, .85); font-weight: 700; color: #3c3f4c; }
+.ds-prev-load[hidden] { display: none; }
+.ds-prev-foot { justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.ds-prev-foot > span { display: inline-flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+@media (max-width: 600px) { .ds-prev form { padding: 14px; } .ds-prev-tabs button { padding: 6px 10px; font-size: 12px; } .ds-sec > summary { padding: 14px 16px; } .ds-sec > p, .ds-sec > .ds-grid { padding-left: 16px; padding-right: 16px; } }
