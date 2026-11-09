@@ -4439,3 +4439,10 @@ button.ds-thumb { width: 100%; border: 0; cursor: zoom-in; font: inherit; color:
 .ds-prev-foot { justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 .ds-prev-foot > span { display: inline-flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 @media (max-width: 600px) { .ds-prev form { padding: 14px; } .ds-prev-tabs button { padding: 6px 10px; font-size: 12px; } .ds-sec > summary { padding: 14px 16px; } .ds-sec > p, .ds-sec > .ds-grid { padding-left: 16px; padding-right: 16px; } }
+
+/* v35e · style sections at the top of each page (open by default); the toggle says what it does */
+.ds-sec { margin: 0 0 18px; }
+.ds-sec > summary .btn::before { content: 'Hide styles'; }
+.ds-sec:not([open]) > summary .btn::before { content: 'Change style'; }
+.ds-sec > summary .btn { font-size: 0 !important; }
+.ds-sec > summary .btn::before, .ds-sec > summary .btn::after { font-size: 12px; }

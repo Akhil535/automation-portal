@@ -3702,6 +3702,22 @@ function dsThumbFor(id, a, kind) {
   return page(`${id === 'official' ? `<rect x="5" y="5" width="110" height="140" rx="2" fill="none" stroke="${a}" stroke-width="1.5"/>` : ''}<rect x="44" y="10" width="32" height="7" rx="2" fill="#dfe5f2"/><rect x="84" y="20" width="22" height="2.5" rx="1" fill="#9aa3b5"/>
     ${head(27, 62)}${text(39)}${head(66, 46)}${text(78)}${tbl(108)}`);
 }
+/** What each style does to this kind of document (the policies use the descriptions from the server). */
+const DS_DESC = {
+  form: {
+    classic: 'The form exactly as designed – logo, Ref. No., headings and tables as in the master.',
+    split: 'Headings as accent bands – a thick bar at the left and a light tint behind each section title.',
+    minimal: 'Accent-coloured headings and light hairline tables – a clean, modern form.',
+    official: 'A full-page border frame, accent headings and every table framed in the accent colour.',
+  },
+  register: {
+    classic: 'The standard report: the document control box, status tiles and the register table.',
+    split: 'Document control in a shaded sidebar card next to the status tiles, accent title.',
+    minimal: 'Borderless tiles and table headings with accent rules – clean and light.',
+    official: 'A double border frame, a centred title and a fully ruled register table.',
+  },
+};
+const dsDesc = (s, kind) => (kind === 'hr' || kind === 'thirdparty' ? DS_DESC.form[s.id] : kind === 'register' ? DS_DESC.register[s.id] : null) || s.desc;
 function renderStyleCards(el, kind) {
   const d = dsData; if (!d?.styles || !el) return;
   const a = d.settings.accent, eff = d.effectives || { policies: d.effective }, ro = me?.role === 'viewer';
@@ -3709,15 +3725,25 @@ function renderStyleCards(el, kind) {
     const locked = s.premium && !d.premium, on = (eff[kind] || 'classic') === s.id;
     return `<article class="ds-card${on ? ' on' : ''}${locked ? ' locked' : ''}" data-ds="${s.id}">
       <button type="button" class="ds-thumb" data-ds-open="${s.id}" aria-label="Preview ${esc(s.name)}">${dsThumbFor(s.id, a, kind)}${locked ? '<span class="ds-prem"><i class=i-lock></i> Premium</span>' : ''}${on ? '<span class="ds-on">✓ In use</span>' : ''}<span class="ds-zoom"><i class=i-eye></i> Preview</span></button>
-      <div class="ds-meta"><b>${s.no} · ${esc(s.name)}</b><small>${esc(s.desc)}</small></div>
+      <div class="ds-meta"><b>${s.no} · ${esc(s.name)}</b><small>${esc(dsDesc(s, kind))}</small></div>
       <div class="ds-act">
         <button type="button" class="btn small" data-ds-open="${s.id}"><i class=i-eye></i> Preview</button>
         ${locked ? '<button type="button" class="btn small premium-btn" data-up>Get Premium to Unlock Custom Templates</button>'
           : on ? '<span class="tag ok">Selected</span>' : `<button type="button" class="btn small primary" data-ds-use="${s.id}"${ro ? ' disabled' : ''}>Use this style</button>`}
+        ${me?.role === 'admin' ? (d.settings.defaults?.[kind] === s.id ? `<span class="tag na">★ Default for ${esc(DS_KIND_LABEL[kind])}</span>`
+          : `<button type="button" class="btn small" data-ds-setdef="${s.id}" title="Every facility without its own choice gets it">★ Set as default for ${esc(DS_KIND_LABEL[kind])}</button>`) : ''}
       </div></article>`;
   }).join('');
   el.querySelectorAll('[data-ds-open]').forEach(b => b.onclick = () => openStylePreview(kind, b.dataset.dsOpen));
   el.querySelectorAll('[data-ds-use]').forEach(b => b.onclick = () => useDocStyle(b.dataset.dsUse, kind));
+  el.querySelectorAll('[data-ds-setdef]').forEach(b => b.onclick = () => saveDocStyleSettings({ defaults: { [kind]: b.dataset.dsSetdef } }));
+  // the section stays as the user left it (open by default; a collapsed one stays collapsed)
+  const sec = el.closest('details.ds-sec');
+  if (sec && !sec.dataset.bound) {
+    sec.dataset.bound = '1';
+    if (store.get(`ds-closed-${kind}`) === '1') sec.open = false;
+    sec.addEventListener('toggle', () => store.set(`ds-closed-${kind}`, sec.open ? '' : '1'));
+  }
 }
 /** The detailed preview: the real document of this facility in the style (made with Word; the register as a page). */
 var dsPrev = { kind: 'policies', style: 'classic' };
@@ -3733,7 +3759,7 @@ function renderStylePreview() {
   const eff = (d.effectives || {})[kind] || 'classic', locked = s.premium && !d.premium, admin = me?.role === 'admin';
   $('#ds-prev-kind').textContent = `${DS_KIND_LABEL[kind]} · preview of ${DS_KIND_SAMPLE[kind]}`;
   $('#ds-prev-title').textContent = `${s.no} · ${s.name}`;
-  $('#ds-prev-desc').textContent = s.desc;
+  $('#ds-prev-desc').textContent = dsDesc(s, kind);
   $('#ds-prev-tabs').innerHTML = d.styles.map(x => `<button type="button" role="tab" aria-selected="${x.id === style}" class="${x.id === style ? 'on' : ''}" data-ds-tab="${x.id}">${x.no} · ${esc(x.name)}${x.premium && !d.premium ? ' <i class=i-lock></i>' : ''}${x.id === eff ? ' <small>in use</small>' : ''}</button>`).join('');
   $$('#ds-prev-tabs [data-ds-tab]').forEach(b => b.onclick = () => { dsPrev.style = b.dataset.dsTab; renderStylePreview(); });
   const url = u(`/api/doc-styles/preview?style=${style}&kind=${kind}`);
