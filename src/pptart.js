@@ -83,3 +83,21 @@ export async function artTiles(theme, accent, names = Object.keys(ICONS)) {
   }
   return out;
 }
+
+/** A scene (see pptscenes.js) as a PNG of a picture's own size, in a look's colours; cached by its drawing. */
+export async function scenePng(name, theme, accent, w, h) {
+  const { sceneSvg } = await import('./pptscenes.js');
+  const t = ART_THEMES[theme], L = t.line || accent;
+  const colors = { panel: t.panel, S: t.soft, L, A: theme === 'minimal' ? '#64748B' : t.accent, I2: '#1F2937', screen: theme === 'dark' ? '#0B1220' : '#E0F2FE' };
+  const svg = sceneSvg(name, colors, w, h);
+  const file = path.join(artDir(), `scene-${name}-${crypto.createHash('sha256').update(svg).digest('hex').slice(0, 16)}.png`);
+  if (!fs.existsSync(file)) {
+    const exe = browser(); if (!exe) return null;
+    const html = file.replace(/\.png$/, '.html');
+    fs.writeFileSync(html, `<!doctype html><html><body style="margin:0;overflow:hidden">${svg}</body></html>`);
+    await new Promise(resolve => execFile(exe, ['--headless=new', '--disable-gpu', '--hide-scrollbars', `--window-size=${w},${h}`, `--screenshot=${file}`, `file:///${html.replace(/\\/g, '/')}`],
+      { timeout: 60000, windowsHide: true }, () => resolve()));
+    fs.rmSync(html, { force: true });
+  }
+  return fs.existsSync(file) ? fs.readFileSync(file) : null;
+}

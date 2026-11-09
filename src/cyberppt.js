@@ -16,7 +16,8 @@ import { dir, loadConfig, loadGlobalConfig, updateFacility } from './config.js';
 import { cachedPdf, contentKey, pdfFor, prepSettings, printPics } from './policyprep.js';
 import { styleSettings, trialFacility } from './docstyle.js';
 import { imageSize } from './imagesize.js';
-import { artTiles, topicOf } from './pptart.js';
+import { artTiles, scenePng, topicOf } from './pptart.js';
+import { CARTOONS } from './pptscenes.js';
 
 /** The tools of the Security & Awareness section; new ones are added here (status 'soon' shows a placeholder page). */
 export const TOOLS = [
@@ -226,6 +227,14 @@ async function decorateSlides(z, look, accent, W, H) {
   if (!Object.keys(tiles).length) return; // no browser to draw them: the look without illustrations
   let ct = await z.file('[Content_Types].xml').async('string');
   if (!/Extension="png"/i.test(ct)) z.file('[Content_Types].xml', ct.replace('<Default ', '<Default Extension="png" ContentType="image/png"/><Default '));
+  // 0 · the master's stick-figure cartoons → professional scenes telling the same story (their words kept)
+  for (const media of Object.keys(z.files).filter(f => /^ppt\/media\/[^/]+\.png$/i.test(f))) {
+    const buf = await z.file(media).async('nodebuffer');
+    const scene = CARTOONS[crypto.createHash('sha256').update(buf).digest('hex').slice(0, 16)];
+    if (!scene) continue;
+    const png = await scenePng(scene, look, accent, buf.readUInt32BE(16), buf.readUInt32BE(20));
+    if (png) z.file(media, png);
+  }
   const layoutBoxes = new Map(); // layout file → its placeholders' boxes by type / idx
   const S = Math.round(0.82 * EMU_IN), m = Math.round(0.18 * EMU_IN), top = Math.round((look === 'official' ? 0.36 : 0.16) * EMU_IN), footer = Math.round(0.62 * EMU_IN);
   const slides = Object.keys(z.files).filter(f => /^ppt\/slides\/slide\d+\.xml$/.test(f));
@@ -317,7 +326,7 @@ async function inputsKey(id, style, opts = {}) {
   return crypto.createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 32);
 }
 /** Raised whenever a look changes, so presentations made with an older look are made again. */
-const LOOK_VERSION = 5;
+const LOOK_VERSION = 6;
 const sigFile = () => path.join(home(), 'pdf-index.json');
 const readSigs = () => { try { return JSON.parse(fs.readFileSync(sigFile(), 'utf8')); } catch { return {}; } };
 /** PDFs of the presentation in every style (made in one PowerPoint run, cached); returns the one asked for. */

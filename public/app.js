@@ -3785,13 +3785,14 @@ function previewFile(url) {
 }
 function clearPreviewFiles() { for (const p of dsFiles.values()) p.then(URL.revokeObjectURL).catch(() => {}); dsFiles.clear(); }
 let dsShowSeq = 0;
-async function showPreviewFile(url, kind) {
+async function showPreviewFile(url, kind, noSave = false) {
   const seq = ++dsShowSeq, fr = $('#ds-prev-frame'), load = $('#ds-prev-load');
   load.hidden = false; load.innerHTML = `<span class="spin"></span> ${kind === 'register' ? 'Preparing the report…' : kind === 'ppt' ? 'Preparing the slides with Microsoft PowerPoint – the first time takes about half a minute, the other looks are then ready at once…' : 'Preparing the preview with Microsoft Word – the first time takes a few seconds, the other styles are then ready at once…'}`;
   try {
     const blobUrl = await previewFile(url);
     if (seq !== dsShowSeq) return; // another tab was chosen meanwhile
-    fr.src = kind === 'register' ? blobUrl : `${blobUrl}#view=FitH&toolbar=1&navpanes=0`;
+    // a premium style for a non-premium account: the viewer's own save / print toolbar is hidden (look only)
+    fr.src = kind === 'register' ? blobUrl : `${blobUrl}#view=FitH&toolbar=${noSave ? 0 : 1}&navpanes=0`;
     load.hidden = true;
     // the other styles in the background (instant from the server's cache now)
     if (kind !== 'ppt') for (const s of dsData.styles) if (s.id !== dsPrev.style) previewFile(u(`/api/doc-styles/preview?style=${s.id}&kind=${kind}`)).catch(() => {});
@@ -3810,7 +3811,7 @@ function renderStylePreview() {
   $('#ds-prev-tabs').innerHTML = d.styles.map(x => `<button type="button" role="tab" aria-selected="${x.id === style}" class="${x.id === style ? 'on' : ''}" data-ds-tab="${x.id}">${x.no} · ${esc(x.name)}${x.premium && !d.premium ? ' <i class=i-lock></i>' : ''}${x.id === eff ? ' <small>in use</small>' : ''}</button>`).join('');
   $$('#ds-prev-tabs [data-ds-tab]').forEach(b => b.onclick = () => { dsPrev.style = b.dataset.dsTab; renderStylePreview(); });
   const url = u(`/api/doc-styles/preview?style=${style}&kind=${kind}`);
-  showPreviewFile(url, kind);
+  showPreviewFile(url, kind, locked && !admin);
   // premium styles: everyone may look, only Premium accounts and administrators download (the server checks too)
   $('#ds-prev-files').innerHTML = locked && !admin ? lockedDownloads(kind === 'register' ? ['Open in a new tab'] : ['PDF', 'Word'])
     : kind === 'register' ? `<a class="btn small" href="${url}" target="_blank" rel="noopener"><i class=i-eye></i> Open in a new tab</a>`
@@ -3911,7 +3912,7 @@ function renderPptPreview() {
   $$('#ds-prev-tabs [data-ds-tab]').forEach(b => b.onclick = () => { dsPrev.style = b.dataset.dsTab; renderStylePreview(); });
   const f = $('#cp-form'), contact = { email: f.elements.email.value.trim(), phone: f.elements.phone.value.trim() };
   const url = cpFile({ style, ...contact });
-  showPreviewFile(url, 'ppt');
+  showPreviewFile(url, 'ppt', locked && !admin);
   $('#ds-prev-files').innerHTML = locked && !admin ? lockedDownloads(['PDF', 'PowerPoint'])
     : `<a class="btn small" href="${cpFile({ style, ...contact, download: 1 })}"><i class=i-download></i> PDF</a><a class="btn small" href="${cpFile({ style, ...contact, format: 'pptx' })}"><i class=i-download></i> PowerPoint</a>`;
   $('#ds-prev-act').innerHTML = style === d.style ? '<span class="tag ok">In use for this facility</span>'

@@ -1557,3 +1557,13 @@ test('11. Microsoft Excel opens the result without repair', { skip: process.plat
 });
 
 test('12. the real register was never modified', () => assert.equal(sha(SOURCE), sourceHash));
+
+test('13. the cartoon scenes of looks 2-4 keep the cartoons\' words', async () => {
+  const { SCENES, CARTOONS, sceneSvg } = await import('../src/pptscenes.js');
+  for (const n of new Set(Object.values(CARTOONS))) assert.ok(SCENES[n], `scene ${n} exists`);
+  const c = { panel: '#fff', S: '#eee', L: '#3b5bfd', A: '#c00000', I2: '#111', screen: '#e0f2fe' };
+  const gimme = sceneSvg('gimme', c, 1143, 642), book = sceneSvg('phonebook', c, 814, 458);
+  assert.match(gimme, />GIMME YER</); assert.match(gimme, />PASSWORDS!!!</);
+  assert.match(book, />Phone</); assert.match(book, />Book</);
+  assert.match(gimme, /^<svg [^>]*width="1143" height="642"/);
+});
