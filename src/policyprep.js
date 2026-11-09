@@ -1265,8 +1265,17 @@ function prunePdfCache() {
   } catch { /* best effort */ }
 }
 
-/** PowerPoint presentations → PDF with Microsoft PowerPoint (one PowerPoint run for all of them). */
+/**
+ * PowerPoint presentations → PDF with Microsoft PowerPoint (one PowerPoint run for all of them). PowerPoint runs as a
+ * single copy on a PC (unlike Word), so conversions wait for each other instead of sharing – and closing – one copy.
+ */
+let pptQueue = Promise.resolve();
 export function pptToPdf(pairs) {
+  const run = pptQueue.then(() => pptToPdfNow(pairs));
+  pptQueue = run.catch(() => {});
+  return run;
+}
+function pptToPdfNow(pairs) {
   const listFile = path.join(path.dirname(pairs[0].out), '..', '_ppt-jobs.json');
   fs.writeFileSync(listFile, JSON.stringify(pairs));
   return new Promise(resolve => {
