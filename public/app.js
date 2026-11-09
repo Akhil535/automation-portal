@@ -478,7 +478,10 @@ $('#ex-pol-go').onclick = () => showTab('policies');
 function showTab(name, adm) {
   if (!facility && name !== 'admin') name = 'nofac'; // nothing to work on yet
   if (name === 'admin') adm = adm || currentAdm || 'masters';
-  $$('#tabs button').forEach(x => x.classList.toggle('active', x.dataset.tab === name && (!x.dataset.adm || x.dataset.adm === adm)));
+  $$('#tabs button[data-tab]').forEach(x => x.classList.toggle('active', x.dataset.tab === name && (!x.dataset.adm || x.dataset.adm === adm)));
+  const inSec = !!$('#sb-sec-items button.active');
+  $('#sb-sec')?.classList.toggle('has-active', inSec);
+  if (inSec) secMenu(true);
   $$('.tab').forEach(t => t.classList.toggle('active', t.id === name));
   window.scrollTo({ top: 0 });
   const btn = $(`#tabs button[data-tab="${name}"]${adm ? `[data-adm="${adm}"]` : ''}`);
@@ -489,7 +492,16 @@ function showTab(name, adm) {
   if (name === 'admin') return showAdmin(adm);
   loaders[name]?.(adm); // (the toolkit's tools use the second part to say which tool)
 }
-$$('#tabs button').forEach(b => b.onclick = () => showTab(b.dataset.tab, b.dataset.adm));
+$$('#tabs button[data-tab]').forEach(b => b.onclick = () => showTab(b.dataset.tab, b.dataset.adm));
+// Step 6 · Security & Awareness: a numbered dropdown – collapsed by default, opened by its parent item (and kept open
+// while one of its tools is the page shown)
+function secMenu(open) {
+  const btn = $('#sb-sec-btn'), sub = $('#sb-sec-items');
+  if (!btn) return;
+  btn.setAttribute('aria-expanded', String(open)); sub.hidden = !open;
+  $('#sb-sec').classList.toggle('open', open);
+}
+$('#sb-sec-btn')?.addEventListener('click', () => secMenu($('#sb-sec-items').hidden));
 
 // ---------------------------------------------------------------------------------------------------
 // Admin console (administrators): master policies, facilities, users & security, schedule & e-mail, history & logs.
@@ -992,7 +1004,8 @@ $('#btn-add-facility-2').onclick = () => $('#btn-add-facility').click();
 
 // Menu items explain themselves on hover
 const NAV_TIPS = { overview: 'Where you are in the process and what to do next', policies: 'Step 1 – fill in the details and create the policies (Word + PDF)', hr: 'Step 2 – HR and onboarding documents, employee training documents and the ADHICS checklist', thirdparty: 'Step 3 – 3rd-party / vendor documents: NDA and acceptable usage, with this facility\'s logo, name and Ref. No.', master: 'Step 4 – link the policies, licences and certificates with their dates', circulars: 'Always on – new DoH Abu Dhabi circulars are added to the register every week', checklist: 'Step 5 – the checklist of everything: HR documents and LEGAL REGISTER entries at a glance', exports: 'Every file to download in one place', settings: 'Details of this facility and your account' };
-$$('#tabs button').forEach(b => { b.dataset.hc = 'tip'; b.dataset.tip = NAV_TIPS[b.dataset.tab] || ''; });
+if ($('#sb-sec-btn')) Object.assign($('#sb-sec-btn').dataset, { hc: 'tip', tip: 'Step 6 – awareness training calendar, document tracker, Cyber Security presentation and visitor log book' });
+$$('#tabs button[data-tab]').forEach(b => { b.dataset.hc = 'tip'; b.dataset.tip = NAV_TIPS[b.dataset.tab] || ''; });
 
 // ---- Export window: Master Excel (.xlsx) and PDF summary report (.pdf) ----
 function openExport() {
@@ -3919,7 +3932,7 @@ function renderPptPreview() {
     : locked && !admin ? '<span class="tag na"><i class=i-lock></i> Preview only – only an administrator can download, export or apply this look</span>'
     : me?.role === 'viewer' ? '' : '<button type="button" class="btn primary" id="ds-prev-use">Use this style for the presentation</button>';
   $('#ds-prev-use')?.addEventListener('click', () => saveCyberPpt({ style }));
-  $('#ds-prev-files [data-locked]').forEach(b => b.onclick = () => toast('<i class=i-lock></i> Preview only – only an administrator can download, export or apply looks 2–4'));
+  $$('#ds-prev-files [data-locked]').forEach(b => b.onclick = () => toast('<i class=i-lock></i> Preview only – only an administrator can download, export or apply looks 2–4'));
 }
 /** The toolkit page: the chosen tool (still to come) and every tool of the section. */
 var tkTools = null;

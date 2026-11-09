@@ -4490,3 +4490,15 @@ button.ds-thumb { width: 100%; border: 0; cursor: zoom-in; font: inherit; color:
 #cyberppt .ds-thumb .cp-shot { position: absolute; inset: 12px; width: calc(100% - 24px); height: calc(100% - 24px); object-fit: contain; opacity: 0; transition: opacity .3s; filter: drop-shadow(0 6px 14px rgba(20, 22, 31, .18)); }
 #cyberppt .ds-thumb .cp-shot.ok { opacity: 1; }
 #cyberppt .ds-thumb:has(.cp-shot.ok) svg { visibility: hidden; }
+
+/* v38 · Step 6 · Security & Awareness: a numbered dropdown in the side menu (collapsed by default) */
+.sb-group { display: flex; flex-direction: column; gap: 2px; }
+.sb-nav .sb-parent .sb-step { margin-left: auto; }
+.sb-nav .sb-parent .sb-chev { flex: none; width: 16px; height: 16px; margin-left: 6px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; opacity: .7; transition: transform .2s; }
+.sb-group.open > .sb-parent .sb-chev { transform: rotate(90deg); }
+.sb-group.has-active > .sb-parent { color: var(--sb-ink, #fff); }
+.sb-group.has-active > .sb-parent .sb-step { background: #3b5bfd !important; border-color: #3b5bfd !important; color: #fff !important; }
+.sb-sub { display: flex; flex-direction: column; gap: 2px; margin: 2px 0 6px 16px; padding-left: 6px; border-left: 1px solid var(--sb-line); }
+.sb-sub[hidden] { display: none; }
+.sb-sub button.sb-tool { font-size: 13px !important; padding-top: 7px !important; padding-bottom: 7px !important; }
+.sb-sub button.sb-tool .ico { width: 16px; height: 16px; }
