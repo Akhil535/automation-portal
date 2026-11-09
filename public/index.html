@@ -130,23 +130,30 @@
     <div id="alerts"></div>
 
     <!-- How it works: an animated isometric scene of the process, with this facility's real progress -->
-    <section class="card iso-card" id="iso-card" aria-label="How it works">
-      <header class="iso-top">
-        <div><span class="pw-kicker">How it works</span><h2>Policies → HR → 3rd-party → LEGAL REGISTER</h2></div>
+    <section class="card hiw-card" id="iso-card" aria-label="How it works">
+      <div class="hiw-aurora" aria-hidden="true"></div>
+      <header class="hiw-top">
+        <div><span class="hiw-kicker"><i class=i-sparkle></i> How it works</span><h2>Your complete ADHICS compliance pack <span class="hiw-grad">in 5 steps</span></h2></div>
         <div class="iso-ctrl">
-          <button type="button" class="btn small" id="iso-play" aria-label="Pause">❚❚ Pause</button>
-          <button type="button" class="btn small" id="iso-hide" aria-label="Hide the animation">Hide</button>
+          <button type="button" class="btn small hiw-btn" id="iso-play" aria-label="Pause">❚❚ Pause</button>
+          <button type="button" class="btn small hiw-btn" id="iso-hide" aria-label="Hide How it works">Hide</button>
         </div>
       </header>
-      <div class="iso-stage" id="iso-stage" role="img" aria-label="Animated picture: documents ride a conveyor belt from Policies to HR forms to the LEGAL REGISTER and DoH updates"></div>
-      <div class="iso-caption">
-        <div class="iso-dots" id="iso-dots" role="tablist" aria-label="Steps">
-          <button type="button" data-k="0" role="tab">1</button><button type="button" data-k="1" role="tab">2</button><button type="button" data-k="2" role="tab">3</button><button type="button" data-k="3" role="tab">↻</button>
-        </div>
-        <div class="iso-text"><b id="iso-title">–</b><span id="iso-sub"></span></div>
-        <button type="button" class="btn primary small" id="iso-go">Open this step →</button>
+      <div class="hiw-track-wrap">
+        <div class="hiw-line" aria-hidden="true"><i id="hiw-fill"></i><b id="hiw-spark"></b></div>
+        <ol class="hiw-track" id="hiw-track" role="tablist" aria-label="Steps"></ol>
       </div>
-      <div class="iso-bar"><i id="iso-bar"></i></div>
+      <div class="hiw-stage" id="hiw-stage">
+        <div class="hiw-copy">
+          <span class="hiw-step" id="hiw-step">Step 1 of 5</span>
+          <h3 id="iso-title">–</h3>
+          <p id="iso-sub"></p>
+          <ul class="hiw-points" id="hiw-points"></ul>
+          <button type="button" class="btn primary hiw-go" id="iso-go">Open this step →</button>
+        </div>
+        <div class="hiw-art" id="hiw-art" aria-hidden="true"></div>
+      </div>
+      <div class="hiw-bar"><i id="iso-bar"></i></div>
     </section>
     <div class="iso-show" id="iso-show" hidden><button type="button" class="link-btn" id="iso-unhide"><i class=i-play></i> Show "How it works"</button></div>
 
@@ -1252,7 +1259,7 @@
     <p class="small muted" id="up-msg" role="status"></p>
   </form>
 </dialog>
-<script src="iso-factory.js"></script>
+<!-- iso-factory.js: used by the sign-in page only -->
 <script src="app.js"></script>
 </body>
 </html>
