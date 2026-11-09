@@ -4343,3 +4343,13 @@ dialog::backdrop { background: rgba(12, 12, 15, .5) !important; backdrop-filter:
 .hiw-login .hiw-bar { margin: 12px -18px 0; background: rgba(255, 255, 255, .12); }
 @media (max-width: 1100px) { .hiw-login .hiw-stage { grid-template-columns: 1fr; } .hiw-login .hiw-art { order: -1; max-width: 380px; width: 100%; justify-self: center; } }
 @media (max-width: 600px) { .hiw-login .hiw-ic { width: 40px; height: 40px; } .hiw-login .hiw-line { top: 18px; } .hiw-login .hiw-meta b { font-size: 12px; } }
+
+/* v34b · sign-in showcase: fits the screen at any width, readable title, the assistant bubble under the text */
+.hiw-login .hiw-copy h3 { color: #ffffff !important; }
+.hiw-login .hiw-stage { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.hiw-login .hiw-art { height: clamp(170px, 30vh, 280px); width: auto; aspect-ratio: 340 / 240; justify-self: end; }
+.hiw-login .la-ai { position: static !important; margin-top: 12px; max-width: none; opacity: 0; transform: translateY(6px); transition: opacity .35s, transform .35s; }
+.hiw-login .la-ai.show { opacity: 1; transform: none; }
+.auth-art.la { overflow-y: auto !important; }
+@media (max-height: 820px) and (min-width: 1101px) { .auth-art.la .la-facts { display: none !important; } }
+@media (max-width: 1100px) { .hiw-login .hiw-stage { grid-template-columns: 1fr; } .hiw-login .hiw-art { justify-self: center; } }

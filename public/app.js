@@ -2733,7 +2733,6 @@ var iso = (() => { // var: renderFlow may ask for it during start-up (name kept:
   const { STEPS, ART } = window.HiwArt; // public/hiw-art.js
   const STEP_MS = 5600, N = STEPS.length;
   const st = { k: 0, t0: 0, playing: true, raf: 0, visible: true, built: false };
-  const reduce = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const STATE_TXT = { done: 'Done ✓', now: 'Do this now', warn: 'Check', todo: 'To do' };
 
   function show(k) {
@@ -2748,20 +2747,20 @@ var iso = (() => { // var: renderFlow may ask for it during start-up (name kept:
     const stage = $('#hiw-stage'); stage.classList.remove('enter'); void stage.offsetWidth; stage.classList.add('enter');
     $('#hiw-fill').style.setProperty('--f', (k / (N - 1)).toFixed(3));
   }
-  function frame(now) {
-    st.raf = 0;
-    if (!st.playing || !st.visible || document.hidden) return;
-    const el = now - st.t0, k = Math.floor(el / STEP_MS) % N;
+  // a plain timer drives the show (it keeps running even where animation frames are throttled)
+  function tick() {
+    if (!st.built || !st.playing || !st.visible || document.hidden) return;
+    const el = performance.now() - st.t0, k = Math.floor(el / STEP_MS) % N;
     if (k !== st.k) show(k);
     $('#iso-bar').style.width = `${(((el % STEP_MS) / STEP_MS) * 100).toFixed(2)}%`;
-    st.raf = requestAnimationFrame(frame);
   }
-  const run = () => { if (!st.raf && st.playing && st.visible) st.raf = requestAnimationFrame(frame); };
+  setInterval(tick, 80);
+  const run = tick;
   function setPlaying(on) {
     st.playing = on;
     $('#iso-card')?.classList.toggle('paused', !on);
     $('#iso-play').innerHTML = on ? '❚❚ Pause' : '<i class=i-play></i> Play'; $('#iso-play').setAttribute('aria-label', on ? 'Pause' : 'Play');
-    if (on) { st.t0 = performance.now() - st.k * STEP_MS; run(); } else { cancelAnimationFrame(st.raf); st.raf = 0; $('#iso-bar').style.width = '100%'; }
+    if (on) st.t0 = performance.now() - st.k * STEP_MS; else $('#iso-bar').style.width = '100%';
   }
   function jump(k) { show(k); st.t0 = performance.now() - k * STEP_MS; }
 
@@ -2787,22 +2786,22 @@ var iso = (() => { // var: renderFlow may ask for it during start-up (name kept:
     track.innerHTML = STEPS.map((s, k) => `<li role="presentation"><button type="button" role="tab" class="hiw-node" data-k="${k}" data-state="todo" aria-label="Step ${k + 1}: ${esc(s.label)}">
       <span class="hiw-ic"><i class=i-${s.icon}></i><em>${k + 1}</em></span><span class="hiw-meta"><b>${esc(s.label)}</b><small class="hiw-state">To do</small></span></button></li>`).join('');
     st.built = true;
-    $$('#hiw-track .hiw-node').forEach(b => b.onclick = () => { setPlaying(false); jump(Number(b.dataset.k)); });
+    $$('#hiw-track .hiw-node').forEach(b => b.onclick = () => { jump(Number(b.dataset.k)); if (st.playing) run(); }); // the show carries on from the chosen step
     track.onkeydown = e => { // arrow keys move between the steps
       const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
       if (!d) return;
-      e.preventDefault(); setPlaying(false); jump((st.k + d + N) % N); $(`#hiw-track [data-k="${st.k}"]`).focus();
+      e.preventDefault(); jump((st.k + d + N) % N); if (st.playing) run(); $(`#hiw-track [data-k="${st.k}"]`).focus();
     };
     $('#iso-play').onclick = () => setPlaying(!st.playing);
     $('#iso-go').onclick = () => showTab(STEPS[st.k].tab);
-    const hide = on => { $('#iso-card').hidden = on; $('#iso-show').hidden = !on; store.set('iso-hidden', on ? '1' : ''); if (on) setPlaying(false); else setPlaying(!reduce()); };
+    const hide = on => { $('#iso-card').hidden = on; $('#iso-show').hidden = !on; store.set('iso-hidden', on ? '1' : ''); if (on) setPlaying(false); else setPlaying(true); };
     $('#iso-hide').onclick = () => hide(true);
     $('#iso-unhide').onclick = () => hide(false);
     if ('IntersectionObserver' in window) new IntersectionObserver(e => { st.visible = e[0].isIntersecting; run(); }).observe($('#iso-card'));
     document.addEventListener('visibilitychange', run);
     jump(0);
     if (store.get('iso-hidden') === '1') hide(true);
-    else setPlaying(!reduce()); // people who prefer less motion get the still picture and the step buttons
+    else setPlaying(true); // always plays by itself; only Pause / Hide stop it
     progress();
   }
   return { init, progress };

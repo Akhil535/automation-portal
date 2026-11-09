@@ -10,7 +10,6 @@
   const $ = id => document.getElementById(id);
   const N = STEPS.length, STEP_MS = 5600;
   const st = { k: -1, t0: performance.now(), playing: true, raf: 0 };
-  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const esc = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   track.innerHTML = STEPS.map((s, k) => `<li role="presentation"><button type="button" role="tab" class="hiw-node" data-k="${k}" aria-label="Step ${k + 1}: ${esc(s.label)}">
@@ -28,22 +27,23 @@
     $('hiw-fill').style.setProperty('--f', (k / (N - 1)).toFixed(3));
     $('la-ai').classList.toggle('show', k === 3); // the assistant speaks up on the LEGAL REGISTER step
   }
-  function frame(now) {
-    st.raf = 0;
+  // A plain timer drives the show (it keeps running even where animation frames are throttled)
+  function tick() {
     if (!st.playing || document.hidden) return;
-    const el = now - st.t0, k = Math.floor(el / STEP_MS) % N;
+    const el = performance.now() - st.t0, k = Math.floor(el / STEP_MS) % N;
     show(k);
     $('la-bar').style.width = `${(((el % STEP_MS) / STEP_MS) * 100).toFixed(2)}%`;
-    st.raf = requestAnimationFrame(frame);
   }
-  const run = () => { if (!st.raf && st.playing) st.raf = requestAnimationFrame(frame); };
+  setInterval(tick, 80);
+  const run = tick;
   const setPlaying = on => {
     st.playing = on;
     document.querySelector('.hiw-login')?.classList.toggle('paused', !on);
     $('la-play').textContent = on ? '❚❚ Pause' : '▶ Play';
-    if (on) { st.t0 = performance.now() - Math.max(0, st.k) * STEP_MS; run(); } else { cancelAnimationFrame(st.raf); st.raf = 0; $('la-bar').style.width = '100%'; }
+    if (on) st.t0 = performance.now() - Math.max(0, st.k) * STEP_MS; else $('la-bar').style.width = '100%';
   };
-  const jump = k => { setPlaying(false); st.k = -1; show(k); };
+  // A click on a step shows it at once and the show carries on from there (only Pause stops it)
+  const jump = k => { st.k = -1; show(k); st.t0 = performance.now() - k * STEP_MS; };
   nodes.forEach((b, i) => { b.onclick = () => jump(i); });
   track.onkeydown = e => {
     const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
@@ -52,5 +52,6 @@
   };
   $('la-play').onclick = () => setPlaying(!st.playing);
   document.addEventListener('visibilitychange', run);
-  if (reduce) jump(0); else { show(0); run(); }
+  // Always plays by itself (with "reduce motion" the steps still change; only the movement inside is kept short)
+  show(0); run();
 })();
