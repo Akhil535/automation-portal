@@ -231,10 +231,15 @@ export function deleteFacility(id) {
   if (fac.home === undefined && fs.existsSync(home) && path.resolve(home).startsWith(path.resolve(base) + path.sep)) {
     archived = path.join(base, '_removed', `${id}-${new Date().toISOString().replace(/[-:]/g, '').slice(0, 15)}`);
     fs.mkdirSync(path.dirname(archived), { recursive: true });
+    let leftOver = false;
     try { fs.renameSync(home, archived); }
-    catch { fs.cpSync(home, archived, { recursive: true }); fs.rmSync(home, { recursive: true, force: true }); }
+    catch {
+      fs.cpSync(home, archived, { recursive: true });
+      try { fs.rmSync(home, { recursive: true, force: true }); } catch { leftOver = true; } // a file still open somewhere
+    }
     // the facility's settings go with its folder, so a removal made by mistake can be undone (Restore)
     fs.writeFileSync(path.join(archived, 'facility.json'), JSON.stringify({ ...fac, removedAt: new Date().toISOString() }, null, 2));
+    if (leftOver) return { removed: id, archived, restorable: true, leftOver: home };
   }
   return { removed: id, archived, restorable: !!archived };
 }

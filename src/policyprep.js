@@ -13,7 +13,7 @@ import JSZip from 'jszip';
 import { dir, facilityHome, loadConfig, loadGlobalConfig, updateFacility } from './config.js';
 import { docToDocx, kindOf, readDocument } from './docparse.js';
 import { imageSize } from './imagesize.js';
-import { cleanLogo, isPageScan, pickLogo, resizeImage, splitSignStamp } from './logoclean.js';
+import { cleanLogo, isPageScan, letterheadFromPdf, pickLogo, resizeImage, splitSignStamp } from './logoclean.js';
 import { parseFacilityDocument } from './policy.js';
 import { applyDocStyle, effectiveStyle, STYLES, trialFacility } from './docstyle.js';
 
@@ -21,6 +21,25 @@ const APP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PDF_SCRIPT = path.join(APP, 'scripts', 'word-to-pdf.ps1');
 /** Policies with a major revision: version 2.0 by default. */
 export const MAJOR_REVISION = [3, 18, 19, 25];
+/** What changed in the master policies' version 2.0 (their change log unless a facility describes its own). */
+export const MASTER_CHANGES = {
+  3: 'Asset handling procedure elaborated and updated',
+  18: 'Information security and data privacy incident reporting contacts and escalation updated',
+  19: 'Asset-based calculation updated in the policy',
+  25: 'Password requirement updated in the policy (12 characters)',
+};
+/**
+ * A policy's version and change log – one rule for the policy's revision table and the Document Tracker:
+ * version 1 → "NILL" (nothing changed yet); version 2 and above → the change must be described (needed = true while
+ * it is not).
+ */
+export function policyChange(s, no) {
+  const version = s.versions?.[no] || (MAJOR_REVISION.includes(no) ? '2.0' : '1.0');
+  if (Number(version) < 2) return { version, change: 'NILL', needed: false, own: false };
+  const own = String(s.descriptions?.[no] || '').trim();
+  const change = own || (version === '2.0' && MASTER_CHANGES[no]) || '';
+  return { version, change, needed: !change, own: !!own };
+}
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 // ---------------------------------------------------------------------------------------------------
@@ -561,6 +580,11 @@ export function saveSettings(id, body = {}) {
   }
   if (body.versions) next.versions = Object.fromEntries(Object.entries(body.versions).filter(([, v]) => /^\d+\.\d$/.test(v)));
   if (body.descriptions) next.descriptions = Object.fromEntries(Object.entries(body.descriptions).map(([k, v]) => [k, String(v).slice(0, 300)]));
+  // version 2 and above needs its change described (audit traceability) – checked when versions or changes are saved
+  if (body.versions || body.descriptions) {
+    const missing = Object.keys(next.versions || {}).map(Number).filter(no => policyChange(next, no).needed);
+    if (missing.length) throw Object.assign(new Error(`Describe what changed for ${missing.map(n => `PO${String(n).padStart(2, '0')} (version ${next.versions[n]})`).join(', ')} – version 2 and above needs a change description`), { status: 400, missingChanges: missing });
+  }
   updateFacility(id, { policyPrep: next });
   return prepSettings(loadConfig(id));
 }
@@ -595,7 +619,7 @@ export async function printReady(kind, pic, { clean = false } = {}) {
   if (printCache.has(key)) return printCache.get(key);
   let out = pic;
   if (clean || !fitsPrint(kind, out)) {
-    const c = await cleanLogo(out, { max: PRINT_MAX[kind] });
+    const c = await cleanLogo(out, { max: PRINT_MAX[kind], keep: kind === 'logo' }); // logos: cropped only, never made transparent
     if (c.ext === 'png') out = c;
   }
   if (!fitsPrint(kind, out)) out = await resizeImage(out, PRINT_MAX[kind]);
@@ -643,7 +667,7 @@ async function measurePictures(pics) {
  * strokes in one colour: a signature. Several colours / solid artwork, or the letterhead: a logo. Where it sat in a
  * document counts too (letterhead = logo; the approval table = signature or stamp).
  */
-export function pictureScores(m, where = '') {
+export function pictureScores(m, where = '', { lettered = false } = {}) { // lettered: the page's rendered letterhead is a candidate too
   const sc = { logo: 0, signature: 0, stamp: 0 };
   if (m) {
     sc.stamp += m.aspect >= 0.75 && m.aspect <= 1.35 ? 3 : m.aspect < 1.6 ? 1 : -2;
@@ -662,7 +686,10 @@ export function pictureScores(m, where = '') {
     if (m.families >= 2) { sc.logo += 2; sc.signature -= 2; sc.stamp -= 1; } // separate colours: a signature or stamp is one ink
     sc.stamp += m.ink >= 0.6 ? -1 : 0; // stamps are rings and lettering, not solid shapes
   }
-  if (where === 'header') { sc.logo += 4; sc.signature -= 2; sc.stamp -= 2; }
+  // the letterhead picture is the logo - unless it plainly is a signature / stamp and the page's own letterhead
+  // (rendered) can be taken instead
+  if (where === 'header') { const inkLike = lettered && m && Math.max(sc.signature, sc.stamp) > sc.logo + 1; sc.logo += inkLike ? 1 : 4; sc.signature -= inkLike ? 0 : 2; sc.stamp -= inkLike ? 0 : 2; }
+  if (where === 'letterhead') { sc.logo += 5; sc.signature -= 4; sc.stamp -= 4; }
   if (where === 'approval') { sc.signature += 1.5; sc.stamp += 1.5; sc.logo -= 3; }
   return sc;
 }
@@ -674,7 +701,7 @@ const bestKind = sc => Object.entries(sc).sort((a, b) => b[1] - a[1])[0];
  * footer pictures (e.g. RESTRICTED) are left out. A picture holding a signature AND a stamp side by side is also
  * split: its two parts become candidates of their own (the whole stays available for "signature + stamp in one").
  */
-async function candidatesOf(buffer, name) {
+async function candidatesOf(buffer, name, { letterhead = false } = {}) {
   const direct = imageSize(buffer);
   let label = 'picture', list;
   if (direct) list = [{ buffer, ...direct, where: 'file' }];
@@ -690,6 +717,8 @@ async function candidatesOf(buffer, name) {
     const rest = big.length || header.length ? big : others;
     // the biggest few are enough
     list = [...header, ...rest].sort((a, b) => b.width * b.height - a.width * a.height).slice(0, 6);
+    // a letterhead drawn as text / vector art (no picture): page 1 rendered and its top line cut out
+    if (letterhead && k === 'pdf') { const lh = await letterheadFromPdf(buffer); if (lh) list.push(lh); }
     if (!list.length) throw new Error(`No picture found in this ${label} – only page decorations such as the RESTRICTED badge`);
   }
   // signature + stamp in one picture (the approval cell, or an uploaded picture): split into the two
@@ -707,10 +736,12 @@ async function candidatesOf(buffer, name) {
 /** Clean (crop, transparent background) and measure candidates; each gets scores for logo / signature / stamp. */
 async function judged(list, max = 1000) {
   const clean = [];
-  for (const c of list) clean.push({ ...(await cleanLogo(c, { max })), where: c.where, part: c.part, whole: c.whole });
+  // (the transparent version is for measuring; `orig` is kept so a logo can be taken with its own background)
+  for (const c of list) clean.push({ ...(await cleanLogo(c, { max })), where: c.where, part: c.part, whole: c.whole, orig: c });
   const feats = await measurePictures(clean);
+  const lettered = list.some(c => c.where === 'letterhead');
   return clean.map((c, i) => {
-    const scores = pictureScores(feats[i], c.where);
+    const scores = pictureScores(feats[i], c.where, { lettered });
     if (c.part) { scores[c.part] += 3; scores.logo -= 3; } // a part of a split signature + stamp picture
     return { ...c, features: feats[i], scores };
   });
@@ -722,7 +753,7 @@ async function judged(list, max = 1000) {
  * when they are one picture). Returns the cleaned picture plus what it looks like, so a wrong slot is noticed.
  */
 export async function pictureFrom(buffer, name = '', kind = 'logo') {
-  const { label, list } = await candidatesOf(buffer, name);
+  const { label, list } = await candidatesOf(buffer, name, { letterhead: kind === 'logo' });
   const all = await judged(list, PRINT_MAX[kind] || 1000);
   let pool, pick;
   if (kind === 'combined') {
@@ -735,12 +766,22 @@ export async function pictureFrom(buffer, name = '', kind = 'logo') {
   }
   pick ||= all[0];
   const [looksLike, score] = bestKind(pick.scores);
-  const place = pick.where === 'header' ? ' (letterhead)' : pick.where === 'approval' ? ' (approval table)' : '';
+  const place = pick.where === 'header' ? ' (letterhead)' : pick.where === 'letterhead' ? ' (letterhead text on page 1)' : pick.where === 'approval' ? ' (approval table)' : '';
   const split = pick.part ? ` – ${pick.part} taken from the signature + stamp picture` : '';
   const source = label === 'picture' ? `picture${split}` : `${label}${place}${split}`;
   // a clear mismatch (e.g. a round stamp uploaded as the signature): said, never silently swapped
   const mismatch = pick.features && kind !== 'combined' && !pick.part && looksLike !== kind && score - pick.scores[kind] >= 2.5 ? looksLike : null;
-  return { ...pick, source, looksLike: pick.features ? looksLike : null, mismatch };
+  return { ...(kind === 'logo' ? await asLogo(pick, PRINT_MAX.logo) : pick), source, looksLike: pick.features ? looksLike : null, mismatch };
+}
+/**
+ * A picture used as the LOGO: cropped from the original with its own background, colours and fills kept – background
+ * removal is only for signatures and stamps (a white-filled or outlined logo would lose the inside of its letters).
+ */
+async function asLogo(pick, max) {
+  if (!pick?.orig) return pick;
+  const kept = await cleanLogo(pick.orig, { max, keep: true });
+  const { orig, ...rest } = pick;
+  return { ...rest, buffer: kept.buffer, ext: kept.ext || imageSize(kept.buffer)?.ext || 'png', width: kept.width, height: kept.height, cleaned: kept.cleaned || { cropped: false, transparent: false } };
 }
 
 /** Upload preview (wizard): the picture as it will be used - cropped, background removed, print size. Nothing saved. */
@@ -760,7 +801,7 @@ const asData = pic => ({ dataUrl: `data:${pic.ext === 'jpg' ? 'image/jpeg' : 'im
 export async function detectPictures(files) {
   const all = [];
   for (const f of files.slice(0, 6)) {
-    const { label, list } = await candidatesOf(f.buffer, f.name);
+    const { label, list } = await candidatesOf(f.buffer, f.name, { letterhead: true });
     for (const j of await judged(list, 1200)) if (!j.whole) all.push({ ...j, file: f.name, label });
   }
   if (!all.length) throw new Error('No pictures found');
@@ -782,9 +823,9 @@ export async function detectPictures(files) {
   for (const r of roles) {
     const i = best.pick[r];
     if (i === undefined) { out[r] = null; continue; }
-    const c = all[i];
+    const c = r === 'logo' ? await asLogo(all[i], 1200) : all[i];
     const pic = await printReady(r, c);
-    const where = c.where === 'header' ? 'letterhead' : c.where === 'approval' ? 'approval table' : 'inside the document';
+    const where = c.where === 'header' ? 'letterhead' : c.where === 'letterhead' ? 'letterhead text on page 1' : c.where === 'approval' ? 'approval table' : 'inside the document';
     out[r] = { ...asData(pic), file: c.file, source: c.label === 'picture' ? c.file : `${c.file} – ${where}`, reason: KIND_REASON[r] };
   }
   const usedIdx = new Set(Object.values(best.pick));
@@ -960,7 +1001,7 @@ export async function fillPolicy(templateBuffer, tpl, s, pics = {}, opts = {}) {
   // 2. Revision table at the end
   const rev = revisionTable(xml);
   if (rev) {
-    const rows = historyRows(version, s, s.descriptions?.[tpl.no]);
+    const rows = historyRows(version, s, (Number(version) >= 2 && policyChange(s, tpl.no).change) || s.descriptions?.[tpl.no]);
     const redits = [];
     const data = rev.t.rows.slice(rev.header + 1);
     // Formatting per column: the first data row that has text in that column (the template's own entry).

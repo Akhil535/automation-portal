@@ -22,7 +22,7 @@ import { CARTOONS } from './pptscenes.js';
 /** The tools of the Security & Awareness section; new ones are added here (status 'soon' shows a placeholder page). */
 export const TOOLS = [
   { id: 'calendar', title: 'Awareness Training Calendar', status: 'soon', desc: 'Plan the year\'s awareness sessions – topics, dates, trainers and who attended.' },
-  { id: 'tracker', title: 'Document Tracker', status: 'soon', desc: 'Every compliance document with its owner, review date and status in one list.' },
+  { id: 'tracker', title: 'Document Tracker', status: 'ready', desc: 'Every policy with its ID, version, issue / review / approval dates, author, approver and change log – synced with the policies.' },
   { id: 'cyberppt', title: 'Cyber Security PPT', status: 'ready', desc: 'The cyber security awareness presentation with your facility\'s name and IT contact.' },
   { id: 'visitors', title: 'Visitor Log Book', status: 'soon', desc: 'A printable visitor log for reception – name, company, purpose, time in and out.' },
 ];

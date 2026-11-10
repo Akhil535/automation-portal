@@ -6,7 +6,9 @@
 # 3. "header" mode (a whole scanned page): looks only at the top of the page and keeps the most logo-like
 #    block (largest, most colourful group of marks).
 # Prints one JSON line: {"ok":true,"width":..,"height":..,"cropped":..,"transparent":..}
-param([string]$In, [string]$Out, [string]$Mode = '', [int]$Max = 0)
+# -Keep (logos): crop only - the picture keeps its own background, colours and fills (nothing made transparent);
+#   background removal is for signatures and stamps.
+param([string]$In, [string]$Out, [string]$Mode = '', [int]$Max = 0, [switch]$Keep)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 Add-Type -ReferencedAssemblies System.Drawing -Language CSharp -TypeDefinition @'
@@ -29,7 +31,50 @@ public static class LogoClean {
     return Math.Max(r, Math.Max(g, b)) - Math.Min(r, Math.Min(g, b));
   }
 
-  public static string Run(string inPath, string outPath, bool header, int maxSide) {
+  // "letterhead" (a rendered first page whose letterhead is drawn as text / vector art, not a picture): the first
+  // block of marks at the top of the page - the facility name line, with any emblem beside it - cropped as it is
+  // printed (solid colours, white background kept). Narrow side decorations at the page edges are ignored.
+  public static string Letterhead(string inPath, string outPath, int maxSide) {
+    using (var src = new Bitmap(inPath)) {
+      int W = src.Width, H = src.Height, x0 = (int)(W * 0.06), x1 = (int)(W * 0.94), yMax = (int)(H * 0.2);
+      var bd = src.LockBits(new Rectangle(0, 0, W, H), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+      int[] px = new int[W * H]; Marshal.Copy(bd.Scan0, px, 0, px.Length); src.UnlockBits(bd);
+      Func<int, bool> ink = p => Alpha(p) > 60 && Diff(p, 0xFFFFFF) > 70;
+      int[] rows = new int[yMax];
+      for (int y = 0; y < yMax; y++) for (int x = x0; x < x1; x++) if (ink(px[y * W + x])) rows[y]++;
+      int minInk = Math.Max(3, (x1 - x0) / 400), gapMax = Math.Max(3, H / 400);
+      int top = -1, bottom = -1, gap = 0;
+      for (int y = 0; y < yMax; y++) {
+        if (rows[y] >= minInk) { if (top < 0) top = y; bottom = y; gap = 0; }
+        else if (top >= 0 && ++gap > gapMax) {
+          if (bottom - top + 1 >= H / 120) break;   // a real line of marks (not a speck or a hairline rule)
+          top = -1; bottom = -1; gap = 0;
+        }
+      }
+      if (top < 0 || bottom - top + 1 < H / 120) return "{\"ok\":false,\"reason\":\"no letterhead\"}";
+      int lx = int.MaxValue, rx = -1;
+      for (int y = top; y <= bottom; y++) for (int x = x0; x < x1; x++) if (ink(px[y * W + x])) { if (x < lx) lx = x; if (x > rx) rx = x; }
+      // a rule across the whole width is not a letterhead
+      if (rx - lx > (x1 - x0) * 0.97 && bottom - top < H / 60) return "{\"ok\":false,\"reason\":\"rule only\"}";
+      int pad = Math.Max(6, (bottom - top) / 6);
+      int cx0 = Math.Max(0, lx - pad), cy0 = Math.Max(0, top - pad), cx1 = Math.Min(W - 1, rx + pad), cy1 = Math.Min(H - 1, bottom + pad);
+      int OW = cx1 - cx0 + 1, OH = cy1 - cy0 + 1;
+      double s = maxSide > 0 && Math.Max(OW, OH) > maxSide ? (double)maxSide / Math.Max(OW, OH) : 1.0;
+      int FW = Math.Max(1, (int)Math.Round(OW * s)), FH = Math.Max(1, (int)Math.Round(OH * s));
+      using (var outBmp = new Bitmap(FW, FH, PixelFormat.Format32bppArgb)) {
+        using (var g = Graphics.FromImage(outBmp)) {
+          g.Clear(Color.White);
+          g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+          g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+          g.DrawImage(src, new Rectangle(0, 0, FW, FH), new Rectangle(cx0, cy0, OW, OH), GraphicsUnit.Pixel);
+        }
+        outBmp.Save(outPath, ImageFormat.Png);
+      }
+      return "{\"ok\":true,\"width\":" + FW + ",\"height\":" + FH + ",\"cropped\":true,\"transparent\":false,\"resized\":" + (s < 1 ? "true" : "false") + "}";
+    }
+  }
+
+  public static string Run(string inPath, string outPath, bool header, int maxSide, bool keep) {
     Bitmap bmp;
     using (var src = new Bitmap(inPath)) {
       int sw = src.Width, sh = src.Height, top = 0;
@@ -183,6 +228,10 @@ public static class LogoClean {
     if (tx1 < 0) return "{\"ok\":false,\"reason\":\"empty\"}";
     int pad = Math.Max(4, (int)(Math.Max(tx1 - tx0, ty1 - ty0) * 0.03));
     tx0 = Math.Max(0, tx0 - pad); ty0 = Math.Max(0, ty0 - pad); tx1 = Math.Min(W - 1, tx1 + pad); ty1 = Math.Min(H - 1, ty1 + pad);
+    // keep (logos): only plain white / very light page margins are trimmed - a logo drawn on its own coloured
+    // background (e.g. white letters on a blue block) is never cut into
+    bool lightBg = uniform && ((bg >> 16) & 255) >= 225 && ((bg >> 8) & 255) >= 225 && (bg & 255) >= 225;
+    if (keep && !header && !lightBg) { tx0 = 0; ty0 = 0; tx1 = W - 1; ty1 = H - 1; }
     int OW = tx1 - tx0 + 1, OH = ty1 - ty0 + 1;
     if (OW < 16 || OH < 16) return "{\"ok\":false,\"reason\":\"too small\"}";
 
@@ -191,7 +240,7 @@ public static class LogoClean {
     for (int y = 0; y < OH; y++) for (int x = 0; x < OW; x++) {
       int i = (y + ty0) * W + (x + tx0), p = px[i];
       int a = Alpha(p);
-      if (uniform) {
+      if (uniform && !keep) {
         if (isBg[i]) a = 0;
         else {
           bool edge = false;
@@ -224,8 +273,8 @@ public static class LogoClean {
         }
       } else outBmp.Save(outPath, ImageFormat.Png);
     }
-    return "{\"ok\":true,\"width\":" + FW + ",\"height\":" + FH + ",\"cropped\":" + ((OW < W || OH < H) ? "true" : "false") + ",\"transparent\":" + (uniform ? "true" : "false") + ",\"resized\":" + ((FW != OW) ? "true" : "false") + "}";
+    return "{\"ok\":true,\"width\":" + FW + ",\"height\":" + FH + ",\"cropped\":" + ((OW < W || OH < H) ? "true" : "false") + ",\"transparent\":" + (uniform && !keep ? "true" : "false") + ",\"resized\":" + ((FW != OW) ? "true" : "false") + "}";
   }
 }
 '@
-try { [LogoClean]::Run($In, $Out, $Mode -eq 'header', $Max) } catch { '{"ok":false,"reason":' + ($_.Exception.Message | ConvertTo-Json) + '}' }
+try { if ($Mode -eq 'letterhead') { [LogoClean]::Letterhead($In, $Out, $Max) } else { [LogoClean]::Run($In, $Out, $Mode -eq 'header', $Max, $Keep.IsPresent) } } catch { '{"ok":false,"reason":' + ($_.Exception.Message | ConvertTo-Json) + '}' }

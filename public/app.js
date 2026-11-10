@@ -12,7 +12,8 @@ async function call(url, opts = {}, scoped = true) {
   const res = await fetch(scoped ? u(url) : url, { ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) } });
   const data = res.headers.get('content-type')?.includes('json') ? await res.json() : await res.text();
   if (res.status === 401) { location.replace('/login.html'); throw new Error('Please sign in'); } // session ended
-  if (!res.ok) throw new Error(data.error || data || res.statusText);
+  // an HTML error page (e.g. the server runs an older version without this feature) → a short message, not raw HTML
+  if (!res.ok) throw new Error(data.error || (typeof data === 'string' && /^\s*</.test(data) ? (res.status === 404 ? 'This feature is not available on the server yet – restart the portal and reload the page' : `Server error ${res.status}`) : data) || res.statusText);
   return data;
 }
 const api = (url, opts) => call(url, opts, true);
@@ -372,9 +373,13 @@ async function removeFacility(id) {
     if (facility === id) facility = '';
     await loadFacilities(); refresh();
     const undo = r.restorable ? r.archived.split(/[\\/]/).pop() : null;
-    toast(`<b>${esc(f.name)}</b> was removed.`, undo ? { label: 'Undo', run: () => restoreRemoved(undo) } : null);
+    toast(`<b>${esc(f.name)}</b> was removed.${r.leftOver ? ' A few of its files are still open in another program – close them; they stay in its old folder.' : ''}`, undo ? { label: 'Undo', run: () => restoreRemoved(undo) } : null);
     loadRemoved();
-  } catch (e) { alert(`Not removed: ${e.message}`); }
+  } catch (e) {
+    alert(`Not removed: ${e.message}`);
+    // the list as it is now (a removal may have gone part of the way): never keep working on a facility that is gone
+    try { await loadFacilities(); refresh(); loadRemoved(); } catch { /* keep the page */ }
+  }
 }
 async function restoreRemoved(archive) {
   try {
@@ -451,7 +456,7 @@ function renderHeader(s) {
 // ===================================================================================================
 // Navigation
 // ===================================================================================================
-const loaders = { overview: () => { if (!master) loadMaster(); }, policies: () => loadPolicies(), master: () => loadMaster(), circulars: () => loadCirculars(), settings: () => loadSettings(), exports: () => loadExports(), hr: () => loadHr(), thirdparty: () => loadThirdParty(), checklist: () => loadChecklistPage(), cyberppt: () => loadCyberPpt(), toolkit: tool => loadToolkit(tool) };
+const loaders = { overview: () => { if (!master) loadMaster(); }, policies: () => loadPolicies(), master: () => loadMaster(), circulars: () => loadCirculars(), settings: () => loadSettings(), exports: () => loadExports(), hr: () => loadHr(), thirdparty: () => loadThirdParty(), checklist: () => loadChecklistPage(), cyberppt: () => loadCyberPpt(), doctracker: () => loadTracker(), toolkit: tool => loadToolkit(tool) };
 
 /** Export hub: every download of the current facility on one page. */
 async function loadExports() {
@@ -1003,7 +1008,7 @@ $$('#flow [data-goto]').forEach(b => b.onclick = () => showTab(b.dataset.goto));
 $('#btn-add-facility-2').onclick = () => $('#btn-add-facility').click();
 
 // Menu items explain themselves on hover
-const NAV_TIPS = { overview: 'Where you are in the process and what to do next', policies: 'Step 1 – fill in the details and create the policies (Word + PDF)', hr: 'Step 2 – HR and onboarding documents, employee training documents and the ADHICS checklist', thirdparty: 'Step 3 – 3rd-party / vendor documents: NDA and acceptable usage, with this facility\'s logo, name and Ref. No.', master: 'Step 4 – link the policies, licences and certificates with their dates', circulars: 'Always on – new DoH Abu Dhabi circulars are added to the register every week', checklist: 'Step 5 – the checklist of everything: HR documents and LEGAL REGISTER entries at a glance', exports: 'Every file to download in one place', settings: 'Details of this facility and your account' };
+const NAV_TIPS = { doctracker: 'Every policy with its version, dates, author, approver and change log – synced with Prepare policies', cyberppt: 'The cyber security awareness presentation for this facility', overview: 'Where you are in the process and what to do next', policies: 'Step 1 – fill in the details and create the policies (Word + PDF)', hr: 'Step 2 – HR and onboarding documents, employee training documents and the ADHICS checklist', thirdparty: 'Step 3 – 3rd-party / vendor documents: NDA and acceptable usage, with this facility\'s logo, name and Ref. No.', master: 'Step 4 – link the policies, licences and certificates with their dates', circulars: 'Always on – new DoH Abu Dhabi circulars are added to the register every week', checklist: 'Step 5 – the checklist of everything: HR documents and LEGAL REGISTER entries at a glance', exports: 'Every file to download in one place', settings: 'Details of this facility and your account' };
 if ($('#sb-sec-btn')) Object.assign($('#sb-sec-btn').dataset, { hc: 'tip', tip: 'Step 6 – awareness training calendar, document tracker, Cyber Security presentation and visitor log book' });
 $$('#tabs button[data-tab]').forEach(b => { b.dataset.hc = 'tip'; b.dataset.tip = NAV_TIPS[b.dataset.tab] || ''; });
 
@@ -1967,7 +1972,7 @@ function renderPolicies() {
         ? `<input type="hidden" data-ver="${x.no}" value="${esc(ver(x.no))}"><div class="vtoggle" data-write>${Object.keys(x.variants).sort().map(v => `<button type="button" data-vt="${x.no}" data-v="${v}" class="${v === vKey(ver(x.no)) ? 'on' : ''}">${v}</button>`).join('')}</div>`
         : `<select data-ver="${x.no}" data-write>${['1.0', '2.0', '3.0'].map(v => `<option${v === ver(x.no) ? ' selected' : ''}>${v}</option>`).join('')}</select>`}</td>
       <td class="small">${ppMasters(x, ver(x.no))}</td>
-      <td><input data-desc="${x.no}" data-write placeholder="${Number(ver(x.no)) >= 2 ? 'Major revision – policy updated' : 'Reviewed No Changes'}" value="${esc(s.descriptions[x.no] || '')}"></td>
+      <td><input data-desc="${x.no}" data-write placeholder="${Number(ver(x.no)) >= 2 ? (ver(x.no) === '2.0' && (pp.masterChanges || {})[x.no]) || 'Required – describe what changed' : 'NILL – no changes (version 1)'}" value="${esc(s.descriptions[x.no] || '')}"></td>
       <td class="small">${(x.labels || []).length >= 4 && x.hasRevisionTable ? '<span class="tag ok">All fields</span>' : `<span class="tag warn">${(x.labels || []).length} fields${x.hasRevisionTable ? '' : ' · no version table'}</span>`}</td>
       <td><div class="row-actions">
         <button class="icon-btn" data-pm-open="${x.no}" data-pm-mode="view" title="See this master as a document"><i class=i-eye></i> View</button>
@@ -1978,8 +1983,11 @@ function renderPolicies() {
   // changing a version is saved at once and confirmed (which master it uses; created policies follow on the next run)
   const verSaved = no => { const tp = t.find(x => x.no === Number(no)), v = $(`#pp-tpl-body [data-ver="${no}"]`).value;
     toast(`${ppNo(Number(no))} will be issued as version ${esc(v)} – uses the v${masterKeyFor(tp, v)} master. Create the policies again to apply it to the Word / PDF files.`); };
-  $$('#pp-tpl-body select[data-ver]').forEach(el => el.onchange = async () => { if (await saveVersions()) verSaved(el.dataset.ver); });
-  $$('#pp-tpl-body [data-vt]').forEach(b => b.onclick = async () => { $(`#pp-tpl-body input[data-ver="${b.dataset.vt}"]`).value = b.dataset.v; if (await saveVersions()) verSaved(b.dataset.vt); });
+  // version 2 and above needs the change described (Document Tracker / audit) – asked for before it is saved
+  const needsChange = (no, v) => Number(v) >= 2 && !$(`#pp-tpl-body [data-desc="${no}"]`).value.trim() && !(v === '2.0' && (pp.masterChanges || {})[no]);
+  const askChange = no => { const el = $(`#pp-tpl-body [data-desc="${no}"]`); el.placeholder = 'Required – describe what changed'; el.classList.add('need'); el.focus(); toast(`<i class=i-alert></i> ${ppNo(Number(no))}: describe what changed in this version – it is saved as soon as you leave the field.`); };
+  $$('#pp-tpl-body select[data-ver]').forEach(el => el.onchange = async () => { if (needsChange(el.dataset.ver, el.value)) return askChange(el.dataset.ver); if (await saveVersions()) verSaved(el.dataset.ver); });
+  $$('#pp-tpl-body [data-vt]').forEach(b => b.onclick = async () => { $(`#pp-tpl-body input[data-ver="${b.dataset.vt}"]`).value = b.dataset.v; $$(`#pp-tpl-body [data-vt="${b.dataset.vt}"]`).forEach(o => o.classList.toggle('on', o === b)); if (needsChange(b.dataset.vt, b.dataset.v)) return askChange(b.dataset.vt); if (await saveVersions()) verSaved(b.dataset.vt); });
   $$('#pp-tpl-body [data-pm-open]').forEach(b => b.onclick = () => { const no = Number(b.dataset.pmOpen); openMaster(no, masterKeyFor(t.find(x => x.no === no), ver(no)), b.dataset.pmMode); });
   $$('#pp-tpl-body [data-desc]').forEach(el => el.onchange = () => saveVersions());
   $$('#pp-tpl-body [data-del-tpl]').forEach(b => b.onclick = async () => {
@@ -2356,7 +2364,13 @@ async function npPreviewFile(format) {
 $('#np-prev-btn').onclick = () => npPreviewFile('pdf');
 $('#np-prev-word').onclick = () => npPreviewFile('docx');
 $('#np-prev-no').onchange = () => npPreview();
-function npOpen() {
+async function npOpen() {
+  // the master policy list is portal-wide: when the current facility's page did not load it (e.g. that facility was
+  // just removed), it is fetched for the wizard on its own
+  if (!pp?.templates?.length) {
+    try { const m = await apiGlobal('/api/policies'); pp = pp && !pp.newPackOnly ? { ...pp, templates: m.templates, lock: m.lock, masterChanges: m.masterChanges, majorRevision: m.majorRevision } : m; }
+    catch { /* the wizard says that no master policies are available */ }
+  }
   const f = np(); f.reset();
   $$('#pp-new-form .np-pic').forEach(l => l._reset?.());
   const base = pp?.lock?.baseline || {};
@@ -3934,6 +3948,71 @@ function renderPptPreview() {
   $('#ds-prev-use')?.addEventListener('click', () => saveCyberPpt({ style }));
   $$('#ds-prev-files [data-locked]').forEach(b => b.onclick = () => toast('<i class=i-lock></i> Preview only – only an administrator can download, export or apply looks 2–4'));
 }
+// ===================================================================================================
+// Security & Awareness: Document Tracker – the policies' IDs, versions, dates, author, approver and change log, read
+// from Prepare policies (one source). Version and change can be edited here (Apply / Discard); version 1 = "NILL",
+// version 2 and above needs the change described.
+// ===================================================================================================
+var dt = null, dtEdits = {}; // var: may be read during start-up
+const dmy = iso => (/^\d{4}-\d{2}-\d{2}$/.test(iso || '') ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : '<span class="muted">—</span>');
+async function loadTracker() {
+  try { dt = await api('/api/doc-tracker'); } catch (e) { $('#dt-msg').innerHTML = `<div class="alert bad">${esc(e.message)}</div>`; return; }
+  dtEdits = {}; renderTracker();
+}
+/** The change shown for a policy: its own description, the master's 2.0 change log, or '' (still to describe). */
+const dtBase = r => (Number(r.version) >= 2 && !r.changeNeeded ? r.change : '');
+function dtRowState(r) {
+  const e = dtEdits[r.no] || {}, version = e.version ?? r.version, own = e.change ?? dtBase(r);
+  const v1 = Number(version) < 2, master = !v1 && !r.changeOwn && version === r.version && own === r.change && !!own;
+  return { version, own, v1, master, missing: !v1 && !own.trim() };
+}
+function renderTracker() {
+  const d = dt, c = d.control, ro = me?.role === 'viewer';
+  $('#dt-fac').textContent = c.facilityName || '–';
+  $('#dt-sub').textContent = `· ${d.rows.length} policies · ${d.generated} created as Word / PDF`;
+  $('#dt-xlsx').href = u('/api/doc-tracker/xlsx');
+  const dates = !c.issuedOn || !c.reviewedOn;
+  $('#dt-msg').innerHTML = (d.missing ? `<div class="alert warn"><i class=i-alert></i> <b>${d.missing} ${d.missing === 1 ? 'policy is' : 'policies are'} at version 2 or above without a change description</b> – describe what changed in the last column (needed for the audit trail).</div>` : '')
+    + (dates ? '<div class="alert warn"><i class=i-alert></i> The issue and review dates are not set yet – add them in <b>Prepare policies → policy details</b>.</div>' : '');
+  const item = (k, v) => `<div><dt>${k}</dt><dd>${v}</dd></div>`;
+  $('#dt-control').innerHTML = item('Document Number', esc(c.number)) + item('Issued on', dmy(c.issuedOn)) + item('Reviewed on', dmy(c.reviewedOn)) + item('Due for Revision by', dmy(c.dueOn))
+    + item('Prepared by', esc(c.preparedBy || '—')) + item('Document Approver', esc(c.approvedBy || '—')) + item('Version', esc(c.version)) + item('Document Classification', '<span class="dt-badge">RESTRICTED / داخلي</span>');
+  const vers = v => [...new Set(['1.0', '2.0', '3.0', '4.0', '5.0', v])].sort((a, b) => a - b);
+  $('#dt-rows').innerHTML = d.rows.map((r, i) => {
+    const st = dtRowState(r), changed = !!dtEdits[r.no];
+    const change = st.v1 ? '<span class="dt-nill">NILL</span>'
+      : `<input class="dt-change${st.missing ? ' need' : ''}" data-dt-change="${r.no}" maxlength="300" value="${esc(st.own)}" placeholder="Required – describe what changed"${ro ? ' disabled' : ''}>${st.master ? '<small class="muted">from the master policy (version 2.0)</small>' : ''}`;
+    return `<tr class="${changed ? 'dt-dirty' : ''}${st.missing ? ' dt-missing' : ''}"><td class="num">${i + 1}</td><td class="nowrap">${esc(r.policyId)}</td><td>${esc(r.title)}${r.generated ? '' : ' <span class="tag na" title="Not created as Word / PDF yet">not created</span>'}</td>
+      <td><select data-dt-ver="${r.no}"${ro ? ' disabled' : ''}>${vers(st.version).map(v => `<option${v === st.version ? ' selected' : ''}>${v}</option>`).join('')}</select></td>
+      <td class="nowrap">${dmy(r.issuedOn)}</td><td class="nowrap">${dmy(r.reviewedOn)}</td><td class="nowrap">${dmy(r.approvedOn)}</td><td class="nowrap">${dmy(r.nextReview)}</td>
+      <td>${esc(r.preparedBy || '—')}</td><td>${esc(r.approvedBy || '—')}</td><td class="dt-mod">${change}</td></tr>`;
+  }).join('');
+  const missingNow = d.rows.filter(r => dtRowState(r).missing).length;
+  $('#dt-count').textContent = `${d.rows.length} policies · ${d.rows.filter(r => Number(dtRowState(r).version) >= 2).length} at version 2 or above${missingNow ? ` · ${missingNow} without a change description` : ''}`;
+  const n = Object.keys(dtEdits).length;
+  $('#dt-apply').hidden = !n; $('#dt-apply-n').textContent = `${n} ${n === 1 ? 'policy' : 'policies'} changed`;
+  const edit = (no, k, v) => { const r = d.rows.find(x => x.no === Number(no)); dtEdits[no] = { ...(dtEdits[no] || {}), [k]: v };
+    // a new version: the master's change log (it describes 2.0) is not carried over – the change is described again
+    if (k === 'version' && !r.changeOwn && dtEdits[no].change === undefined && v !== r.version) dtEdits[no].change = '';
+    if (k === 'version' && !r.changeOwn && v === r.version && dtEdits[no].change === '') delete dtEdits[no].change;
+    const e = dtEdits[no]; if ((e.version ?? r.version) === r.version && (e.change ?? dtBase(r)) === dtBase(r)) delete dtEdits[no]; };
+  $$('#dt-rows [data-dt-ver]').forEach(el => el.onchange = () => { edit(el.dataset.dtVer, 'version', el.value); renderTracker(); $(`#dt-rows [data-dt-change="${el.dataset.dtVer}"]`)?.focus(); });
+  $$('#dt-rows [data-dt-change]').forEach(el => el.oninput = () => { edit(el.dataset.dtChange, 'change', el.value); const tr = el.closest('tr'); tr.classList.add('dt-dirty'); const nn = Object.keys(dtEdits).length; $('#dt-apply').hidden = !nn; $('#dt-apply-n').textContent = `${nn} ${nn === 1 ? 'policy' : 'policies'} changed`; el.classList.toggle('need', !el.value.trim() && el.placeholder.startsWith('Required')); });
+}
+$('#dt-discard').onclick = () => { dtEdits = {}; renderTracker(); };
+$('#dt-save').onclick = async () => {
+  const todo = Object.entries(dtEdits);
+  const bad = todo.filter(([no]) => dtRowState(dt.rows.find(r => r.no === Number(no))).missing);
+  if (bad.length) { toast(`<i class=i-alert></i> Describe what changed for ${bad.map(([no]) => ppNo(Number(no))).join(', ')} – version 2 and above needs a change description.`); $(`#dt-rows [data-dt-change="${bad[0][0]}"]`)?.focus(); return; }
+  for (const [no, e] of todo) {
+    try { dt = await api(`/api/doc-tracker/${no}`, { method: 'PUT', body: JSON.stringify(e) }); delete dtEdits[no]; }
+    catch (er) { toast(`<i class=i-alert></i> ${ppNo(Number(no))} not saved: ${esc(er.message)}`); renderTracker(); return; }
+  }
+  toast(`Saved – ${todo.length} ${todo.length === 1 ? 'policy' : 'policies'} updated. Create the policies again to put the new version into the Word / PDF files.`);
+  renderTracker();
+};
+$('#dt-edit-details').onclick = () => showTab('policies');
+
 /** The toolkit page: the chosen tool (still to come) and every tool of the section. */
 var tkTools = null;
 async function loadToolkit(tool) {
@@ -3941,7 +4020,7 @@ async function loadToolkit(tool) {
   const t = tkTools.find(x => x.id === tool) || tkTools[0];
   if (t) { $('#tk-title').textContent = t.title; $('#tk-desc').textContent = t.desc; $('#mb-title').textContent = t.title; }
   $('#tk-grid').innerHTML = tkTools.map(x => `<button type="button" class="tk-card${x.id === t?.id ? ' on' : ''}" data-tk="${x.id}"><b>${esc(x.title)}</b><small class="muted">${esc(x.desc)}</small><span class="tag ${x.status === 'ready' ? 'ok' : 'na'}">${x.status === 'ready' ? 'Ready' : 'Coming soon'}</span></button>`).join('');
-  $$('#tk-grid [data-tk]').forEach(b => b.onclick = () => (b.dataset.tk === 'cyberppt' ? showTab('cyberppt') : showTab('toolkit', b.dataset.tk)));
+  $$('#tk-grid [data-tk]').forEach(b => b.onclick = () => (b.dataset.tk === 'cyberppt' ? showTab('cyberppt') : b.dataset.tk === 'tracker' ? showTab('doctracker') : showTab('toolkit', b.dataset.tk)));
 }
 /** Download buttons of a premium style for a non-premium account: locked – a click opens Get Premium instead. */
 function lockedDownloads(labels, why = 'Downloading this style is part of Premium', up = true) {

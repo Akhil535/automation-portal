@@ -52,7 +52,7 @@
         <button type="button" class="sb-parent" id="sb-sec-btn" aria-expanded="false" aria-controls="sb-sec-items"><svg class="ico" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.6-3.3 8-8 9-4.7-1-8-4.4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>Security &amp; Awareness<span class="sb-step">6</span><svg class="sb-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
         <div class="sb-sub" id="sb-sec-items" role="group" aria-label="Security &amp; Awareness tools" hidden>
           <button data-tab="toolkit" data-adm="calendar" class="sb-tool"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 14h3M8 17h6"/></svg>Awareness Training Calendar<span class="sb-soon">Soon</span></button>
-          <button data-tab="toolkit" data-adm="tracker" class="sb-tool"><svg class="ico" viewBox="0 0 24 24"><path d="M9 4h9a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9z"/><path d="M9 4v5H4M9 13h7M9 17h5"/></svg>Document Tracker<span class="sb-soon">Soon</span></button>
+          <button data-tab="doctracker" class="sb-tool"><svg class="ico" viewBox="0 0 24 24"><path d="M9 4h9a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9z"/><path d="M9 4v5H4M9 13h7M9 17h5"/></svg>Document Tracker</button>
           <button data-tab="cyberppt" class="sb-tool"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8M12 7l2.5 1v1.8c0 1.6-1 2.6-2.5 3.2-1.5-.6-2.5-1.6-2.5-3.2V8z"/></svg>Cyber Security PPT</button>
           <button data-tab="toolkit" data-adm="visitors" class="sb-tool"><svg class="ico" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="10" r="3"/><path d="M7.5 18a4.5 4.5 0 0 1 9 0"/></svg>Visitor Log Book<span class="sb-soon">Soon</span></button>
         </div>
@@ -535,6 +535,32 @@
     <article class="card cp-admin" data-admin>
       <header class="hr-sec-head"><div><h2>Master presentation</h2><p class="muted small" id="cp-master-sub">–</p></div>
         <label class="btn small"><i class=i-upload></i> Replace master (.pptx)<input type="file" id="cp-master-up" accept=".pptx" hidden></label></header>
+    </article>
+  </section>
+
+  <!-- ============================== Security & Awareness: Document Tracker ============================== -->
+  <section id="doctracker" class="tab">
+    <header class="pw-head">
+      <div>
+        <span class="pw-kicker">Security &amp; Awareness</span>
+        <h1>Document Tracker<span class="h-dim"><mark>synced with your policies</mark></span></h1>
+        <p class="muted">Every policy with its Policy ID, version, issue, review, approval and next-review dates, author, approver and change log – read live from <b>Prepare policies</b>, so the tracker always matches the documents. Version 1 shows <b>NILL</b>; version 2 and above needs a description of what changed.</p>
+      </div>
+      <div class="pw-head-side">
+        <a class="btn primary" id="dt-xlsx" href="#"><i class=i-download></i> Download Document Tracker (.xlsx)</a>
+      </div>
+    </header>
+    <div class="pp-for step-for"><span>Tracker for</span><b id="dt-fac">–</b><span class="muted small" id="dt-sub"></span></div>
+    <div id="dt-msg"></div>
+    <article class="card dt-control">
+      <header class="hr-sec-head"><div><h2>A. Document Control</h2><p class="muted small">From the policy details (Prepare policies → step 1) – change them there and the tracker follows.</p></div>
+        <button type="button" class="btn small" id="dt-edit-details">✎ Edit policy details</button></header>
+      <dl class="dt-dl" id="dt-control"></dl>
+    </article>
+    <article class="card">
+      <header class="hr-sec-head"><div><h2>Document Tracker</h2><p class="muted small" id="dt-count">–</p></div></header>
+      <div class="tbl-wrap dt-wrap"><table class="dt-tbl"><thead><tr><th class="num">Sr.no.</th><th>Policy ID</th><th>Policy Name</th><th>Version</th><th>Issue Date</th><th>Reviewed Date</th><th>Approved Date</th><th>Next Review Date</th><th>Prepared By</th><th>Approved By</th><th>(if any Modification)</th></tr></thead><tbody id="dt-rows"></tbody></table></div>
+      <div class="dt-apply" id="dt-apply" hidden><span id="dt-apply-n"></span><button type="button" class="btn" id="dt-discard">Discard</button><button type="button" class="btn primary" id="dt-save">Apply changes</button></div>
     </article>
   </section>
 

@@ -18,10 +18,11 @@ import { Store } from './src/store.js';
 import { ASSISTANT_MODEL, ask, assistantConfigured, setAssistantKey } from './src/assistant.js';
 import { applyReview, currentRun, runAll, runMonitor } from './src/monitor.js';
 import { startScheduler } from './src/scheduler.js';
-import { formKind, installedForms } from './src/hrforms.js';
+import { formKind, installedForms, hrJobState } from './src/hrforms.js';
 import { MODULE_KEYS, buildPackage, packageTree } from './src/package.js';
 import { allowedSet, checkFreeRows, freeRegisterRows, maskMaster, checkChecklistItem, checkTrialApply, checklistFree, claim, claimUpload, maskChecklist, createdFacilities, facilityAllowance, isTrial, planInfo, setTrialLimits, trialLimits, upgradeError, upgradeUrl } from './src/plans.js';
 import { previewForm } from './src/hrforms.js';
+import { trackerData, trackerXlsx, savePolicyChange } from './src/doctracker.js';
 import { PPT_STYLES, TOOLS, buildPpt, cyberState, pptPdf, pptThumb, saveCyber, saveMaster as saveCyberMaster, trialFacility } from './src/cyberppt.js';
 import { addForms, addItem, checklistXlsx, crossCheck, formFile, formsStatus, formsZip, generateForms, getChecklist, pdfState, prewarmPdfs, saveDocSettings, GROUPS, importMasterChecklist, listForms, masterChecklist, removeForm, removeItem, resetChecklist, updateItem } from './src/hrforms.js';
 import { documentHeader, sendMail } from './src/mailer.js';
@@ -31,7 +32,7 @@ import { lockReason, readLogo, readRegister } from './src/xlsx.js';
 import { imageSize } from './src/policy.js';
 import { htmlToPdf, logoDataUrl, reportHtml } from './src/report.js';
 import {
-  MAJOR_REVISION, addTemplates, assetFile, generatePolicies, generatedFile, generatedFiles, jobState, listTemplates,
+  MAJOR_REVISION, MASTER_CHANGES, addTemplates, assetFile, generatePolicies, generatedFile, generatedFiles, jobState, listTemplates,
   prepSettings, printPics, readiness, registerSourcePolicy, removeAsset, removeTemplate, saveAsset, saveSettings, zipGenerated, policyNoOf,
   generatedStyle, pdfFor, detectPictures, lockTemplates, masterFile, masterParagraphs, picturePreview, previewPolicy, saveMasterEdits, templateLock, unlockTemplates,
 } from './src/policyprep.js';
@@ -505,12 +506,12 @@ const facId = req => loadConfig(fac(req))._facility.id;
 app.get('/api/policies', wrap(async (req, res) => {
   if (req.newPackOnly) { // no facility yet: only the master policy list for the New facility wizard
     return res.json({ templates: listTemplates(), settings: {}, job: null, files: { folder: '', word: [], pdf: [] }, need: [], lastGenerated: null,
-      majorRevision: MAJOR_REVISION, linked: null, lock: (({ hashes, ...l }) => l)(templateLock() || { locked: false }), newPackOnly: true });
+      majorRevision: MAJOR_REVISION, masterChanges: MASTER_CHANGES, linked: null, lock: (({ hashes, ...l }) => l)(templateLock() || { locked: false }), newPackOnly: true });
   }
   const cfg = loadConfig(fac(req));
   res.json({
     templates: listTemplates(), settings: prepSettings(cfg), job: jobState(cfg._facility.id), files: generatedFiles(cfg),
-    need: readiness(cfg), lastGenerated: cfg._facility.policyPrep?.lastGenerated || null, majorRevision: MAJOR_REVISION,
+    need: readiness(cfg), lastGenerated: cfg._facility.policyPrep?.lastGenerated || null, majorRevision: MAJOR_REVISION, masterChanges: MASTER_CHANGES,
     linked: cfg._facility.policyPrep?.linkedAt || null,
     lock: (({ hashes, ...l }) => l)(templateLock() || { locked: false }),
   });
@@ -701,7 +702,13 @@ app.post('/api/facilities/:id/policy', wrap(async (req, res) => {
 /** Remove a facility (its folder is archived, nothing is erased). */
 app.delete('/api/facilities/:id', wrap(async (req, res) => {
   notWhileRunning();
-  res.json(deleteFacility(req.params.id));
+  // its documents are still being written (policies, HR documents, "apply style to all"): removing now would leave
+  // files behind (Word keeps them open) and the job would write into the removed facility
+  const id = req.params.id, name = loadFacilities().list.find(f => f.id === id)?.name;
+  if (jobState(id)?.running || hrJobState(id)?.running || (restyle.running && (restyle.current === name || restyle.queue.includes(name)))) {
+    throw Object.assign(new Error('This facility\'s documents are being created right now – wait until that finishes (a few minutes), then remove it'), { status: 409 });
+  }
+  res.json(deleteFacility(id));
 }));
 /** Removed facilities (kept in facilities/_removed) and putting one back. Administrators only. */
 const adminOnly = req => { if (req.user.role !== 'admin') throw Object.assign(new Error('Administrators only'), { status: 403 }); };
@@ -1086,6 +1093,14 @@ app.get('/api/toolkit/cyber-ppt/file', wrap(async (req, res) => {
   }
   const pdf = await pptPdf(fid, style, opts);
   res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `${req.query.download ? 'attachment' : 'inline'}; filename="${name}.pdf"`, 'Cache-Control': 'private, max-age=60' }).send(pdf);
+}));
+/** Document Tracker: every policy's ID, title, version, dates, author, approver and change log (from the policies). */
+app.get('/api/doc-tracker', wrap(async (req, res) => res.json(trackerData(facId(req)))));
+/** A policy's version and change log (version 2 and above needs the change described). */
+app.put('/api/doc-tracker/:no', wrap(async (req, res) => { const r = savePolicyChange(facId(req), req.params.no, req.body || {}); prewarmPdfs(facId(req)); res.json(r); }));
+app.get('/api/doc-tracker/xlsx', wrap(async (req, res) => {
+  const r = await trackerXlsx(facId(req));
+  res.set({ 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': dispo('attachment', r.name), 'Cache-Control': 'no-store' }).send(r.buffer);
 }));
 /** A style card's picture: slide 2 of the facility's presentation in a look (cached). */
 app.get('/api/toolkit/cyber-ppt/thumb', wrap(async (req, res) => {

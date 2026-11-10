@@ -9,7 +9,7 @@
 // and due dates, responsible person, compliance); those are matched to the facility's register entries.
 // The logo is the largest picture in the page header (Word) or on page 1 (PDF).
 import { readDocument } from './docparse.js';
-import { cleanLogo, pickLogo } from './logoclean.js';
+import { cleanLogo, letterheadFromPdf, pickLogo } from './logoclean.js';
 
 export { imageSize } from './imagesize.js';
 
@@ -197,8 +197,10 @@ export async function parseFacilityDocument(buffer, name = '', { entryNames = []
   if (!found.responsible && found.approver) warnings.push('No "Responsible person" entry - the approver is used');
   if (!fields.responsible) warnings.push('Responsible person not found');
 
-  // The logo: the most logo-like picture, cropped to its content with the plain background removed.
-  const logo = await cleanLogo(pickLogo([...(doc.images || []), ...((doc.images || []).length ? [] : doc.allImages || [])]));
+  // The logo: the most logo-like picture, cropped to its content - its own background and colours are kept.
+  // (a PDF whose letterhead is text / vector art: page 1 rendered and its top line taken)
+  const logo = (await cleanLogo(pickLogo([...(doc.images || []), ...((doc.images || []).length ? [] : doc.allImages || [])]), { keep: true }))
+    || (doc.kind === 'pdf' ? await letterheadFromPdf(buffer) : null);
   if (!logo) warnings.push(doc.kind === 'pdf' ? 'No logo picture found on page 1' : 'No logo found in the page header');
   const entries = extractEntries(doc.rows, entryNames);
   const releaseRaw = found.issuedOn && parseAnyDate(found.issuedOn);

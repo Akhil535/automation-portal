@@ -54,6 +54,28 @@ export async function splitSignStamp(img) {
   finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
 
+const PDF_PAGE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'pdf-page.ps1');
+/**
+ * The letterhead of a PDF drawn as text / vector art (no logo picture inside): page 1 rendered on this PC and its first
+ * line of marks at the top (the facility name, with any emblem beside it) cut out as printed – solid, white
+ * background kept. Returns { buffer, ext: 'png', width, height, where: 'letterhead' } or null.
+ */
+export async function letterheadFromPdf(buffer, { max = 1000 } = {}) {
+  if (!buffer?.length || process.platform !== 'win32') return null;
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lrp-lh-'));
+  const pdf = path.join(tmp, 'doc.pdf'), page = path.join(tmp, 'page.png'), out = path.join(tmp, 'letterhead.png');
+  const run = args => new Promise(resolve => execFile('powershell', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', ...args],
+    { timeout: 90000, windowsHide: true }, (err, so) => { try { resolve(JSON.parse(String(so || '').trim().split(/\r?\n/).pop() || '{}')); } catch { resolve({}); } }));
+  try {
+    fs.writeFileSync(pdf, buffer);
+    if (!(await run([PDF_PAGE, pdf, page, '1', '3000'])).ok || !fs.existsSync(page)) return null;
+    if (!(await run([SCRIPT, page, out, '-Mode', 'letterhead', '-Max', String(max)])).ok || !fs.existsSync(out)) return null;
+    const b = fs.readFileSync(out), size = imageSize(b);
+    return size ? { buffer: b, ext: 'png', width: size.width, height: size.height, where: 'letterhead', cleaned: { cropped: true, transparent: false } } : null;
+  } catch { return null; }
+  finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+}
+
 const RESIZE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'image-resize.ps1');
 /** Plain resize to at most `max` px on the longest side (PNG, or JPEG on white). Returns the original when it cannot run. */
 export async function resizeImage(img, max, { jpeg = false } = {}) {
@@ -73,11 +95,12 @@ export async function resizeImage(img, max, { jpeg = false } = {}) {
 }
 
 /**
- * Crop the logo to its content and make its plain background transparent. Whole scanned pages: the logo block is
+ * Crop a picture to its content and make its plain background transparent (signatures and stamps); with `keep`
+ * (logos) it is only cropped - the logo keeps its own background, colours and fills. Whole scanned pages: the logo block is
  * found in the top part of the page. Returns a new { buffer, ext: 'png', width, height, cleaned } or the original
  * picture unchanged when it cannot be improved (or the clean-up is not available).
  */
-export async function cleanLogo(img, { max = 0 } = {}) {
+export async function cleanLogo(img, { max = 0, keep = false } = {}) { // keep: crop only, background kept (logos)
   if (!img?.buffer || process.platform !== 'win32') return img;
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lrp-logo-'));
   const src = path.join(tmp, `in.${img.ext || 'png'}`), out = path.join(tmp, 'out.png');
@@ -86,6 +109,7 @@ export async function cleanLogo(img, { max = 0 } = {}) {
     const args = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', SCRIPT, src, out];
     if (isPageScan(img)) args.push('-Mode', 'header');
     if (max > 0) args.push('-Max', String(max)); // print size: smaller files
+    if (keep) args.push('-Keep');
     const stdout = await new Promise(resolve => execFile('powershell', args, { timeout: 60000, windowsHide: true }, (err, so) => resolve(err ? '' : so)));
     const r = JSON.parse(stdout.trim().split(/\r?\n/).pop() || '{}');
     if (!r.ok || !fs.existsSync(out)) return img;

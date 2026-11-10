@@ -4502,3 +4502,28 @@ button.ds-thumb { width: 100%; border: 0; cursor: zoom-in; font: inherit; color:
 .sb-sub[hidden] { display: none; }
 .sb-sub button.sb-tool { font-size: 13px !important; padding-top: 7px !important; padding-bottom: 7px !important; }
 .sb-sub button.sb-tool .ico { width: 16px; height: 16px; }
+
+/* v39 · Document Tracker */
+.dt-dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 16px; margin: 4px 0 0; }
+.dt-dl > div { padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); }
+.dt-dl dt { font-size: 12px; color: var(--muted); font-weight: 600; }
+.dt-dl dd { margin: 2px 0 0; font-weight: 700; }
+.dt-badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; color: #0284c7; border: 1px solid currentColor; letter-spacing: .02em; }
+.dt-wrap { overflow-x: auto; }
+.dt-tbl { width: 100%; min-width: 1180px; border-collapse: collapse; font-size: 13px; }
+.dt-tbl th { position: sticky; top: 0; z-index: 1; padding: 9px 8px; text-align: left; font-size: 12px; font-weight: 700; background: color-mix(in srgb, var(--brand) 12%, var(--panel)); border-bottom: 1px solid var(--line); white-space: nowrap; }
+.dt-tbl td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.dt-tbl td.num, .dt-tbl th.num { text-align: center; width: 54px; }
+.dt-tbl .nowrap { white-space: nowrap; }
+.dt-tbl select { min-width: 70px; }
+.dt-mod { min-width: 260px; }
+.dt-mod small { display: block; margin-top: 2px; font-size: 11px; }
+.dt-change { width: 100%; }
+.dt-change.need, #pp-tpl-body input.need { border-color: #dc2626 !important; box-shadow: 0 0 0 3px rgba(220, 38, 38, .14); }
+:root[data-theme="dark"] .dt-change.need, :root[data-theme="dark"] #pp-tpl-body input.need { border-color: #f59e0b !important; box-shadow: 0 0 0 3px rgba(245, 158, 11, .18); }
+.dt-nill { font-weight: 700; color: var(--muted); letter-spacing: .04em; }
+.dt-tbl tr.dt-dirty td { background: color-mix(in srgb, var(--brand) 6%, transparent); }
+.dt-tbl tr.dt-missing td:first-child { box-shadow: inset 3px 0 0 #dc2626; }
+.dt-apply { position: sticky; bottom: 12px; display: flex; align-items: center; gap: 10px; justify-content: flex-end; margin-top: 12px; padding: 10px 12px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 10px 28px rgba(20, 22, 31, .14); }
+.dt-apply[hidden] { display: none; }
+.dt-apply span { margin-right: auto; font-weight: 700; }

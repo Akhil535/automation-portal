@@ -939,7 +939,9 @@ test('10i. policy preparation: templates are filled for a facility (ID, dates, n
 
   // 2. Details: due for revision = one year after the review date. Contacts and a logo are required for a
   //    facility other than the baseline.
-  P.saveSettings(id, { issuedOn: '2022-01-01', reviewedOn: '2026-03-23', preparedBy: 'Mr. Ashraf Said', approvedBy: 'Mr. Hamdan Almazrouei', standard: 'ADHICS', versions: { 7: '2.0' } });
+  // version 2 and above needs its change described (Document Tracker / audit trail)
+  assert.throws(() => P.saveSettings(id, { versions: { 7: '2.0' } }), /PO07 \(version 2\.0\).*change description/);
+  P.saveSettings(id, { issuedOn: '2022-01-01', reviewedOn: '2026-03-23', preparedBy: 'Mr. Ashraf Said', approvedBy: 'Mr. Hamdan Almazrouei', standard: 'ADHICS', versions: { 7: '2.0' }, descriptions: { 7: 'Access review procedure updated' } });
   assert.ok(P.readiness(loadConfig(id)).some(n => /Contact e-mail/.test(n)));
   const s = P.saveSettings(id, { contactEmail: 'info@newfacility.ae', contactPhone: '0501234567' });
   assert.equal(s.dueOn, '2027-03-23');
@@ -962,7 +964,7 @@ test('10i. policy preparation: templates are filled for a facility (ID, dates, n
   const doc = await out.file('word/document.xml').async('string');
   const text = [...doc.matchAll(/<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>/g)].map(m => m[1]).join('|');
   const name = s.facilityName;
-  for (const v of [`${code} / ADHICS - PO07`, '01/01/2022', '23/03/2026', '23/03/2027', 'Mr. Ashraf Said', 'Mr. Hamdan Almazrouei', name, '2.0', 'Initial release']) assert.ok(text.includes(v), `${v} in the policy`);
+  for (const v of [`${code} / ADHICS - PO07`, '01/01/2022', '23/03/2026', '23/03/2027', 'Mr. Ashraf Said', 'Mr. Hamdan Almazrouei', name, '2.0', 'Initial release', 'Access review procedure updated']) assert.ok(text.includes(v), `${v} in the policy`);
   assert.ok(!/OLD TOWN|Old Approver|Old Author|OLD \/|Desk@oldtown|509379664/.test(text), 'nothing of the template facility is left');
   assert.equal((text.match(/info@newfacility\.ae/g) || []).length, 2, 'facility e-mail replaced in both facility cells');
   assert.equal((text.match(/0501234567/g) || []).length, 2, 'facility phone replaced in both facility cells');
@@ -1570,4 +1572,63 @@ test('13. the cartoon scenes of looks 2-4 keep the cartoons\' words', async () =
   assert.match(gimme, />GIMME YER</); assert.match(gimme, />PASSWORDS!!!</);
   assert.match(book, />Phone</); assert.match(book, />Book</);
   assert.match(gimme, /^<svg [^>]*width="1143" height="642"/);
+});
+
+test('14. Document Tracker: synced with the policies, NILL for version 1, a described change for version 2+, Excel', async () => {
+  const P = await import('../src/policyprep.js');
+  const T = await import('../src/doctracker.js');
+  const { loadFacilities } = await import('../src/config.js');
+  // the rule
+  assert.deepEqual(P.policyChange({ versions: {} }, 1), { version: '1.0', change: 'NILL', needed: false, own: false });
+  assert.equal(P.policyChange({ versions: {} }, 3).change, P.MASTER_CHANGES[3], 'the master 2.0 change log');
+  assert.equal(P.policyChange({ versions: { 9: '2.0' } }, 9).needed, true, 'a new version 2 without a description');
+  assert.equal(P.policyChange({ versions: { 3: '3.0' } }, 3).needed, true, 'the master log is for 2.0 only');
+  assert.equal(P.policyChange({ versions: { 9: '3.0' }, descriptions: { 9: 'Scope extended' } }, 9).change, 'Scope extended');
+  const id = loadFacilities().default;
+  const d = T.trackerData(id), s = P.prepSettings((await import('../src/config.js')).loadConfig(id));
+  assert.ok(d.rows.length > 0, 'one row per policy');
+  for (const r of d.rows) {
+    assert.match(r.policyId, new RegExp(`^${s.code} / .+ - PO${String(r.no).padStart(2, '0')}$`));
+    assert.equal(r.issuedOn, s.issuedOn); assert.equal(r.reviewedOn, s.reviewedOn); assert.equal(r.preparedBy, s.preparedBy); assert.equal(r.approvedBy, s.approvedBy);
+    assert.equal(r.change === 'NILL', Number(r.version) < 2, `${r.policyId}: NILL only for version 1`);
+    assert.doesNotMatch(r.title, /^ADHICS\s*-/);
+  }
+  // a version bump from the tracker needs the change; with it, the policies get the same version and change
+  const no = d.rows[0].no;
+  T.savePolicyChange(id, no, { version: '1.0', change: '' }); // start: version 1, nothing described
+  assert.equal(T.trackerData(id).rows.find(r => r.no === no).change, 'NILL');
+  assert.throws(() => T.savePolicyChange(id, no, { version: '3.0' }), /change description/);
+  const after = T.savePolicyChange(id, no, { version: '3.0', change: 'Roles and responsibilities updated' });
+  assert.equal(after.rows.find(r => r.no === no).change, 'Roles and responsibilities updated');
+  assert.equal(P.prepSettings((await import('../src/config.js')).loadConfig(id)).versions[no], '3.0', 'stored where the policies read it');
+  T.savePolicyChange(id, no, { version: '1.0', change: '' });
+  // Excel: the two sheets, the header of the DoH tracker, NILL in the modification column
+  const x = await T.trackerXlsx(id);
+  const z = await JSZip.loadAsync(x.buffer);
+  assert.match(await z.file('xl/workbook.xml').async('string'), /DOCUMENT CONTROLLER[\s\S]*DOCUMENT TRACKER/);
+  const sh = await z.file('xl/worksheets/sheet2.xml').async('string');
+  for (const h of ['Sr.no.', 'Policy ID', 'Policy Name', 'Version', 'Issue Date', 'Reviewed Date', 'Approved Date', 'Next Review Date', 'Prepared By', 'Approved By', '(if any Modification)']) assert.ok(sh.includes(`>${h}<`), h);
+  assert.ok(sh.includes('>NILL<'));
+  assert.ok(z.file('xl/media/image1.png') || z.file('xl/media/image2.png'), 'the classification badge');
+});
+
+test('15. logos keep their own background; only signatures and stamps are made transparent', async () => {
+  const P = await import('../src/policyprep.js');
+  // a header picture that looks like a signature is not taken as the logo; the letterhead text of page 1 is
+  const sigLike = { aspect: 4.1, ring: 0.1, colours: 1, dark: 0.1, ink: 0.12, families: 1 };
+  const inHeader = P.pictureScores(sigLike, 'header', { lettered: true }), letterhead = P.pictureScores({ ...sigLike, ink: 0.35 }, 'letterhead');
+  assert.ok(letterhead.logo > inHeader.logo, 'the letterhead text beats a signature placed in the header');
+  assert.ok(inHeader.signature > inHeader.logo, 'a signature in the header still reads as a signature');
+  if (process.platform !== 'win32') return;
+  const { cleanLogo } = await import('../src/logoclean.js');
+  // white-filled outlined letters on white: transparent for a signature / stamp clean-up, untouched for a logo
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lrp-logo-test-')), f = path.join(tmp, 'logo.png');
+  execFileSync('powershell', ['-NoProfile', '-Command', `Add-Type -AssemblyName System.Drawing; $b=New-Object System.Drawing.Bitmap(400,120); $g=[System.Drawing.Graphics]::FromImage($b); $g.Clear([System.Drawing.Color]::White); $p=New-Object System.Drawing.Drawing2D.GraphicsPath; $p.AddString('LOGO',(New-Object System.Drawing.FontFamily('Arial')),1,90,(New-Object System.Drawing.Point(20,10)),[System.Drawing.StringFormat]::GenericDefault); $g.FillPath([System.Drawing.Brushes]::White,$p); $g.DrawPath((New-Object System.Drawing.Pen([System.Drawing.Color]::Black,2)),$p); $b.Save('${f}')`]);
+  const img = { buffer: fs.readFileSync(f), ext: 'png', width: 400, height: 120 };
+  const alpha0 = async pic => { fs.writeFileSync(f, pic.buffer); return Number(execFileSync('powershell', ['-NoProfile', '-Command', `Add-Type -AssemblyName System.Drawing; $b=New-Object System.Drawing.Bitmap('${f}'); $t=0; for($y=0;$y -lt $b.Height;$y+=2){for($x=0;$x -lt $b.Width;$x+=2){if($b.GetPixel($x,$y).A -lt 30){$t++}}}; $b.Dispose(); $t`]).toString().trim()); };
+  const kept = await cleanLogo(img, { keep: true }), cleared = await cleanLogo(img);
+  assert.equal(await alpha0(kept), 0, 'the logo keeps its background and the inside of its letters');
+  assert.ok(kept.width < 400, 'the logo is still cropped to its content');
+  assert.ok(await alpha0(cleared) > 0, 'signature / stamp clean-up still removes the background');
+  fs.rmSync(tmp, { recursive: true, force: true });
 });
