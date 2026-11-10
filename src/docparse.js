@@ -10,6 +10,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import JSZip from 'jszip';
 import { imageSize } from './imagesize.js';
+import { withWord } from './wordqueue.js';
 
 const decode = s => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
   .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(+d)).replace(/&amp;/g, '&');
@@ -100,12 +101,13 @@ async function readDocx(buffer) {
 // ---------------------------------------------------------------------------------------------------
 // Word 97-2003 .doc -> converted to .docx by Microsoft Word on this PC (macros disabled)
 // ---------------------------------------------------------------------------------------------------
-export function docToDocx(buffer) {
+export function docToDocx(buffer) { return withWord(() => docToDocxNow(buffer)); }
+function docToDocxNow(buffer) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lrp-doc-'));
   const src = path.join(dir, 'in.doc'), out = path.join(dir, 'out.docx');
   fs.writeFileSync(src, buffer);
-  const ps = `$ErrorActionPreference='Stop';$w=New-Object -ComObject Word.Application;$w.Visible=$false;$w.DisplayAlerts=0;` +
-    `$w.AutomationSecurity=3;try{$d=$w.Documents.Open('${src}',$false,$true,$false);$d.SaveAs2('${out}',16);$d.Close($false)}finally{$w.Quit()}`;
+  const ps = `$ErrorActionPreference='Stop';$was=@(Get-Process WINWORD -ErrorAction SilentlyContinue).Count;$w=New-Object -ComObject Word.Application;if(-not $was){$w.Visible=$false};$w.DisplayAlerts=0;` +
+    `$w.AutomationSecurity=3;try{$d=$w.Documents.Open('${src}',$false,$true,$false);$d.SaveAs2('${out}',16);$d.Close($false)}finally{if(-not $was){$w.Quit()}}`;
   return new Promise((resolve, reject) => {
     execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps], { timeout: 120000, windowsHide: true }, err => {
       try {

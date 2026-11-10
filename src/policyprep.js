@@ -19,6 +19,7 @@ import { applyDocStyle, effectiveStyle, STYLES, trialFacility } from './docstyle
 
 const APP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PDF_SCRIPT = path.join(APP, 'scripts', 'word-to-pdf.ps1');
+import { withWord } from './wordqueue.js';
 /** Policies with a major revision: version 2.0 by default. */
 export const MAJOR_REVISION = [3, 18, 19, 25];
 /** What changed in the master policies' version 2.0 (their change log unless a facility describes its own). */
@@ -1331,7 +1332,9 @@ function pptToPdfNow(pairs) {
   });
 }
 
-export function wordToPdf(pairs) {
+/** Word documents → PDF with Microsoft Word, one conversion at a time (Word is shared – see wordqueue.js). */
+export function wordToPdf(pairs) { return withWord(() => wordToPdfNow(pairs)); }
+function wordToPdfNow(pairs) {
   const listFile = path.join(path.dirname(pairs[0].out), '..', '_pdf-jobs.json');
   fs.writeFileSync(listFile, JSON.stringify(pairs));
   return new Promise(resolve => {
