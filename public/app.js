@@ -4013,6 +4013,111 @@ $('#dt-save').onclick = async () => {
 };
 $('#dt-edit-details').onclick = () => showTab('policies');
 
+// ===================================================================================================
+// Annual renewal from last year's policy: upload → read on the server (details, dates, version history, logo,
+// signature, stamp) → review and edit here → apply to this facility, or start a new facility with the details.
+// ===================================================================================================
+var rn = null; // var: may be read during start-up
+const RN_PICS = { logo: 'Logo (kept as it is)', signature: 'Signature', stamp: 'Stamp' };
+const rnForm = () => $('#rn-form');
+const plus1y = iso => (/^\d{4}-\d{2}-\d{2}$/.test(iso || '') ? `${Number(iso.slice(0, 4)) + 1}${iso.slice(4)}` : '');
+function rnOpen() {
+  rn = null; rnForm().reset();
+  $('#rn-body').hidden = true; $('#rn-msg').innerHTML = ''; $('#rn-drop').hidden = false;
+  $('#rn-apply').hidden = !facility || me?.role === 'viewer';
+  $('#rn-apply').textContent = `Apply to ${facilities?.find(f => f.id === facility)?.name || 'this facility'}`;
+  $('#rn-dlg').showModal();
+}
+async function rnRead(file) {
+  if (!file) return;
+  $('#rn-msg').innerHTML = `<div class="alert"><span class="spin"></span> Reading <b>${esc(file.name)}</b> – details, dates, version history, logo, signature and stamp (about half a minute)…</div>`;
+  $('#rn-drop').classList.add('busy');
+  try {
+    const res = await fetch(u(`/api/policies/renewal-extract?name=${encodeURIComponent(file.name)}`), { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error || res.statusText);
+    rn = d; rnRender();
+    $('#rn-msg').innerHTML = `<div class="alert ok">✓ Read <b>${esc(file.name)}</b> – check the details below; change anything that is not right.</div>`;
+  } catch (e) { $('#rn-msg').innerHTML = `<div class="alert bad">${esc(e.message)}</div>`; }
+  finally { $('#rn-drop').classList.remove('busy'); }
+}
+function rnRender() {
+  const d = rn, f = rnForm().elements;
+  $('#rn-body').hidden = false; $('#rn-drop').hidden = true;
+  f.name.value = d.facility.name || ''; f.code.value = d.facility.code || '';
+  for (const k of ['preparedBy', 'approvedBy', 'contactEmail', 'contactPhone']) f[k].value = d.details[k] || '';
+  f.issuedOn.value = d.proposed.issuedOn || ''; f.reviewedOn.value = d.proposed.reviewedOn || '';
+  $('#rn-prev-issued').textContent = dmy(d.previous.issuedOn).replace(/<[^>]+>/g, '') || '–';
+  $('#rn-prev-reviewed').textContent = dmy(d.previous.reviewedOn).replace(/<[^>]+>/g, '') || '–';
+  $('#rn-prev-due').textContent = dmy(d.previous.dueOn).replace(/<[^>]+>/g, '') || '–';
+  const due = () => { $('#rn-due').textContent = dmy(plus1y(f.reviewedOn.value)).replace(/<[^>]+>/g, '') || '–'; };
+  f.reviewedOn.oninput = due; due();
+  const cur = d.current;
+  $('#rn-match').innerHTML = !cur ? ''
+    : cur.matches ? `<div class="alert ok">✓ This is a policy of <b>${esc(cur.name)}</b> (${esc(cur.code)}) – the facility you are working on.</div>`
+    : `<div class="alert warn"><i class=i-alert></i> This policy is of <b>${esc(d.facility.name || 'another facility')}</b>, not of <b>${esc(cur.name)}</b> – start a new facility with it, or check that you picked the right file.</div>`;
+  // the policy: which one, its version and change, the history
+  const pol = d.policy;
+  $('#rn-policy-sec').hidden = !pol;
+  if (pol) {
+    $('#rn-policy').innerHTML = `<b>${ppNo(pol.no)}</b> – ${esc(pol.title)}${d.previous.ref ? ` <span class="muted small">· last year's reference ${esc(d.previous.ref)}</span>` : ''}`;
+    f.version.value = pol.version; f.change.value = Number(pol.version) >= 2 ? pol.change || '' : '';
+    const sync = () => { const v1 = Number(f.version.value) < 2; f.change.disabled = v1; f.change.placeholder = v1 ? 'NILL – version 1 has no changes' : 'Required – describe what changed'; f.change.classList.toggle('need', !v1 && !f.change.value.trim()); };
+    f.version.onchange = sync; f.change.oninput = sync; sync();
+  }
+  $('#rn-history').innerHTML = (d.history || []).map(h => `<li><b>v${esc(h.version)}</b> ${esc(h.change || '—')} <small class="muted">${esc(h.date || '')}</small></li>`).join('');
+  $('#rn-pics').innerHTML = Object.keys(RN_PICS).map(k => {
+    const p = d.pictures[k];
+    return `<figure class="rn-pic${p ? '' : ' none'}">${p ? `<img src="${p.dataUrl}" alt="${k}">` : '<span class="muted">Not found</span>'}<figcaption><b>${RN_PICS[k]}</b>${p ? `<small class="muted">${esc(p.source || '')}</small><label class="rn-check"><input type="checkbox" data-rn-pic="${k}" checked> Use it</label>` : ''}</figcaption></figure>`;
+  }).join('');
+  $('#rn-warn').innerHTML = (d.warnings || []).map(w => `<li><i class=i-alert></i> ${esc(w)}</li>`).join('');
+}
+const rnPics = () => Object.fromEntries($$('#rn-pics [data-rn-pic]').filter(c => c.checked).map(c => [c.dataset.rnPic, rn.pictures[c.dataset.rnPic].dataUrl]));
+function rnValues() {
+  const f = rnForm().elements, v = k => f[k].value.trim();
+  const out = { issuedOn: v('issuedOn'), reviewedOn: v('reviewedOn'), preparedBy: v('preparedBy'), approvedBy: v('approvedBy'), contactEmail: v('contactEmail'), contactPhone: v('contactPhone') };
+  if (rn.policy && f.usePolicy.checked) out.policy = { no: rn.policy.no, version: f.version.value, change: Number(f.version.value) >= 2 ? v('change') : '' };
+  return out;
+}
+function rnCheck(vals) {
+  const miss = [];
+  if (!vals.issuedOn) miss.push('Issued on'); if (!vals.reviewedOn) miss.push('Reviewed on');
+  if (!vals.preparedBy) miss.push('Prepared by'); if (!vals.approvedBy) miss.push('Approved by');
+  if (vals.policy && Number(vals.policy.version) >= 2 && !vals.policy.change) miss.push(`what changed in ${ppNo(vals.policy.no)} version ${vals.policy.version}`);
+  if (miss.length) { $('#rn-note').innerHTML = `<span class="warn-txt"><i class=i-alert></i> Fill in: ${esc(miss.join(', '))}</span>`; return false; }
+  return true;
+}
+$('#rn-open').onclick = rnOpen;
+$('#rn-file').onchange = e => { rnRead(e.target.files[0]); e.target.value = ''; };
+['dragenter', 'dragover'].forEach(t => $('#rn-drop').addEventListener(t, e => { e.preventDefault(); $('#rn-drop').classList.add('over'); }));
+['dragleave', 'drop'].forEach(t => $('#rn-drop').addEventListener(t, e => { e.preventDefault(); $('#rn-drop').classList.remove('over'); }));
+$('#rn-drop').addEventListener('drop', e => rnRead(e.dataTransfer.files[0]));
+$('#rn-apply').onclick = async () => {
+  const vals = rnValues(); if (!rnCheck(vals)) return;
+  if (rn.current && !rn.current.matches && !confirm(`This policy names ${rn.facility.name || 'another facility'}, not ${rn.current.name}. Apply its details to ${rn.current.name} anyway?`)) return;
+  const b = $('#rn-apply'); b.disabled = true; b.innerHTML = '<span class="spin"></span> Saving…';
+  try {
+    const r = await api('/api/policies/renewal-apply', { method: 'POST', body: JSON.stringify({ ...vals, pictures: rnPics() }) });
+    $('#rn-dlg').close();
+    toast(`Renewal details saved${r.pictures.length ? ` with the ${r.pictures.join(', ')}` : ''} – reviewed ${dmy(vals.reviewedOn).replace(/<[^>]+>/g, '')}, due ${dmy(plus1y(vals.reviewedOn)).replace(/<[^>]+>/g, '')}. Create the policies to issue this year's pack.`);
+    loadPolicies();
+  } catch (e) { $('#rn-note').innerHTML = `<span class="warn-txt"><i class=i-alert></i> ${esc(e.message)}</span>`; }
+  finally { b.disabled = false; b.textContent = `Apply to ${rn?.current?.name || 'this facility'}`; }
+};
+// a new facility: the wizard opens with everything filled in (pictures included); the user checks it there
+$('#rn-new').onclick = async () => {
+  const vals = rnValues(), f = rnForm().elements, pics = rnPics(), d = rn;
+  $('#rn-dlg').close();
+  await npOpen();
+  const w = np().elements;
+  const set = (k, v) => { if (w[k] && v) { w[k].value = v; w[k].dispatchEvent(new Event('input', { bubbles: true })); } };
+  set('name', f.name.value.trim()); set('code', f.code.value.trim());
+  for (const k of ['issuedOn', 'reviewedOn', 'preparedBy', 'approvedBy', 'contactEmail', 'contactPhone']) set(k, vals[k]);
+  for (const [k, url] of Object.entries(pics)) await np().querySelector(`.np-pic[data-pic="${k}"]`)?._set({ dataUrl: url, ext: d.pictures[k].ext || 'png' }, `✓ From last year's policy · ${d.pictures[k].source || ''}`);
+  npPreview();
+  toast('The new facility is filled in from last year\'s policy – check each step, then create the policy pack.');
+};
+
 /** The toolkit page: the chosen tool (still to come) and every tool of the section. */
 var tkTools = null;
 async function loadToolkit(tool) {

@@ -284,6 +284,7 @@
       </div>
       <div class="pw-head-side">
         <span class="pp-badge" id="pp-status">–</span>
+        <button class="btn primary" id="rn-open" data-write title="Upload last year's policy (PDF or Word): its details, dates, version history, logo, signature and stamp are taken over for this year">↻ Renew from last year's policy</button>
         <button class="btn" id="pp-new" data-write>＋ New facility</button>
       </div>
     </header>
@@ -1341,6 +1342,49 @@
     <p class="muted small" id="ds-prev-desc"></p>
     <div class="ds-prev-frame"><iframe id="ds-prev-frame" title="Document preview"></iframe><div class="ds-prev-load" id="ds-prev-load"><span class="spin"></span> Preparing the preview with Microsoft Word – a few seconds…</div></div>
     <div class="btn-row ds-prev-foot"><span id="ds-prev-files"></span><span class="ds-prev-act" id="ds-prev-act"></span></div>
+  </form>
+</dialog>
+<dialog id="rn-dlg" class="rn-dlg" aria-labelledby="rn-title">
+  <form method="dialog" id="rn-form" novalidate>
+    <header class="act-head"><div><h2 id="rn-title">Annual renewal – last year's policy</h2><p class="muted small">Upload last year's finalised policy (PDF or Word). Its details, dates, version history, logo, signature and stamp are read on this PC – you check everything before it is used.</p></div><button class="icon-btn" value="close" aria-label="Close">✕</button></header>
+    <label class="rn-drop" id="rn-drop"><input type="file" id="rn-file" accept=".pdf,.docx,.doc" hidden><b>Drop last year's policy here</b><span class="muted small">or click to choose – PDF, Word (.docx / .doc)</span></label>
+    <div id="rn-msg" role="status"></div>
+    <div id="rn-body" hidden>
+      <div class="rn-match" id="rn-match"></div>
+      <div class="rn-grid">
+        <section class="card rn-sec"><h3>Facility</h3>
+          <label>Facility name<input name="name" maxlength="120"></label>
+          <label>Facility code<input name="code" maxlength="20"></label>
+        </section>
+        <section class="card rn-sec"><h3>Dates for this year's cycle</h3>
+          <table class="rn-dates"><thead><tr><th></th><th>Last year</th><th>This year</th></tr></thead><tbody>
+            <tr><th>Issued on</th><td id="rn-prev-issued">–</td><td><input type="date" name="issuedOn"></td></tr>
+            <tr><th>Reviewed on</th><td id="rn-prev-reviewed">–</td><td><input type="date" name="reviewedOn"></td></tr>
+            <tr><th>Due for Revision on</th><td id="rn-prev-due">–</td><td><b id="rn-due">–</b> <small class="muted">a year after the review</small></td></tr>
+          </tbody></table>
+        </section>
+        <section class="card rn-sec"><h3>People &amp; incident contact</h3>
+          <label>Prepared by<input name="preparedBy" maxlength="80"></label>
+          <label>Approved by<input name="approvedBy" maxlength="80"></label>
+          <label>Contact e-mail<input name="contactEmail" type="email" maxlength="120"></label>
+          <label>Contact phone<input name="contactPhone" maxlength="30"></label>
+        </section>
+        <section class="card rn-sec" id="rn-policy-sec"><h3>The policy</h3>
+          <p id="rn-policy" class="rn-policy"></p>
+          <label>Version<select name="version"><option>1.0</option><option>2.0</option><option>3.0</option><option>4.0</option><option>5.0</option></select></label>
+          <label>What changed in this version<input name="change" maxlength="300" placeholder="NILL for version 1"></label>
+          <label class="rn-check"><input type="checkbox" name="usePolicy" checked> Carry this version and change over to the policy pack</label>
+          <ol class="rn-history" id="rn-history"></ol>
+        </section>
+      </div>
+      <section class="card rn-sec"><h3>Pictures found</h3><div class="rn-pics" id="rn-pics"></div></section>
+      <ul class="rn-warn" id="rn-warn"></ul>
+      <footer class="rn-foot">
+        <span class="muted small" id="rn-note">Nothing is saved until you choose below.</span>
+        <button type="button" class="btn" id="rn-new">＋ Start a new facility with these details</button>
+        <button type="button" class="btn primary" id="rn-apply">Apply to this facility</button>
+      </footer>
+    </div>
   </form>
 </dialog>
 <dialog id="act-dlg" class="act-dlg" aria-labelledby="act-title">

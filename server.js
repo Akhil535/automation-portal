@@ -23,6 +23,7 @@ import { MODULE_KEYS, buildPackage, packageTree } from './src/package.js';
 import { allowedSet, checkFreeRows, freeRegisterRows, maskMaster, checkChecklistItem, checkTrialApply, checklistFree, claim, claimUpload, maskChecklist, createdFacilities, facilityAllowance, isTrial, planInfo, setTrialLimits, trialLimits, upgradeError, upgradeUrl } from './src/plans.js';
 import { previewForm } from './src/hrforms.js';
 import { trackerData, trackerXlsx, savePolicyChange } from './src/doctracker.js';
+import { applyRenewal, extractRenewal } from './src/renewal.js';
 import { PPT_STYLES, TOOLS, buildPpt, cyberState, pptPdf, pptThumb, saveCyber, saveMaster as saveCyberMaster, trialFacility } from './src/cyberppt.js';
 import { addForms, addItem, checklistXlsx, crossCheck, formFile, formsStatus, formsZip, generateForms, getChecklist, pdfState, prewarmPdfs, saveDocSettings, GROUPS, importMasterChecklist, listForms, masterChecklist, removeForm, removeItem, resetChecklist, updateItem } from './src/hrforms.js';
 import { documentHeader, sendMail } from './src/mailer.js';
@@ -112,7 +113,7 @@ app.use((req, res, next) => {
 });
 
 // What the "New facility" wizard needs before the user has any facility (see the facility check below).
-const NEW_PACK = new Set(['/api/policies', '/api/policies/preview', '/api/policies/picture-detect', '/api/policies/picture-preview']);
+const NEW_PACK = new Set(['/api/policies', '/api/policies/preview', '/api/policies/picture-detect', '/api/policies/picture-preview', '/api/policies/renewal-extract']);
 
 // Role required for each kind of request, and the facility it concerns.
 function requiredRole(req) {
@@ -554,6 +555,20 @@ app.put('/api/policies/templates/:no/paragraphs', wrap(async (req, res) => {
 // (a document style is set only with PUT /api/doc-styles/facility, which checks Premium)
 app.put('/api/policies/settings', wrap(async (req, res) => { const { docStyle, ...body } = req.body || {}; const r = saveSettings(facId(req), body); prewarmPdfs(facId(req)); res.json(r); }));
 /** One drop for all pictures (any mix of photos, PDF, Word): each found picture goes to its slot - logo, signature, stamp. */
+/**
+ * Annual renewal: last year's policy (PDF / Word) is read – facility, people, contacts, dates, version history, logo,
+ * signature and stamp – and this year's dates are proposed. Nothing is saved (see renewal-apply).
+ */
+app.post('/api/policies/renewal-extract', express.raw({ type: () => true, limit: '60mb' }), wrap(async (req, res) => {
+  if (!req.body?.length) throw new Error('No file received');
+  res.json(await extractRenewal(req.body, path.basename(String(req.query.name || 'policy.pdf')), { facilityId: req.newPackOnly ? null : facId(req) }));
+}));
+/** Apply the reviewed renewal details to this facility (dates, names, contacts, the policy's version / change, pictures). */
+app.post('/api/policies/renewal-apply', express.json({ limit: '40mb' }), wrap(async (req, res) => {
+  const r = await applyRenewal(facId(req), req.body || {});
+  prewarmPdfs(facId(req));
+  res.json(r);
+}));
 app.post('/api/policies/picture-detect', express.json({ limit: '60mb' }), wrap(async (req, res) => {
   const files = (req.body?.files || []).map(f => { const m = /^data:[^;]*;base64,(.+)$/.exec(f.data || ''); return m ? { name: String(f.name || 'upload'), buffer: Buffer.from(m[1], 'base64') } : null; }).filter(Boolean);
   if (!files.length) throw new Error('No file received');

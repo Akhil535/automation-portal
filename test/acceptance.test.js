@@ -1632,3 +1632,46 @@ test('15. logos keep their own background; only signatures and stamps are made t
   assert.ok(await alpha0(cleared) > 0, 'signature / stamp clean-up still removes the background');
   fs.rmSync(tmp, { recursive: true, force: true });
 });
+
+test('16. annual renewal: last year\'s policy is read, new dates proposed, and applied after review', async () => {
+  const R = await import('../src/renewal.js');
+  const P = await import('../src/policyprep.js');
+  const { loadFacilities, loadConfig } = await import('../src/config.js');
+  const id = loadFacilities().default;
+  const tpl = P.listTemplates()[0];
+  assert.ok(tpl, 'a master policy exists (earlier tests)');
+  const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+  const p = t => `<w:p><w:r><w:t xml:space="preserve">${t}</w:t></w:r></w:p>`;
+  const row = (...c) => `<w:tr>${c.map(t => `<w:tc>${p(t)}</w:tc>`).join('')}</w:tr>`;
+  const nn = String(tpl.no).padStart(2, '0');
+  const body = p('SUNRISE MEDICAL CENTER') + p(String(tpl.title)) +
+    `<w:tbl>${row('Policy ID', `SMC / ADHICS - PO${nn}`)}${row('Issued on', '01/03/2024')}${row('Reviewed on', '05/03/2025')}${row('Due for Revision on', '05/03/2026')}` +
+    `${row('Prepared by', 'Ms. Lina Haddad')}${row('Approved by', 'Dr. Omar Aziz')}${row('Facility Name', 'SUNRISE MEDICAL CENTER')}${row('Version', '2.0')}</w:tbl>` +
+    p('Report incidents to it@sunrise-mc.ae or +971 2 555 1234.') +
+    `<w:tbl>${row('S. No', 'Version No.', 'Amendments', 'Date')}${row('1', '1.0', 'New', '01/03/2024')}${row('2', '2.0', 'Access review steps added', '05/03/2025')}</w:tbl>`;
+  const zip = new JSZip();
+  zip.file('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
+  zip.file('_rels/.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
+  zip.file('word/document.xml', `<?xml version="1.0" encoding="UTF-8"?><w:document ${W}><w:body>${body}</w:body></w:document>`);
+  const buf = await zip.generateAsync({ type: 'nodebuffer' });
+  const r = await R.extractRenewal(buf, 'last-year.docx', { facilityId: id });
+  assert.equal(r.facility.name, 'SUNRISE MEDICAL CENTER'); assert.equal(r.facility.code, 'SMC');
+  assert.equal(r.details.preparedBy, 'Ms. Lina Haddad'); assert.equal(r.details.approvedBy, 'Dr. Omar Aziz');
+  assert.equal(r.details.contactEmail, 'it@sunrise-mc.ae');
+  assert.deepEqual([r.previous.issuedOn, r.previous.reviewedOn, r.previous.dueOn], ['2024-03-01', '2025-03-05', '2026-03-05']);
+  assert.equal(r.policy?.no, tpl.no, 'the policy is recognised by its ID');
+  assert.equal(r.policy.version, '2.0'); assert.equal(r.policy.change, 'Access review steps added');
+  assert.equal(r.history.length, 2);
+  // this year's cycle: the issue date stays, reviewed today, due a year later
+  const today = R.todayDubai();
+  assert.equal(r.proposed.issuedOn, '2024-03-01'); assert.equal(r.proposed.reviewedOn, today);
+  assert.equal(r.proposed.dueOn, `${Number(today.slice(0, 4)) + 1}${today.slice(4)}`);
+  assert.equal(r.current?.matches, false, 'another facility than the one open is said');
+  // applied after review: dates, people, contact, the policy's version and change
+  const before = P.prepSettings(loadConfig(id));
+  const out = await R.applyRenewal(id, { issuedOn: r.proposed.issuedOn, reviewedOn: r.proposed.reviewedOn, preparedBy: 'Ms. Lina Haddad', approvedBy: 'Dr. Omar Aziz', contactEmail: 'it@sunrise-mc.ae', policy: { no: tpl.no, version: '2.0', change: 'Access review steps added' } });
+  assert.equal(out.settings.reviewedOn, today); assert.equal(out.settings.dueOn, r.proposed.dueOn);
+  assert.equal(out.settings.versions[tpl.no], '2.0'); assert.equal(out.settings.descriptions[tpl.no], 'Access review steps added');
+  await assert.rejects(R.applyRenewal(id, { policy: { no: tpl.no, version: '3.0', change: '' } }), /change description/, 'version 2+ still needs its change');
+  P.saveSettings(id, { issuedOn: before.issuedOn, reviewedOn: before.reviewedOn, preparedBy: before.preparedBy, approvedBy: before.approvedBy, contactEmail: before.contactEmail, versions: before.versions, descriptions: before.descriptions });
+});
